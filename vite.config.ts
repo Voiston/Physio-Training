@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
+    base: './',
     plugins: [
       react(),
       tailwindcss(),
@@ -14,15 +15,15 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
-          id: '/',
+          id: './',
           name: 'PhysioTracker PRO',
           short_name: 'PhysioPro',
           description: "Suivi des effets résiduels d'entraînement, courbes EMA et préparation athlétique.",
           theme_color: '#0a0a0c',
           background_color: '#0a0a0c',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
+          start_url: './',
+          scope: './',
           icons: [
             {
               src: '/pwa-192x192.png',

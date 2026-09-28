@@ -75,6 +75,7 @@ export interface TargetCompetition {
   date: string;
   type: string; // 'marathon' | 'trail' | 'triathlon' | 'force' | 'course' | 'autre'
   targetTsb: number; // e.g. 15 to 25
+  targetTime?: string;
   notes?: string;
 }
 
