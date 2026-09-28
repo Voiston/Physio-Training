@@ -85,6 +85,9 @@ export interface SessionData {
   fatigue?: number;
   duration?: number;
   load: number;
+  loadCardio?: number;
+  loadMusc?: number;
+  isEccentric?: boolean;
   isSecondary?: boolean;
   parentQId?: string;
   originalLoad?: number;

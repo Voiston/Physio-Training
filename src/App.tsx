@@ -10,6 +10,7 @@ import RadarChart from './components/RadarChart';
 import MetricsDashboard from './components/MetricsDashboard';
 import TrainingBlocksModal from './components/TrainingBlocksModal';
 import SmartSuggestions from './components/SmartSuggestions';
+import { PeriodizationView } from './components/PeriodizationView';
 import { CompetitionModal } from './components/CompetitionModal';
 import { TrainingReportModal } from './components/TrainingReportModal';
 import { PhysiologicalSettingsModal } from './components/PhysiologicalSettingsModal';
@@ -18,7 +19,7 @@ import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
-  Trophy, FileText, Sparkles, Sliders 
+  Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target 
 } from 'lucide-react';
 
 export default function App() {
@@ -64,6 +65,7 @@ export default function App() {
     commitSimulation
   } = useData();
 
+  const [activeTab, setActiveTab] = useState<'grid' | 'physiology' | 'qualities' | 'periodization'>('grid');
   const [modalInfo, setModalInfo] = useState<any>(null);
   const [metricModalInfo, setMetricModalInfo] = useState<any>(null);
   const [qualityChartInfo, setQualityChartInfo] = useState<any>(null);
@@ -94,98 +96,65 @@ export default function App() {
       {/* Indicateur mode hors-ligne */}
       <OfflineIndicator />
 
-      <div className="relative z-10 flex flex-col h-full gap-6 max-w-[1550px] mx-auto">
+      <div className="relative z-10 flex flex-col h-full gap-5 max-w-[1550px] mx-auto">
         
         {/* Header Section */}
-        <header className="flex flex-wrap items-center justify-between px-4 lg:px-6 py-4 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md shadow-2xl gap-4">
+        <header className="flex flex-wrap items-center justify-between px-4 lg:px-6 py-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md shadow-2xl gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-500/20 rounded-xl shadow-inner border border-blue-500/30 text-blue-400">
-              <Activity className="w-6 h-6" />
+              <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight">PhysioTracker</h1>
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight">PhysioTracker</h1>
                 <span className="px-2 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm">
                   PRO
                 </span>
               </div>
-              <p className="text-xs text-slate-400 uppercase tracking-widest hidden sm:block">
+              <p className="text-[11px] text-slate-400 uppercase tracking-widest hidden sm:block">
                 Charge Banister, Courbes EMA & Affûtage
               </p>
             </div>
           </div>
           
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Bouton PWA Install */}
             <PWAInstallButton />
 
             {/* Bouton Mode Simulation (What-If) */}
             <button
               onClick={() => toggleSimulation()}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
                 isSimulationActive 
                   ? 'bg-purple-600 text-white border-purple-400 shadow-lg shadow-purple-500/25 animate-pulse' 
                   : 'bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/30'
               }`}
               title="Tester des séances prévisionnelles et anticiper la forme (TSB) future"
             >
-              <Sparkles size={15} className={isSimulationActive ? 'animate-spin-slow' : ''} />
+              <Sparkles size={14} className={isSimulationActive ? 'animate-spin-slow' : ''} />
               <span className="hidden sm:inline">{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
               <span className="sm:hidden">Simu</span>
-            </button>
-
-            {/* Bouton Objectif Compétition */}
-            <button
-              onClick={() => setShowCompetitionModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-sm"
-              title="Définir ou suivre votre compétition cible et affûtage"
-            >
-              <Trophy size={15} className="text-amber-400 shrink-0" />
-              {targetCompetition ? (
-                <span className="truncate max-w-[130px] sm:max-w-[180px]">
-                  {taperingAnalysis?.daysRemaining >= 0 ? `J-${taperingAnalysis.daysRemaining}` : 'Objectif'}
-                </span>
-              ) : (
-                <span className="hidden sm:inline">Objectif</span>
-              )}
-            </button>
-
-            {/* Bouton Export Bilan PDF */}
-            <button
-              onClick={() => setShowReportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer"
-              title="Générer un bilan hebdomadaire ou mensuel PDF pour votre entraîneur"
-            >
-              <FileText size={15} className="text-blue-400 shrink-0" />
-              <span className="hidden sm:inline">Bilan PDF</span>
             </button>
 
             {/* Bouton Calibrage Constantes Physiologiques */}
             <button
               onClick={() => setShowPhysioSettingsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               title="Calibrer les constantes de rémanence Banister (tau fatigue 5-12j, tau condition 21-45j)"
             >
-              <Sliders size={15} className="text-indigo-400 shrink-0" />
+              <Sliders size={14} className="text-indigo-400 shrink-0" />
               <span className="hidden md:inline font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</span>
               <span className="md:hidden">τ</span>
             </button>
 
-            {/* Bouton Blocs de Préparation */}
-            <button 
-              onClick={() => setShowBlocksModal(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600/25 to-purple-600/25 hover:from-blue-600/35 hover:to-purple-600/35 border border-blue-500/30 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-lg"
+            {/* Bouton Export Bilan PDF */}
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              title="Générer un bilan hebdomadaire ou mensuel PDF pour votre entraîneur"
             >
-              <Calendar size={15} className="text-blue-400 shrink-0" />
-              {activeBlockToday ? (
-                <div className="flex items-center gap-1.5 text-xs text-left">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="font-bold text-white hidden md:inline">Bloc :</span>
-                  <span className="text-blue-300 font-bold truncate max-w-[90px]">{activeBlockToday.name}</span>
-                </div>
-              ) : (
-                <span className="text-xs hidden sm:inline">Blocs</span>
-              )}
+              <FileText size={14} className="text-blue-400 shrink-0" />
+              <span className="hidden sm:inline">Bilan PDF</span>
             </button>
 
             {/* Import / Export JSON */}
@@ -194,7 +163,7 @@ export default function App() {
               className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-xl transition-all cursor-pointer"
               title="Importer des données JSON"
             >
-              <FileUp size={15} />
+              <FileUp size={14} />
             </button>
             <input 
               type="file" 
@@ -208,10 +177,78 @@ export default function App() {
               className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-xl transition-all cursor-pointer"
               title="Exporter toutes les données en JSON"
             >
-              <FileDown size={15} />
+              <FileDown size={14} />
             </button>
           </div>
         </header>
+
+        {/* BARRE D'ONGLETS PRINCIPALE */}
+        <nav className="flex items-center gap-1.5 p-1.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md overflow-x-auto custom-scrollbar shadow-lg">
+          <button
+            onClick={() => setActiveTab('grid')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'grid'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Calendar size={15} />
+            <span>1. Grille & Planification</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('physiology')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'physiology'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <TrendingUp size={15} />
+            <span>2. Analyses Physiologiques & Banister</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+              (banisterPerformance?.current?.tsb ?? 0) >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+            }`}>
+              {(banisterPerformance?.current?.tsb ?? 0) >= 0 ? `+${banisterPerformance?.current?.tsb ?? 0}` : banisterPerformance?.current?.tsb} TSB
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('qualities')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'qualities'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Layers size={15} />
+            <span>3. Qualités & Rémanence EMA</span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/10 text-slate-300">
+              {qualities.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('periodization')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'periodization'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Target size={15} />
+            <span>4. Périodisation & Objectifs</span>
+            {activeBlockToday ? (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 truncate max-w-[100px]">
+                {activeBlockToday.name}
+              </span>
+            ) : targetCompetition ? (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
+                J-{taperingAnalysis?.daysRemaining}
+              </span>
+            ) : null}
+          </button>
+        </nav>
 
         {/* Bannière active du mode Simulation What-If */}
         <SimulationBanner
@@ -225,180 +262,233 @@ export default function App() {
           onCommit={commitSimulation}
         />
 
-        {/* Main Body Layout */}
-        <div className="flex flex-col xl:flex-row gap-6 min-h-0">
-          
-          {/* Left Sidebar */}
-          <aside className="w-full xl:w-80 flex flex-col gap-6 shrink-0">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
-              <RadarChart 
-                qualities={qualities} 
-                events={events} 
-                dailyMetrics={dailyMetrics} 
-                trainingBlocks={trainingBlocks}
-              />
-            </div>
+        {/* CONTENU SELON L'ONGLET ACTIF */}
 
-            {/* Widget Bloc de Préparation Actif */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
-              <div className="flex items-center justify-between mb-2.5">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar size={13} className="text-blue-400" />
-                  Cycle de Préparation
-                </h3>
-                <button
-                  onClick={() => setShowBlocksModal(true)}
-                  className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline"
-                >
-                  {activeBlockToday ? 'Gérer' : 'Planifier'}
-                </button>
+        {/* ONGLET 1 : GRILLE & PLANIFICATION */}
+        {activeTab === 'grid' && (
+          <div className="flex flex-col xl:flex-row gap-6 min-h-0 animate-fadeIn">
+            
+            {/* Left Sidebar */}
+            <aside className="w-full xl:w-80 flex flex-col gap-6 shrink-0">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
+                <RadarChart 
+                  qualities={qualities} 
+                  events={events} 
+                  dailyMetrics={dailyMetrics} 
+                  trainingBlocks={trainingBlocks}
+                />
               </div>
 
-              {activeBlockToday ? (
-                <div className="space-y-3">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-purple-950/20 to-transparent border border-blue-500/30">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-sm text-white">{activeBlockToday.name}</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        Sem. {blockProgress?.currentWeek}/{activeBlockToday.durationWeeks}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] text-slate-400 font-mono mb-2">
-                      Fin le {activeBlockToday.endDate} • reste {blockProgress?.remainingDays} j
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
-                      <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
-                        style={{ width: `${blockProgress?.percent || 0}%` }}
-                      />
-                    </div>
-
-                    {/* Impacts Summary */}
-                    <div className="space-y-1.5 text-[11px] border-t border-white/5 pt-2">
-                      <div className="flex items-center gap-1.5 text-red-300">
-                        <Zap size={11} className="text-red-400 shrink-0" />
-                        <span className="font-semibold">Fréquence accrue (-25%) :</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 pl-4 leading-tight">
-                        {activeBlockToday.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ')}
-                      </p>
-
-                      <div className="flex items-center gap-1.5 text-sky-300 pt-1">
-                        <Shield size={11} className="text-sky-400 shrink-0" />
-                        <span className="font-semibold">Maintien (+35% délai prolongé) :</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 pl-4 leading-tight">
-                        Reste des séances bénéficient d'un intervalle étendu.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-center">
-                  <p className="text-xs text-slate-300 font-medium mb-1">Aucun bloc actif</p>
-                  <p className="text-[10px] text-slate-500 mb-3">
-                    Déclarez un bloc spécifique (ex: Force max 4 sem., Seuil/VMA 3 sem.) pour rythmer votre progression.
-                  </p>
+              {/* Widget Bloc de Préparation Actif */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
+                <div className="flex items-center justify-between mb-2.5">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 m-0">
+                    <Calendar size={13} className="text-blue-400" />
+                    Cycle de Préparation
+                  </h3>
                   <button
                     onClick={() => setShowBlocksModal(true)}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                    className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline"
                   >
-                    <Plus size={13} /> Déclarer un bloc (3, 4, 6 sem.)
+                    {activeBlockToday ? 'Gérer' : 'Planifier'}
                   </button>
                 </div>
-              )}
-            </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md shadow-xl text-sm text-slate-300">
-              <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Guide Physiologique EMA</h3>
-              <ul className="space-y-4 text-xs">
-                <li className="flex gap-3 items-start">
-                  <span className="text-red-400 font-bold text-base leading-none mt-0.5">•</span>
-                  <span className="leading-relaxed"><strong>EMA 3j (Aiguë) :</strong> Reflète l'état de fatigue immédiat et le stress du système nerveux.</span>
-                </li>
-                <li className="flex gap-3 items-start">
-                  <span className="text-amber-400 font-bold text-base leading-none mt-0.5">•</span>
-                  <span className="leading-relaxed"><strong>EMA 7j (Récente / ATL) :</strong> Fatigue aiguë accumulée sur la semaine courante.</span>
-                </li>
-                <li className="flex gap-3 items-start">
-                  <span className="text-sky-400 font-bold text-base leading-none mt-0.5">•</span>
-                  <span className="leading-relaxed"><strong>EMA 21j (Chronique / CTL) :</strong> Charge de fond / condition physique durable (Fitness).</span>
-                </li>
-                <li className="flex gap-3 items-start">
-                  <span className="text-emerald-400 font-bold text-base leading-none mt-0.5">•</span>
-                  <span className="leading-relaxed"><strong>Forme Banister (TSB) :</strong> CTL - ATL. Supérieur à +15 pour le pic de forme en compétition.</span>
-                </li>
-              </ul>
-            </div>
-          </aside>
+                {activeBlockToday ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-purple-950/20 to-transparent border border-blue-500/30">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-sm text-white">{activeBlockToday.name}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          Sem. {blockProgress?.currentWeek}/{activeBlockToday.durationWeeks}
+                        </span>
+                      </div>
 
-          {/* Center Content */}
-          <main className="flex-1 min-w-0 flex flex-col gap-6">
-            {/* Suggestions & Priorités d'entraînement algorithmiques */}
-            <SmartSuggestions 
-              recommendations={trainingRecommendations}
-              activeBlock={activeBlockToday}
-              onOpenSessionModal={(q) => {
-                setModalInfo({ 
-                  qId: q.id, 
-                  qName: q.name, 
-                  dateStr: todayStr, 
-                  currentData: events[q.id]?.[todayStr] 
-                });
-              }}
-              onReorderByUrgency={reorderByUrgency}
-              onReorderByBlock={() => reorderByBlockFocus(activeBlockToday)}
-              onResetOrder={resetQualitiesOrder}
-            />
+                      <div className="text-[11px] text-slate-400 font-mono mb-2">
+                        Fin le {activeBlockToday.endDate} • reste {blockProgress?.remainingDays} j
+                      </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto backdrop-blur-md shadow-xl custom-scrollbar flex-1 w-full">
-              <Grid 
-                timeline={timeline} 
-                events={events} 
-                qualities={qualities} 
-                dailyMetrics={dailyMetrics}
-                qualitiesEMA={qualitiesEMA}
-                trainingBlocks={trainingBlocks}
-                moveQuality={moveQuality}
-                onCellClick={(q: any, dateStr: string, currentData: any) => setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData })}
-                onQualityClick={(q: any) => setQualityChartInfo(q)}
-                onMetricClick={(dateStr: string, type: string, currentValue: any) => {
-                  setMetricModalInfo({
-                    type,
-                    dateStr,
-                    currentValue,
-                    title: type === 'readiness' ? 'Readiness Score' : 'VFC Matinale',
-                    label: type === 'readiness' ? 'Score (1 à 10)' : 'Valeur VFC (ms)',
-                    min: 1,
-                    max: type === 'readiness' ? 10 : 300,
-                    placeholder: type === 'readiness' ? 'Ex: 7' : 'Ex: 65'
+                      {/* Progress Bar */}
+                      <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
+                        <div 
+                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
+                          style={{ width: `${blockProgress?.percent || 0}%` }}
+                        />
+                      </div>
+
+                      {/* Impacts Summary */}
+                      <div className="space-y-1.5 text-[11px] border-t border-white/5 pt-2">
+                        <div className="flex items-center gap-1.5 text-red-300">
+                          <Zap size={11} className="text-red-400 shrink-0" />
+                          <span className="font-semibold">Fréquence accrue (-25%) :</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
+                          {activeBlockToday.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ')}
+                        </p>
+
+                        <div className="flex items-center gap-1.5 text-sky-300 pt-1">
+                          <Shield size={11} className="text-sky-400 shrink-0" />
+                          <span className="font-semibold">Maintien (+35% délai prolongé) :</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
+                          Reste des séances bénéficient d'un intervalle étendu.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-center">
+                    <p className="text-xs text-slate-300 font-medium mb-1">Aucun bloc actif</p>
+                    <p className="text-[10px] text-slate-500 mb-3">
+                      Déclarez un bloc spécifique (ex: Force max 4 sem., Seuil/VMA 3 sem.) pour rythmer votre progression.
+                    </p>
+                    <button
+                      onClick={() => setShowBlocksModal(true)}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      <Plus size={13} /> Déclarer un bloc (3, 4, 6 sem.)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md shadow-xl text-sm text-slate-300">
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider m-0">Guide Physiologique EMA</h3>
+                <ul className="space-y-4 text-xs p-0 m-0 list-none">
+                  <li className="flex gap-3 items-start">
+                    <span className="text-red-400 font-bold text-base leading-none mt-0.5">•</span>
+                    <span className="leading-relaxed"><strong>EMA 3j (Aiguë) :</strong> Reflète l'état de fatigue immédiat et le stress du système nerveux.</span>
+                  </li>
+                  <li className="flex gap-3 items-start">
+                    <span className="text-amber-400 font-bold text-base leading-none mt-0.5">•</span>
+                    <span className="leading-relaxed"><strong>EMA 7j (Récente / ATL) :</strong> Fatigue aiguë accumulée sur la semaine courante.</span>
+                  </li>
+                  <li className="flex gap-3 items-start">
+                    <span className="text-sky-400 font-bold text-base leading-none mt-0.5">•</span>
+                    <span className="leading-relaxed"><strong>EMA 21j (Chronique / CTL) :</strong> Charge de fond / condition physique durable (Fitness).</span>
+                  </li>
+                  <li className="flex gap-3 items-start">
+                    <span className="text-emerald-400 font-bold text-base leading-none mt-0.5">•</span>
+                    <span className="leading-relaxed"><strong>Forme Banister (TSB) :</strong> CTL - ATL. Supérieur à +15 pour le pic de forme en compétition.</span>
+                  </li>
+                </ul>
+              </div>
+            </aside>
+
+            {/* Center Content */}
+            <main className="flex-1 min-w-0 flex flex-col gap-6">
+              {/* Suggestions & Priorités d'entraînement algorithmiques */}
+              <SmartSuggestions 
+                recommendations={trainingRecommendations}
+                activeBlock={activeBlockToday}
+                onOpenSessionModal={(q) => {
+                  setModalInfo({ 
+                    qId: q.id, 
+                    qName: q.name, 
+                    dateStr: todayStr, 
+                    currentData: events[q.id]?.[todayStr] 
                   });
                 }}
+                onReorderByUrgency={reorderByUrgency}
+                onReorderByBlock={() => reorderByBlockFocus(activeBlockToday)}
+                onResetOrder={resetQualitiesOrder}
               />
-            </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full">
-              <MetricsDashboard 
-                events={events} 
-                dailyMetrics={dailyMetrics} 
-                qualities={qualities}
-                qualitiesEMA={qualitiesEMA}
-                fosterMetrics={fosterMetrics}
-                taperingAnalysis={taperingAnalysis}
-                cardioMuscularBalance={cardioMuscularBalance}
-                isSimulationActive={isSimulationActive}
-                physioSettings={physioSettings}
-                onOpenCompetitionModal={() => setShowCompetitionModal(true)}
-                onOpenReportModal={() => setShowReportModal(true)}
-                onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
-                onToggleSimulation={toggleSimulation}
-              />
-            </div>
-          </main>
-        </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto backdrop-blur-md shadow-xl custom-scrollbar flex-1 w-full">
+                <Grid 
+                  timeline={timeline} 
+                  events={events} 
+                  qualities={qualities} 
+                  dailyMetrics={dailyMetrics}
+                  qualitiesEMA={qualitiesEMA}
+                  trainingBlocks={trainingBlocks}
+                  moveQuality={moveQuality}
+                  onCellClick={(q: any, dateStr: string, currentData: any) => setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData })}
+                  onQualityClick={(q: any) => setQualityChartInfo(q)}
+                  onMetricClick={(dateStr: string, type: string, currentValue: any) => {
+                    setMetricModalInfo({
+                      type,
+                      dateStr,
+                      currentValue,
+                      title: type === 'readiness' ? 'Readiness Score' : 'VFC Matinale',
+                      label: type === 'readiness' ? 'Score (1 à 10)' : 'Valeur VFC (ms)',
+                      min: 1,
+                      max: type === 'readiness' ? 10 : 300,
+                      placeholder: type === 'readiness' ? 'Ex: 7' : 'Ex: 65'
+                    });
+                  }}
+                />
+              </div>
+            </main>
+          </div>
+        )}
+
+        {/* ONGLET 2 : ANALYSES PHYSIOLOGIQUES & BANISTER */}
+        {activeTab === 'physiology' && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
+            <MetricsDashboard 
+              events={events} 
+              dailyMetrics={dailyMetrics} 
+              qualities={qualities}
+              qualitiesEMA={qualitiesEMA}
+              fosterMetrics={fosterMetrics}
+              taperingAnalysis={taperingAnalysis}
+              cardioMuscularBalance={cardioMuscularBalance}
+              isSimulationActive={isSimulationActive}
+              physioSettings={physioSettings}
+              viewMode="physiology"
+              onOpenCompetitionModal={() => setShowCompetitionModal(true)}
+              onOpenReportModal={() => setShowReportModal(true)}
+              onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
+              onToggleSimulation={toggleSimulation}
+            />
+          </div>
+        )}
+
+        {/* ONGLET 3 : QUALITÉS & RÉMANENCE EMA */}
+        {activeTab === 'qualities' && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
+            <MetricsDashboard 
+              events={events} 
+              dailyMetrics={dailyMetrics} 
+              qualities={qualities}
+              qualitiesEMA={qualitiesEMA}
+              fosterMetrics={fosterMetrics}
+              taperingAnalysis={taperingAnalysis}
+              cardioMuscularBalance={cardioMuscularBalance}
+              isSimulationActive={isSimulationActive}
+              physioSettings={physioSettings}
+              viewMode="qualities"
+              onOpenCompetitionModal={() => setShowCompetitionModal(true)}
+              onOpenReportModal={() => setShowReportModal(true)}
+              onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
+              onToggleSimulation={toggleSimulation}
+            />
+          </div>
+        )}
+
+        {/* ONGLET 4 : PÉRIODISATION & OBJECTIFS */}
+        {activeTab === 'periodization' && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
+            <PeriodizationView
+              activeBlock={activeBlockToday}
+              blocks={trainingBlocks}
+              templates={blockTemplates}
+              qualities={qualities}
+              targetCompetition={targetCompetition}
+              taperingAnalysis={taperingAnalysis}
+              fosterMetrics={fosterMetrics}
+              banisterPerformance={banisterPerformance}
+              cardioMuscularBalance={cardioMuscularBalance}
+              physioSettings={physioSettings}
+              onOpenBlocksModal={() => setShowBlocksModal(true)}
+              onOpenCompetitionModal={() => setShowCompetitionModal(true)}
+              onOpenReportModal={() => setShowReportModal(true)}
+              onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
+            />
+          </div>
+        )}
+
       </div>
 
       {modalInfo && (
@@ -465,6 +555,7 @@ export default function App() {
           targetCompetition={targetCompetition}
           fosterMetrics={fosterMetrics}
           banisterPerformance={banisterPerformance}
+          cardioMuscularBalance={cardioMuscularBalance}
           onClose={() => setShowReportModal(false)}
         />
       )}
@@ -481,3 +572,4 @@ export default function App() {
     </div>
   );
 }
+

@@ -6,7 +6,8 @@ import {
 import { 
   AlertTriangle, TrendingUp, TrendingDown, Activity, Sparkles, 
   Minus, ArrowUp, ArrowDown, Info, Gauge, Trophy, FileText, 
-  ShieldAlert, Play, CheckCircle2, Sliders, Heart, Dumbbell, Flame 
+  ShieldAlert, Play, CheckCircle2, Sliders, Heart, Dumbbell, Flame,
+  Search, X, Layers, SlidersHorizontal
 } from 'lucide-react';
 import { calculateEMA } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
@@ -22,6 +23,7 @@ export default function MetricsDashboard({
   cardioMuscularBalance = null,
   isSimulationActive = false,
   physioSettings = null,
+  viewMode = 'all', // 'all' | 'physiology' | 'qualities'
   onOpenCompetitionModal = null,
   onOpenReportModal = null,
   onOpenPhysioSettingsModal = null,
@@ -30,6 +32,15 @@ export default function MetricsDashboard({
   const [selectedQualityId, setSelectedQualityId] = useState(qualities[0]?.id || 'vo2max');
   // 'period' = période caractéristique (J-3, J-7, J-21), 'daily' = hier (J-1), 'week' = semaine passée (J-7)
   const [trendBasis, setTrendBasis] = useState('period');
+  const [qualitySearch, setQualitySearch] = useState('');
+
+  const showPhysiology = viewMode === 'all' || viewMode === 'physiology';
+  const showQualities = viewMode === 'all' || viewMode === 'qualities';
+
+  const filteredQualities = useMemo(() => {
+    if (!qualitySearch.trim()) return qualities;
+    return qualities.filter(q => q.name.toLowerCase().includes(qualitySearch.toLowerCase()));
+  }, [qualities, qualitySearch]);
 
   const tauFatigue = physioSettings?.tauFatigue || 7;
   const tauFitness = physioSettings?.tauFitness || 28;
@@ -413,8 +424,10 @@ export default function MetricsDashboard({
   return (
     <div className="p-4 md:p-6 w-full flex flex-col gap-6">
       
-      {/* BARRE D'ACTIONS SCIENTIFIQUES : SIMULATION, OBJECTIF & EXPORT */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+      {showPhysiology && (
+        <>
+          {/* BARRE D'ACTIONS SCIENTIFIQUES : SIMULATION, OBJECTIF & EXPORT */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
             <Gauge size={16} />
@@ -721,10 +734,91 @@ export default function MetricsDashboard({
         </div>
       )}
 
+          {/* GRAPHIQUES GLOBAUX BANISTER + VFC */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[300px] min-h-0">
+            
+            {/* GRAPHIQUE 1 : Charge Globale (Banister) */}
+            <div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-0 relative">
+              <div className="flex items-center justify-between mb-2 shrink-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold m-0 flex items-center gap-1.5">
+                    <Activity size={12} className="text-blue-400" />
+                    Charge Globale & Forme Banister (ATL, CTL, TSB)
+                  </p>
+                  {onOpenPhysioSettingsModal && (
+                    <button
+                      onClick={onOpenPhysioSettingsModal}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-colors cursor-pointer"
+                      title="Modifier les constantes de rémanence tau"
+                    >
+                      τ₁:{tauFatigue}j / τ₂:{tauFitness}j
+                    </button>
+                  )}
+                </div>
+                {isSimulationActive && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    Projection Future Active (+14j)
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 w-full min-h-[180px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorAigue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorChronique" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                    
+                    <Area type="monotone" dataKey="loadEMA7" name={`Fatigue Aiguë ATL (${tauFatigue}j)`} stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorAigue)" />
+                    <Area type="monotone" dataKey="loadEMA21" name={`Condition CTL (${tauFitness}j)`} stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorChronique)" />
+                    <Line type="monotone" dataKey="tsb" name="Forme TSB (Readiness)" stroke="#10b981" strokeWidth={2.5} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* GRAPHIQUE 2 : Tendance VFC */}
+            <div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-0 relative">
+              <p className="text-[10px] text-slate-500 uppercase font-bold mb-2 shrink-0">
+                Tendances de Récupération VFC (HRV)
+              </p>
+              <div className="flex-1 w-full min-h-[180px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                    
+                    <Line type="monotone" dataKey="vfc" name="VFC Nette" stroke="rgba(255,255,255,0.2)" strokeWidth={1} dot={{ r: 2, fill: 'rgba(255,255,255,0.2)', strokeWidth: 0 }} connectNulls />
+                    <Line type="monotone" dataKey="vfcEMA3" name="VFC EMA 3j" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="vfcEMA7" name="VFC Ligne de Base (EMA 7j)" stroke="#ec4899" strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+          </div>
+        </>
+      )}
+
       {/* FOCUS QUALITÉ INDIVIDUELLE : COURBES EMA 3 / 7 / 21 JOURS & TENDANCES */}
-      {qualities.length > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+      {showQualities && qualities.length > 0 && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-5">
+          {/* EN-TÊTE DE LA SECTION QUALITÉS & SÉLECTEUR DE TENDANCE */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
@@ -739,74 +833,119 @@ export default function MetricsDashboard({
               </h3>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Sélecteur de base de comparaison de tendance */}
-              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]">
-                <span className="text-slate-400 px-1 text-[10px] font-semibold flex items-center gap-1">
-                  <Gauge size={11} className="text-blue-400" />
-                  Tendance vs :
+            {/* Sélecteur de base de comparaison de tendance */}
+            <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]">
+              <span className="text-slate-400 px-1 text-[10px] font-semibold flex items-center gap-1">
+                <Gauge size={11} className="text-blue-400" />
+                Tendance vs :
+              </span>
+              <button
+                onClick={() => setTrendBasis('period')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  trendBasis === 'period'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Compare chaque EMA à sa période caractéristique : EMA 3j vs J-3, EMA 7j vs J-7, EMA 21j vs J-21"
+              >
+                Période (3j/7j/21j)
+              </button>
+              <button
+                onClick={() => setTrendBasis('daily')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  trendBasis === 'daily'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Compare l'EMA d'aujourd'hui à celle d'hier (J-1)"
+              >
+                J-1 (Veille)
+              </button>
+              <button
+                onClick={() => setTrendBasis('week')}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  trendBasis === 'week'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Compare l'EMA d'aujourd'hui à celle de la semaine passée (J-7)"
+              >
+                J-7 (Semaine)
+              </button>
+            </div>
+          </div>
+
+          {/* SÉLECTEUR DE QUALITÉS DÉDIÉ (PLEINE LARGEUR, TOUTES VISIBLES SANS DÉPASSEMENT) */}
+          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <Layers size={14} className="text-blue-400" />
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Sélectionnez une filière d'entraînement :
                 </span>
-                <button
-                  onClick={() => setTrendBasis('period')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                    trendBasis === 'period'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Compare chaque EMA à sa période caractéristique : EMA 3j vs J-3, EMA 7j vs J-7, EMA 21j vs J-21"
-                >
-                  Période (3j/7j/21j)
-                </button>
-                <button
-                  onClick={() => setTrendBasis('daily')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                    trendBasis === 'daily'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Compare l'EMA d'aujourd'hui à celle d'hier (J-1)"
-                >
-                  J-1 (Veille)
-                </button>
-                <button
-                  onClick={() => setTrendBasis('week')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                    trendBasis === 'week'
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Compare l'EMA d'aujourd'hui à celle de la semaine passée (J-7)"
-                >
-                  J-7 (Semaine)
-                </button>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-white/5 text-slate-400 border border-white/5">
+                  {filteredQualities.length}/{qualities.length}
+                </span>
               </div>
 
-              {/* Sélecteur de qualité sous forme de pilules défilables */}
-              <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 custom-scrollbar">
-                {qualities.map(q => {
-                  const isSelected = q.id === selectedQualityId;
-                  const qEma = qualitiesEMA[q.id]?.current;
-                  const d = trendBasis === 'daily' ? (qEma?.delta3 ?? 0) : (qEma?.periodDelta3 ?? 0);
-                  const isUp = d > 0.05;
-                  const isDown = d < -0.05;
-
-                  return (
-                    <button
-                      key={q.id}
-                      onClick={() => setSelectedQualityId(q.id)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer flex items-center gap-1.5 ${
-                        isSelected 
-                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-sm' 
-                          : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      <span>{q.name}</span>
-                      {isUp && <ArrowUp size={11} className="stroke-[3] text-emerald-400" />}
-                      {isDown && <ArrowDown size={11} className="stroke-[3] text-red-400" />}
-                    </button>
-                  );
-                })}
+              {/* Barre de recherche instantanée */}
+              <div className="relative flex items-center min-w-[180px] max-w-xs">
+                <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={qualitySearch}
+                  onChange={(e) => setQualitySearch(e.target.value)}
+                  placeholder="Rechercher une qualité..."
+                  className="w-full pl-8 pr-7 py-1 text-xs bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-white/10 transition-all"
+                />
+                {qualitySearch && (
+                  <button
+                    onClick={() => setQualitySearch('')}
+                    className="absolute right-2 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
+            </div>
+
+            {/* Grille fluide / Pills de toutes les qualités avec retour à la ligne automatique */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {filteredQualities.map(q => {
+                const isSelected = q.id === selectedQualityId;
+                const qEma = qualitiesEMA[q.id]?.current;
+                const d = trendBasis === 'daily' ? (qEma?.delta3 ?? 0) : trendBasis === 'week' ? (qEma?.weekDelta3 ?? 0) : (qEma?.periodDelta3 ?? 0);
+                const isUp = d > 0.05;
+                const isDown = d < -0.05;
+                const val3 = qEma?.ema3 ?? 0;
+
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => setSelectedQualityId(q.id)}
+                    className={`group px-3 py-1.5 rounded-xl text-xs transition-all border cursor-pointer flex items-center gap-2 ${
+                      isSelected 
+                        ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/30 font-bold' 
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <span>{q.name}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      isSelected ? 'bg-black/30 text-blue-100' : 'bg-black/40 text-slate-400'
+                    }`}>
+                      {val3}
+                    </span>
+                    {isUp && <ArrowUp size={11} className={`stroke-[3] ${isSelected ? 'text-emerald-300' : 'text-emerald-400'}`} />}
+                    {isDown && <ArrowDown size={11} className={`stroke-[3] ${isSelected ? 'text-red-200' : 'text-red-400'}`} />}
+                  </button>
+                );
+              })}
+
+              {filteredQualities.length === 0 && (
+                <div className="text-xs text-slate-400 py-2 italic w-full text-center">
+                  Aucune qualité ne correspond à "{qualitySearch}".
+                </div>
+              )}
             </div>
           </div>
 
@@ -989,7 +1128,7 @@ export default function MetricsDashboard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {qualities.map((q, idx) => {
+                  {filteredQualities.map((q, idx) => {
                     const qInfo = qualitiesEMA[q.id]?.current || { 
                       ema3: 0, ema7: 0, ema21: 0, acwr: 1, 
                       prevEma3: 0, prevEma7: 0, prevEma21: 0,
@@ -1118,83 +1257,6 @@ export default function MetricsDashboard({
         </div>
       )}
 
-      {/* GRAPHIQUES GLOBAUX */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[260px] min-h-0">
-        
-        {/* GRAPHIQUE 1 : Charge Globale (Banister) */}
-        <div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-0 relative">
-          <div className="flex items-center justify-between mb-2 shrink-0">
-            <div className="flex items-center gap-2">
-              <p className="text-[10px] text-slate-500 uppercase font-bold m-0 flex items-center gap-1.5">
-                <Activity size={12} className="text-blue-400" />
-                Charge Globale & Forme Banister (ATL, CTL, TSB)
-              </p>
-              {onOpenPhysioSettingsModal && (
-                <button
-                  onClick={onOpenPhysioSettingsModal}
-                  className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-colors cursor-pointer"
-                  title="Modifier les constantes de rémanence tau"
-                >
-                  τ₁:{tauFatigue}j / τ₂:{tauFitness}j
-                </button>
-              )}
-            </div>
-            {isSimulationActive && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Projection Future Active (+14j)
-              </span>
-            )}
-          </div>
-          <div className="flex-1 w-full min-h-[160px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorAigue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorChronique" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                
-                <Area type="monotone" dataKey="loadEMA7" name={`Fatigue Aiguë ATL (${tauFatigue}j)`} stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorAigue)" />
-                <Area type="monotone" dataKey="loadEMA21" name={`Condition CTL (${tauFitness}j)`} stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#colorChronique)" />
-                <Line type="monotone" dataKey="tsb" name="Forme TSB (Readiness)" stroke="#10b981" strokeWidth={2.5} dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* GRAPHIQUE 2 : Tendance VFC */}
-        <div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-0 relative">
-          <p className="text-[10px] text-slate-500 uppercase font-bold mb-2 shrink-0">
-            Tendances de Récupération VFC (HRV)
-          </p>
-          <div className="flex-1 w-full min-h-[160px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                
-                <Line type="monotone" dataKey="vfc" name="VFC Nette" stroke="rgba(255,255,255,0.2)" strokeWidth={1} dot={{ r: 2, fill: 'rgba(255,255,255,0.2)', strokeWidth: 0 }} connectNulls />
-                <Line type="monotone" dataKey="vfcEMA3" name="VFC EMA 3j" stroke="#10b981" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="vfcEMA7" name="VFC Ligne de Base (EMA 7j)" stroke="#ec4899" strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-      </div>
     </div>
   );
 }
