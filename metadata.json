@@ -1,0 +1,6 @@
+{
+  "name": "PhysioTracker PRO",
+  "description": "Suivi des effets résiduels d'entraînement, courbes EMA (3, 7, 21 jours) et préparation athlétique",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
