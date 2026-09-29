@@ -559,8 +559,12 @@ export default function App() {
         <ScoreModal 
           info={modalInfo}
           qualities={qualities}
+          events={events}
           onClose={() => setModalInfo(null)}
-          onSave={(sessionData: any, applyImpacts: boolean) => saveEventWithImpacts(modalInfo.qId, modalInfo.dateStr, sessionData, applyImpacts)}
+          onSave={(sessionData: any, applyImpacts: boolean, targetDateStr?: string) => {
+            const finalDate = targetDateStr || modalInfo.dateStr;
+            saveEventWithImpacts(modalInfo.qId, finalDate, sessionData, applyImpacts);
+          }}
         />
       )}
 
