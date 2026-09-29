@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import { 
   AreaChart, Area, ComposedChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer 
+  Tooltip, Legend, ResponsiveContainer, ReferenceLine 
 } from 'recharts';
 import { 
   AlertTriangle, TrendingUp, TrendingDown, Activity, Sparkles, 
   Minus, ArrowUp, ArrowDown, Info, Gauge, Trophy, FileText, 
   ShieldAlert, Play, CheckCircle2, Sliders, Heart, Dumbbell, Flame,
-  Search, X, Layers, SlidersHorizontal, BarChart3
+  Search, X, Layers, SlidersHorizontal, BarChart3, Calendar, Clock,
+  Pin, RotateCcw, Zap, Filter
 } from 'lucide-react';
 import { calculateEMA } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
@@ -38,6 +39,117 @@ function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }
   );
 }
 
+/**
+ * Mini-jauge circulaire de rémanence restante (SVG haute précision)
+ */
+function CircularRemanenceGauge({ percent = 0, size = 42, strokeWidth = 3.5, color = '#10b981' }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clampedPercent = Math.max(0, Math.min(100, percent));
+  const offset = circumference - (clampedPercent / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255, 255, 255, 0.1)"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          fill="transparent"
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[10px] font-black font-mono text-white">
+          {clampedPercent}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Formate une date YYYY-MM-DD en français complet pour l'inspection de séance
+ */
+function formatFullInspectionDate(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const weekdays = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  return `${weekdays[dt.getDay()]} ${d} ${months[m - 1]} ${y}`;
+}
+
+/**
+ * Interprétation dynamique en langage clair du bilan Banister
+ */
+function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28) {
+  if (!dayData) return null;
+  const { tsb = 0, loadEMA7 = 0, loadEMA21 = 0, load = 0 } = dayData;
+  const atl = loadEMA7;
+  const ctl = loadEMA21;
+  const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
+
+  let zoneTitle = '';
+  let zoneColor = 'text-slate-200';
+  let zoneBadge = 'bg-slate-700/30 text-slate-300 border-slate-600';
+  let summary = '';
+  let prescription = '';
+
+  if (tsb > 25) {
+    zoneTitle = 'Sur-affûtage / Repos Prolongé';
+    zoneColor = 'text-amber-400';
+    zoneBadge = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+    summary = `Fraîcheur nerveuse maximale (TSB ${tsb > 0 ? `+${tsb}` : tsb}), mais risque de désentraînement amorcé si cette période dépasse 7 jours. La condition de fond CTL (${ctl} pts) commence à fléchir face au manque de stimulation.`;
+    prescription = 'Programmer un rappel d\'intensité ou une reprise progressive pour relancer l\'adaptation sans accumuler de fatigue excessive.';
+  } else if (tsb >= 10) {
+    zoneTitle = 'Pic de Forme Idéal (Sweet Spot)';
+    zoneColor = 'text-emerald-400';
+    zoneBadge = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+    summary = `Équilibre optimal entre condition acquise (${ctl} pts) et dissipation de la fatigue aiguë (${atl} pts). Fenêtre privilégiée pour performer en compétition ou tester ses records.`;
+    prescription = 'Maintien de la fraîcheur avec quelques intensités courtes et ciblées, sans volume épuisant.';
+  } else if (tsb >= 0) {
+    zoneTitle = 'Zone Neutre / Récupération Active';
+    zoneColor = 'text-sky-400';
+    zoneBadge = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+    summary = `Fatigue aiguë et condition sont à l'équilibre (TSB ${tsb > 0 ? `+${tsb}` : tsb}). L'organisme a bien absorbé les charges récentes et reste disponible.`;
+    prescription = 'Propice à une séance d\'entretien foncier ou au lancement d\'un nouveau microcycle.';
+  } else if (tsb >= -15) {
+    zoneTitle = 'Entraînement Productif Modéré';
+    zoneColor = 'text-indigo-300';
+    zoneBadge = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
+    summary = `Charge stimulante bien absorbée. L'accumulation de fatigue aiguë (${atl} pts) prépare la future surcompensation de votre condition de fond (${ctl} pts). Ratio ACWR ${acwr}x.`;
+    prescription = 'Poursuivre la progression en veillant au sommeil et aux délais de rémanence des filières.';
+  } else if (tsb >= -30) {
+    zoneTitle = 'Charge d\'Accumulation Intensive';
+    zoneColor = 'text-purple-300';
+    zoneBadge = 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+    summary = `Fatigue aiguë substantielle (TSB ${tsb}, ATL ${atl} pts). L'organisme subit un stress important nécessaire pour franchir un palier athlétique supérieur.`;
+    prescription = 'Prévoir une phase d\'assimilation ou une journée allégée dans les 48 heures pour éviter la rupture.';
+  } else {
+    zoneTitle = 'Surcharge Aiguë Critique';
+    zoneColor = 'text-rose-400';
+    zoneBadge = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+    summary = `Déficit de fraîcheur sévère (TSB ${tsb}, ATL ${atl} pts). Risque élevé de surmenage, d'immuno-dépression ou de blessure musculaire.`;
+    prescription = 'Repos complet ou régénération active impérative. Interdiction de planifier des intensités maximales.';
+  }
+
+  return { zoneTitle, zoneColor, zoneBadge, summary, prescription, acwr };
+}
+
 export default function MetricsDashboard({ 
   events = {}, 
   dailyMetrics = {}, 
@@ -63,6 +175,11 @@ export default function MetricsDashboard({
   const [activeTooltip, setActiveTooltip] = useState(null); // 'tsb' | 'atl' | 'ctl' | null
   const [banisterCurves, setBanisterCurves] = useState({ atl: true, ctl: true, tsb: true });
   const [vfcCurves, setVfcCurves] = useState({ vfc: true, ema3: true, ema7: true });
+
+  // Nouveaux états d'interactivité : inspection d'un point Banister et filtre du ruban de rémanence
+  const [selectedBanisterDay, setSelectedBanisterDay] = useState(null);
+  const [isDayPinned, setIsDayPinned] = useState(false);
+  const [remanenceFilter, setRemanenceFilter] = useState('all'); // 'all' | 'urgent' | 'recall' | 'optimal'
 
   const showPhysiology = viewMode === 'all' || viewMode === 'physiology';
   const showQualities = viewMode === 'all' || viewMode === 'qualities';
@@ -99,7 +216,7 @@ export default function MetricsDashboard({
   const tauFatigue = physioSettings?.tauFatigue || 7;
   const tauFitness = physioSettings?.tauFitness || 28;
 
-  // 1. Préparation des données globales Banister & VFC pour Recharts (avec projection future)
+  // 1. Préparation des données globales Banister & VFC pour Recharts (avec projection future et sessions détaillées)
   const chartData = useMemo(() => {
     const today = new Date();
     const rawData = [];
@@ -113,14 +230,43 @@ export default function MetricsDashboard({
       
       const vfc = dailyMetrics[dateStr]?.vfc || null;
       let totalLoad = 0;
+      const daySessions = [];
       
-      Object.values(events).forEach(qualityDates => {
+      Object.entries(events).forEach(([qualityId, qualityDates]) => {
         if (qualityDates && qualityDates[dateStr]) {
           const item = qualityDates[dateStr];
-          if (typeof item === 'object' && item.load !== undefined) {
-            totalLoad += Number(item.load) || 0;
+          const qDef = qualities.find(q => q.id === qualityId);
+          let sLoad = 0;
+          let duration = 0;
+          let rpeM = 5;
+          let rpeC = 5;
+          let notes = '';
+          let sessionType = '';
+
+          if (typeof item === 'object' && item !== null) {
+            sLoad = Number(item.load) || 0;
+            duration = Number(item.duration) || 0;
+            rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
+            rpeC = item.rpeCardio ?? 5;
+            notes = item.notes || '';
+            sessionType = item.type || '';
           } else if (typeof item === 'number') {
-            totalLoad += item * 5;
+            sLoad = item * 5;
+          }
+
+          totalLoad += sLoad;
+
+          if (sLoad > 0 || duration > 0) {
+            daySessions.push({
+              qualityId,
+              qualityName: qDef?.name || qualityId,
+              load: sLoad,
+              duration,
+              rpeM,
+              rpeC,
+              notes,
+              sessionType
+            });
           }
         }
       });
@@ -132,7 +278,8 @@ export default function MetricsDashboard({
         isToday: i === 0,
         isFuture: i > 0,
         vfc, 
-        load: totalLoad 
+        load: totalLoad,
+        sessions: daySessions
       });
     }
 
@@ -157,10 +304,171 @@ export default function MetricsDashboard({
         loadEMA3: Math.round(loadEMA3[i]),
         loadEMA7: atl,
         loadEMA21: ctl,
-        tsb
+        tsb,
+        sessions: data.sessions || []
       };
     });
-  }, [events, dailyMetrics, isSimulationActive, taperingAnalysis, tauFatigue, tauFitness]);
+  }, [events, dailyMetrics, isSimulationActive, taperingAnalysis, tauFatigue, tauFitness, qualities]);
+
+  // Jour inspecté actif (synchronisé par clic ou survol sur la courbe Banister)
+  const currentInspectedDay = useMemo(() => {
+    if (selectedBanisterDay) return selectedBanisterDay;
+    const todayItem = chartData.find(d => d.isToday);
+    if (todayItem) return todayItem;
+    const nonFuture = chartData.filter(d => !d.isFuture);
+    return nonFuture[nonFuture.length - 1] || chartData[chartData.length - 1] || null;
+  }, [selectedBanisterDay, chartData]);
+
+  // Interprétation dynamique Banister pour le jour inspecté
+  const banisterInterpretation = useMemo(() => {
+    return getDynamicBanisterInterpretation(currentInspectedDay, tauFatigue, tauFitness);
+  }, [currentInspectedDay, tauFatigue, tauFitness]);
+
+  // 1b. Calcul du ruban de rémanence immédiat pour toutes les qualités
+  const remanenceStatusList = useMemo(() => {
+    const today = new Date();
+    const todayStr = getLocalYYYYMMDD(today);
+
+    return qualities.map((q, index) => {
+      const rank = index + 1;
+      const qEvents = events[q.id] || {};
+      const dates = Object.keys(qEvents)
+        .filter(d => d <= todayStr && qEvents[d])
+        .sort();
+
+      let lastDate = null;
+      let daysSince = null;
+      let lastSession = null;
+
+      if (dates.length > 0) {
+        lastDate = dates[dates.length - 1];
+        lastSession = qEvents[lastDate];
+        const diffMs = today.getTime() - new Date(lastDate).getTime();
+        daysSince = Math.max(0, Math.floor(diffMs / (1000 * 3600 * 24)));
+      }
+
+      const plateauDays = q.g || 4; // Durée de gain / plateau (jours)
+      const declineDays = q.o || 3; // Durée de déclin (jours)
+      const totalRemanenceWindow = plateauDays + declineDays;
+
+      // Calcul de la jauge circulaire de rémanence restante (0% à 100%)
+      let remainingPercent = 0;
+      let statusKey = 'decondition';
+      let statusLabel = 'Désentraînement';
+      let statusColor = 'text-rose-400';
+      let statusBg = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      let statusIcon = AlertTriangle;
+      let actionAdvice = 'Séance de rappel nécessaire';
+
+      if (daysSince === null) {
+        remainingPercent = 0;
+        statusKey = 'decondition';
+        statusLabel = 'Non stimulée';
+        statusColor = 'text-slate-400';
+        statusBg = 'bg-white/5 text-slate-400 border-white/10';
+        actionAdvice = 'Aucune séance enregistrée';
+      } else if (daysSince === 0) {
+        remainingPercent = 100;
+        statusKey = 'optimal';
+        statusLabel = 'Travaillée aujourd\'hui';
+        statusColor = 'text-emerald-400';
+        statusBg = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+        statusIcon = CheckCircle2;
+        actionAdvice = 'Assimilation en cours (J+0)';
+      } else if (daysSince <= plateauDays) {
+        // En plateau : effet résiduel plein
+        remainingPercent = Math.round(100 - (daysSince / plateauDays) * 20); // 100% -> 80%
+        statusKey = 'optimal';
+        statusLabel = `En plateau (J+${daysSince})`;
+        statusColor = 'text-emerald-400';
+        statusBg = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+        statusIcon = CheckCircle2;
+        const daysToRecall = plateauDays - daysSince;
+        actionAdvice = daysToRecall === 0 
+          ? 'Fin de plateau : rappel demain' 
+          : `Acquis protégés encore ${daysToRecall}j`;
+      } else if (daysSince <= plateauDays + 2) {
+        // Fenêtre de rappel critique
+        remainingPercent = Math.round(75 - ((daysSince - plateauDays) / 2) * 35); // 75% -> 40%
+        statusKey = 'recall';
+        statusLabel = `Fenêtre de rappel (J+${daysSince})`;
+        statusColor = 'text-amber-400';
+        statusBg = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+        statusIcon = Zap;
+        actionAdvice = 'Rappel idéal sous 24h-48h';
+      } else if (daysSince <= totalRemanenceWindow) {
+        // Déclin amorcé
+        const elapsedDecline = daysSince - plateauDays;
+        remainingPercent = Math.max(10, Math.round(40 * (1 - elapsedDecline / declineDays)));
+        statusKey = 'decline';
+        statusLabel = `Déclin amorcé (J+${daysSince})`;
+        statusColor = 'text-orange-400';
+        statusBg = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+        statusIcon = TrendingDown;
+        actionAdvice = 'Dégradation des gains en cours';
+      } else {
+        // Désentraînement complet
+        remainingPercent = 0;
+        statusKey = 'decondition';
+        statusLabel = `Désentraînement (J+${daysSince})`;
+        statusColor = 'text-rose-400';
+        statusBg = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+        statusIcon = AlertTriangle;
+        actionAdvice = 'Capacité désentraînée';
+      }
+
+      const qEma = qualitiesEMA[q.id]?.current;
+      const ema3 = qEma?.ema3 ?? 0;
+      const ema7 = qEma?.ema7 ?? 0;
+      const ema21 = qEma?.ema21 ?? 0;
+
+      return {
+        quality: q,
+        rank,
+        daysSince,
+        lastDate,
+        lastSession,
+        plateauDays,
+        declineDays,
+        totalRemanenceWindow,
+        remainingPercent,
+        statusKey,
+        statusLabel,
+        statusColor,
+        statusBg,
+        statusIcon,
+        actionAdvice,
+        ema3,
+        ema7,
+        ema21
+      };
+    });
+  }, [qualities, events, qualitiesEMA]);
+
+  const urgentCount = useMemo(() => {
+    return remanenceStatusList.filter(item => item.statusKey === 'decondition' || item.statusKey === 'decline').length;
+  }, [remanenceStatusList]);
+
+  const recallCount = useMemo(() => {
+    return remanenceStatusList.filter(item => item.statusKey === 'recall').length;
+  }, [remanenceStatusList]);
+
+  const optimalCount = useMemo(() => {
+    return remanenceStatusList.filter(item => item.statusKey === 'optimal').length;
+  }, [remanenceStatusList]);
+
+  const filteredRemanenceList = useMemo(() => {
+    if (remanenceFilter === 'urgent') {
+      return remanenceStatusList.filter(item => item.statusKey === 'decondition' || item.statusKey === 'decline');
+    }
+    if (remanenceFilter === 'recall') {
+      return remanenceStatusList.filter(item => item.statusKey === 'recall');
+    }
+    if (remanenceFilter === 'optimal') {
+      return remanenceStatusList.filter(item => item.statusKey === 'optimal');
+    }
+    return remanenceStatusList;
+  }, [remanenceStatusList, remanenceFilter]);
 
   // Données de la qualité sélectionnée pour le graphique dédié EMA 3/7/21j
   const activeQualityData = useMemo(() => {
@@ -263,7 +571,7 @@ export default function MetricsDashboard({
       const isTod = dataItem?.isToday;
 
       return (
-        <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.5)]">
+        <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.5)] max-w-xs">
           <div className="flex items-center justify-between gap-3 mb-2 pb-1 border-b border-white/10">
             <span className="font-bold text-slate-100 uppercase text-[10px] tracking-wider font-mono">
               {dataItem?.dateStr || `Jour ${label}`}
@@ -285,6 +593,23 @@ export default function MetricsDashboard({
               <span className="font-mono font-bold">{p.value}</span>
             </p>
           ))}
+
+          {/* Séances associées à cette date */}
+          {dataItem?.sessions && dataItem.sessions.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-white/10">
+              <span className="text-[10px] text-slate-400 font-semibold block mb-1">
+                🏋️ {dataItem.sessions.length} séance(s) réalisée(s) :
+              </span>
+              <div className="space-y-1">
+                {dataItem.sessions.map((s, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 text-[10px] bg-white/5 px-1.5 py-0.5 rounded">
+                    <span className="truncate max-w-[130px] font-medium text-slate-200">{s.qualityName}</span>
+                    <span className="font-mono font-bold text-amber-300 shrink-0">{s.load} pts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -1403,7 +1728,21 @@ export default function MetricsDashboard({
 
               <div className="flex-1 w-full min-h-[220px] relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                  <AreaChart 
+                    data={chartData} 
+                    margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                    onMouseMove={(e) => {
+                      if (!isDayPinned && e && e.activePayload && e.activePayload[0]) {
+                        setSelectedBanisterDay(e.activePayload[0].payload);
+                      }
+                    }}
+                    onClick={(e) => {
+                      if (e && e.activePayload && e.activePayload[0]) {
+                        setSelectedBanisterDay(e.activePayload[0].payload);
+                        setIsDayPinned(true);
+                      }
+                    }}
+                  >
                     <defs>
                       <linearGradient id="colorAigue" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
@@ -1419,6 +1758,15 @@ export default function MetricsDashboard({
                     <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     
+                    {currentInspectedDay && (
+                      <ReferenceLine 
+                        x={currentInspectedDay.day} 
+                        stroke="#38bdf8" 
+                        strokeWidth={2} 
+                        strokeDasharray="3 3" 
+                      />
+                    )}
+
                     {banisterCurves.atl && (
                       <Area type="monotone" dataKey="loadEMA7" name={`Fatigue Aiguë ATL (${tauFatigue}j)`} stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorAigue)" />
                     )}
@@ -1510,12 +1858,369 @@ export default function MetricsDashboard({
             </div>
 
           </div>
+
+          {/* POINT 4 : PANNEAU D'INSPECTION & DIAGNOSTIC DYNAMIQUE DE CHARGE BANISTER */}
+          {currentInspectedDay && banisterInterpretation && (
+            <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
+              {/* En-tête avec date inspectée, badge temporel, état épinglé et bouton retour aujourd'hui */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                    <Calendar size={16} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-white capitalize m-0">
+                        {formatFullInspectionDate(currentInspectedDay.dateStr)}
+                      </h4>
+                      {currentInspectedDay.isToday ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/25 text-blue-300 border border-blue-500/40">
+                          Aujourd'hui (Jour J)
+                        </span>
+                      ) : currentInspectedDay.isFuture ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-500/25 text-purple-300 border border-purple-500/40">
+                          Projection (+{currentInspectedDay.offset}j)
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-slate-300 border border-white/10">
+                          J{currentInspectedDay.offset}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 mb-0">
+                      Cliquez sur la courbe Banister pour figer une date et inspecter l'impact de chaque entraînement
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {isDayPinned ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-xl">
+                      <Pin size={12} className="text-amber-400" /> Date Épinglée
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl font-mono">
+                      Survol interactif
+                    </span>
+                  )}
+
+                  {(!currentInspectedDay.isToday || isDayPinned) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const todayItem = chartData.find(d => d.isToday);
+                        setSelectedBanisterDay(todayItem || null);
+                        setIsDayPinned(false);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-blue-300 hover:text-blue-200 border border-white/10 transition-colors cursor-pointer"
+                      title="Réinitialiser l'inspection sur la date d'aujourd'hui"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Aujourd'hui</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 4 Métriques Clés Instantanées du Jour Inspecté */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Forme TSB */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                    Forme (TSB)
+                  </span>
+                  <div className="flex items-baseline gap-2 my-1">
+                    <span className={`text-2xl font-black font-mono ${
+                      currentInspectedDay.tsb >= 10 ? 'text-emerald-400' :
+                      currentInspectedDay.tsb >= 0 ? 'text-sky-300' :
+                      currentInspectedDay.tsb >= -25 ? 'text-indigo-300' : 'text-rose-400'
+                    }`}>
+                      {currentInspectedDay.tsb > 0 ? `+${currentInspectedDay.tsb}` : currentInspectedDay.tsb}
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block truncate ${banisterInterpretation.zoneBadge}`}>
+                    {banisterInterpretation.zoneTitle}
+                  </span>
+                </div>
+
+                {/* Fatigue Aiguë ATL */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                    Fatigue Aiguë (ATL)
+                  </span>
+                  <div className="flex items-baseline gap-2 my-1">
+                    <span className="text-2xl font-black font-mono text-rose-400">
+                      {currentInspectedDay.loadEMA7}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">pts</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Moyenne mobile {tauFatigue}j
+                  </span>
+                </div>
+
+                {/* Condition CTL */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                    Condition Durable (CTL)
+                  </span>
+                  <div className="flex items-baseline gap-2 my-1">
+                    <span className="text-2xl font-black font-mono text-sky-400">
+                      {currentInspectedDay.loadEMA21}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">pts</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Moyenne mobile {tauFitness}j
+                  </span>
+                </div>
+
+                {/* Charge Quotidienne */}
+                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                    Charge Quotidienne
+                  </span>
+                  <div className="flex items-baseline gap-2 my-1">
+                    <span className="text-2xl font-black font-mono text-amber-300">
+                      {currentInspectedDay.load}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">pts</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {currentInspectedDay.sessions?.length || 0} séance(s) ce jour
+                  </span>
+                </div>
+              </div>
+
+              {/* Explication Contextuelle Rédigée en Français Clair */}
+              <div className="p-3.5 rounded-xl bg-black/30 border border-white/5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-blue-400 shrink-0" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Diagnostic Physiologique & Recommandation
+                  </span>
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed m-0">
+                  {banisterInterpretation.summary}
+                </p>
+                <p className="text-xs text-emerald-300 font-medium bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg m-0">
+                  🎯 <strong>Conseil d'entraînement :</strong> {banisterInterpretation.prescription}
+                </p>
+              </div>
+
+              {/* Séances Enregistrées Réalisées Ce Jour-Là */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-slate-300 flex items-center gap-1.5">
+                    <Dumbbell size={13} className="text-blue-400" />
+                    Séances Réalisées Ce Jour ({currentInspectedDay.sessions?.length || 0})
+                  </span>
+                </div>
+
+                {currentInspectedDay.sessions && currentInspectedDay.sessions.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {currentInspectedDay.sessions.map((s, idx) => (
+                      <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col justify-between gap-1 hover:border-blue-500/30 transition-all">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-white truncate">
+                            {s.qualityName}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            {s.load} pts
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-1">
+                          <span>⏱️ {s.duration} min</span>
+                          <span>RPE Card: {s.rpeC}/10 · Musc: {s.rpeM}/10</span>
+                        </div>
+                        {s.notes && (
+                          <p className="text-[10px] text-slate-400 italic line-clamp-1 m-0 pt-1 border-t border-white/5">
+                            « {s.notes} »
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-xs text-slate-400 text-center">
+                    🌿 Journée de repos (0 point de charge) — Favorable à l'abaissement de la fatigue aiguë ATL et au relèvement du TSB.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
       {/* FOCUS QUALITÉ INDIVIDUELLE : COURBES EMA 3 / 7 / 21 JOURS & TENDANCES */}
       {showQualities && qualities.length > 0 && (
-        <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
+        <div className="flex flex-col gap-6">
+          {/* POINT 5 : RUBAN DE STATUT DE RÉMANENCE IMMÉDIAT (« QUICK STATUS BAR ») */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-white/10 space-y-3.5 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    <Layers size={16} />
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider m-0">
+                    Ruban de Statut de Rémanence Immédiat
+                  </h4>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                    {qualities.length} Filières
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 mb-0">
+                  Surveillance en direct de l'effet résiduel, des paliers de stabilisation et des urgences de rappel
+                </p>
+              </div>
+
+              {/* Filtres rapides d'urgence du ruban */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setRemanenceFilter('all')}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                    remanenceFilter === 'all'
+                      ? 'bg-blue-600 text-white border-blue-400 shadow-sm font-bold'
+                      : 'bg-white/5 text-slate-400 hover:text-white border-white/5'
+                  }`}
+                >
+                  Toutes ({remanenceStatusList.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRemanenceFilter('urgent')}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                    remanenceFilter === 'urgent'
+                      ? 'bg-rose-600 text-white border-rose-400 shadow-sm font-bold'
+                      : 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border-rose-500/30'
+                  }`}
+                >
+                  <span>🚨 Déclin & Urgence</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-black/40 font-bold">
+                    {urgentCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRemanenceFilter('recall')}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                    remanenceFilter === 'recall'
+                      ? 'bg-amber-600 text-white border-amber-400 shadow-sm font-bold'
+                      : 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border-amber-500/30'
+                  }`}
+                >
+                  <span>⚡ Rappel (24-48h)</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-black/40 font-bold">
+                    {recallCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRemanenceFilter('optimal')}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                    remanenceFilter === 'optimal'
+                      ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm font-bold'
+                      : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border-emerald-500/30'
+                  }`}
+                >
+                  <span>✅ Consolidées</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-black/40 font-bold">
+                    {optimalCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Défilement horizontal des cartes de rémanence express */}
+            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar pt-1">
+              {filteredRemanenceList.map(item => {
+                const isSelected = item.quality.id === selectedQualityId;
+                const IconComponent = item.statusIcon;
+
+                // Couleur de jauge dynamique selon le % restant
+                const gaugeColor = 
+                  item.remainingPercent >= 70 ? '#10b981' :
+                  item.remainingPercent >= 40 ? '#f59e0b' :
+                  item.remainingPercent > 0 ? '#f97316' : '#ef4444';
+
+                return (
+                  <div
+                    key={item.quality.id}
+                    onClick={() => setSelectedQualityId(item.quality.id)}
+                    className={`shrink-0 w-64 p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between select-none ${
+                      isSelected
+                        ? 'bg-blue-950/60 border-blue-400 ring-2 ring-blue-500/60 shadow-lg shadow-blue-500/20'
+                        : 'bg-slate-900/80 border-white/10 hover:border-white/20 hover:bg-slate-900'
+                    }`}
+                    title="Cliquer pour afficher les courbes EMA et l'historique complet de cette qualité"
+                  >
+                    {/* Header : Rang (#1, #2...) + Nom + Jauge circulaire */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-300'
+                          }`}>
+                            #{item.rank}
+                          </span>
+                          <span className="text-xs font-bold text-white truncate block">
+                            {item.quality.name}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono mt-1 block">
+                          Fenêtre : {item.plateauDays}j g + {item.declineDays}j o
+                        </span>
+                      </div>
+
+                      {/* Mini-jauge circulaire SVG avec % exact */}
+                      <CircularRemanenceGauge 
+                        percent={item.remainingPercent} 
+                        color={gaugeColor} 
+                        size={40} 
+                        strokeWidth={3.5} 
+                      />
+                    </div>
+
+                    {/* Badge de statut immédiat */}
+                    <div className="mb-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${item.statusBg}`}>
+                        <IconComponent size={11} className="shrink-0" />
+                        <span className="truncate">{item.statusLabel}</span>
+                      </span>
+                    </div>
+
+                    {/* Ligne d'action & dernier rappel */}
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                      <span>
+                        {item.daysSince === null ? 'Jamais' : item.daysSince === 0 ? 'Aujourd\'hui' : `J-${item.daysSince}`}
+                      </span>
+                      <span className={`font-semibold ${
+                        item.statusKey === 'optimal' ? 'text-emerald-400' :
+                        item.statusKey === 'recall' ? 'text-amber-400 font-bold' :
+                        item.statusKey === 'decline' ? 'text-orange-400 font-bold' :
+                        'text-rose-400 font-bold'
+                      }`}>
+                        {item.actionAdvice}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredRemanenceList.length === 0 && (
+                <div className="w-full py-4 text-center text-xs text-slate-400 bg-white/[0.02] rounded-xl border border-white/5">
+                  Aucune qualité ne correspond à ce filtre de rémanence.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
           {/* EN-TÊTE ÉPURÉ : NOM DE LA FILIÈRE + SÉLECTEUR DE COMPARAISON IMMÉDIATEMENT ATTACHÉ */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
             <div className="flex items-center gap-3 flex-wrap">
@@ -2037,6 +2742,7 @@ export default function MetricsDashboard({
             </div>
           </div>
 
+        </div>
         </div>
       )}
 
