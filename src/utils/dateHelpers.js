@@ -5,10 +5,10 @@ export function getLocalYYYYMMDD(dateObj) {
   return `${y}-${m}-${d}`;
 }
 
-export function generateTimeline() {
+export function generateTimeline(pastDays = 14, futureDays = 14) {
   const today = new Date();
   const timeline = [];
-  for (let i = -2; i <= 10; i++) {
+  for (let i = -pastDays; i <= futureDays; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     timeline.push({

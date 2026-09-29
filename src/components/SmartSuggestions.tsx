@@ -149,19 +149,22 @@ export default function SmartSuggestions({
             priorityLabel = 'Priorité 1 · Séance Clé';
             priorityBadgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold';
             PriorityIcon = Flame;
-            btnStyle = 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30';
+            // Bouton action n°1 : fond plein vif très visible (Priorité 1 urgente)
+            btnStyle = 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/35 border border-rose-400/50 font-bold';
           } else if (isRank2) {
             cardStyle = 'border-amber-500/30 bg-gradient-to-b from-amber-950/15 via-slate-900/60 to-slate-900/90 hover:border-amber-400/50';
             priorityLabel = 'Priorité 2 · À Programmer';
             priorityBadgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30 font-semibold';
             PriorityIcon = Clock;
-            btnStyle = 'bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/25';
+            // Bouton priorité 2 : style secondaire (fond sombre avec bordure colorée) pour canaliser l'attention sur le #1
+            btnStyle = 'bg-amber-950/30 hover:bg-amber-900/40 text-amber-300 border border-amber-500/40 hover:border-amber-400 shadow-sm';
           } else {
             cardStyle = 'border-slate-700/60 bg-gradient-to-b from-slate-900/70 to-slate-950/80 hover:border-blue-500/40';
             priorityLabel = `Priorité ${index + 1} · Régularité`;
             priorityBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
             PriorityIcon = Zap;
-            btnStyle = 'bg-blue-600/80 hover:bg-blue-600 text-white shadow-md shadow-blue-600/20';
+            // Bouton priorité 3+ : style secondaire discret (fond sombre subtil avec bordure)
+            btnStyle = 'bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 border border-slate-700/80 hover:border-slate-500 shadow-sm';
           }
           
           return (

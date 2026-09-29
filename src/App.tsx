@@ -84,7 +84,7 @@ export default function App() {
   }, [activeBlockToday, todayStr]);
 
   const timeline = useMemo(() => {
-    return generateTimeline().map(day => ({
+    return generateTimeline(21, 14).map(day => ({
       ...day,
       display: formatDisplayDate(day.dateObj, day.offset)
     }));
@@ -209,8 +209,10 @@ export default function App() {
           >
             <TrendingUp size={15} />
             <span>2. Analyses Physiologiques & Banister</span>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-              (banisterPerformance?.current?.tsb ?? 0) >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+            <span className={`inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border shrink-0 ${
+              (banisterPerformance?.current?.tsb ?? 0) >= 0 
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
+                : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
             }`}>
               {(banisterPerformance?.current?.tsb ?? 0) >= 0 ? `+${banisterPerformance?.current?.tsb ?? 0}` : banisterPerformance?.current?.tsb} TSB
             </span>
@@ -226,7 +228,7 @@ export default function App() {
           >
             <Layers size={15} />
             <span>3. Qualités & Rémanence EMA</span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/10 text-slate-300">
+            <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-white/10 text-slate-300 border border-white/10 shrink-0">
               {qualities.length}
             </span>
           </button>
@@ -242,11 +244,11 @@ export default function App() {
             <Target size={15} />
             <span>4. Périodisation & Objectifs</span>
             {activeBlockToday ? (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 truncate max-w-[100px]">
+              <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 truncate max-w-[110px] shrink-0">
                 {activeBlockToday.name}
               </span>
             ) : targetCompetition ? (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300">
+              <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
                 J-{taperingAnalysis?.daysRemaining}
               </span>
             ) : null}
