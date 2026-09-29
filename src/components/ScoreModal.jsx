@@ -4,6 +4,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2, Clock, RotateCcw 
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
+import { getQualityImpacts } from '../utils/physiology';
 
 const MONTH_NAMES = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -23,6 +24,7 @@ function formatFrenchDate(dateStr) {
 
 export default function ScoreModal({ info, qualities = [], events = {}, onClose, onSave }) {
   const todayStr = useMemo(() => getLocalYYYYMMDD(new Date()), []);
+  const isMultiSport = useMemo(() => ['vo2max', 'seuil', 'ef', 'sprint'].includes(info.qId), [info.qId]);
   
   // Date sélectionnée (initialisée à la date fournie ou aujourd'hui)
   const [selectedDate, setSelectedDate] = useState(info.dateStr || todayStr);
@@ -48,8 +50,9 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   };
 
   const currentSessionData = getSessionForDate(selectedDate);
-  const existing = currentSessionData || { rpeMusc: '', rpeCardio: '', fatigue: '', duration: '', isEccentric: false };
+  const existing = currentSessionData || { rpeMusc: '', rpeCardio: '', fatigue: '', duration: '', isEccentric: false, sport: 'run' };
 
+  const [sport, setSport] = useState(existing.sport || 'run');
   const [rpeMusc, setRpeMusc] = useState(existing.rpeMusc || (typeof existing === 'number' ? existing : ''));
   const [rpeCardio, setRpeCardio] = useState(existing.rpeCardio || '');
   const [fatigue, setFatigue] = useState(existing.fatigue || '');
@@ -67,12 +70,14 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     const session = getSessionForDate(newDateStr);
     if (session) {
       if (typeof session === 'object') {
+        setSport(session.sport || 'run');
         setRpeMusc(session.rpeMusc ?? session.rpeMusculaire ?? '');
         setRpeCardio(session.rpeCardio ?? '');
         setFatigue(session.fatigue ?? '');
         setDuration(session.duration ?? '');
         setIsEccentric(session.isEccentric !== undefined ? session.isEccentric : (info.qId === 'descente' || info.qId === 'plyo'));
       } else if (typeof session === 'number') {
+        setSport('run');
         setRpeMusc(session);
         setRpeCardio(session);
         setFatigue(session);
@@ -80,6 +85,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
       }
     } else {
       // Nouvelle date vierge : conserver la durée par défaut ou vider
+      setSport('run');
       setRpeMusc('');
       setRpeCardio('');
       setFatigue('');
@@ -170,9 +176,12 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     return days;
   }, [viewDate, events, info.qId, todayStr, selectedDate]);
 
-  // Derive impacts for display
-  const qDef = qualities.find(q => q.id === info.qId);
-  const hasImpacts = qDef && qDef.impacts && qDef.impacts.length > 0;
+  // Derive impacts for display dynamically according to chosen sport (Course à pied vs Vélo)
+  const activeImpacts = useMemo(() => {
+    return getQualityImpacts(info.qId, isMultiSport ? sport : 'run', qualities);
+  }, [info.qId, isMultiSport, sport, qualities]);
+
+  const hasImpacts = activeImpacts && activeImpacts.length > 0;
 
   // Calcul Multi-Facteurs (Cardio vs Musculaire vs Excentrique)
   const numDur = Number(duration) || 0;
@@ -204,6 +213,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         load,
         loadCardio,
         loadMusc,
+        sport: isMultiSport ? sport : (existing?.sport || 'run'),
         isEccentric: Boolean(isEccentric)
       }, applyImpacts, selectedDate);
     } else {
@@ -408,6 +418,47 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         
         {/* FORMULAIRE DE SAISIE DE LA SÉANCE */}
         <form onSubmit={handleSubmit} className="space-y-3.5">
+          
+          {/* SÉLECTEUR DE SPORT (Course à pied vs Vélo / Home-trainer) pour VO2max, Seuil, EF et Sprint */}
+          {isMultiSport && (
+            <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Modalité sportive / Pratique :
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSport('run')}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    sport === 'run'
+                      ? 'bg-blue-600 border-blue-400 text-white shadow-md ring-1 ring-blue-400'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-base">🏃</span>
+                  <span>Course à pied</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSport('bike')}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    sport === 'bike'
+                      ? 'bg-amber-600 border-amber-400 text-white shadow-md ring-1 ring-amber-400'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-base">🚴</span>
+                  <span>Vélo / HT</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight m-0">
+                {sport === 'bike' 
+                  ? '🚴 Mode Vélo : Contraction concentrique pure sans chocs au sol. Impact pliométrique (plyo) exclu des transferts.' 
+                  : '🏃 Mode Course : Contrainte pliométrique (SSC) et chocs structurels complets.'}
+              </p>
+            </div>
+          )}
+
           <div className="input-group">
             <label className="text-xs font-medium text-slate-300">Durée effective (min)</label>
             <input 
@@ -534,9 +585,9 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                     className="rounded border-none accent-blue-500" 
                   />
                   <span>
-                    Appliquer impacts secondaires ({qDef.impacts.map(i => {
+                    Appliquer impacts secondaires ({activeImpacts.map(i => {
                       const targetName = qualities.find(q => q.id === i.id)?.name || i.id;
-                      return `${targetName} ${i.ratio * 100}%`;
+                      return `${targetName} ${Math.round(i.ratio * 100)}%`;
                     }).join(', ')})
                   </span>
                 </label>

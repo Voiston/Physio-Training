@@ -17,6 +17,75 @@ export const DEFAULT_QUALITIES = [
   { id: 'proprio', name: 'Proprioception', g: 5, o: 3 }
 ];
 
+export const SPORT_IMPACTS = {
+  vo2max: {
+    run: [
+      { id: 'seuil', ratio: 0.6 },
+      { id: 'ef', ratio: 0.4 },
+      { id: 'leg', ratio: 0.4 },
+      { id: 'co2', ratio: 0.4 },
+      { id: 'plyo', ratio: 0.4 }
+    ],
+    bike: [
+      { id: 'seuil', ratio: 0.55 },
+      { id: 'ef', ratio: 0.4 },
+      { id: 'leg', ratio: 0.3 },
+      { id: 'co2', ratio: 0.35 }
+    ]
+  },
+  seuil: {
+    run: [
+      { id: 'vo2max', ratio: 0.3 },
+      { id: 'ef', ratio: 0.4 },
+      { id: 'leg', ratio: 0.3 },
+      { id: 'co2', ratio: 0.3 },
+      { id: 'plyo', ratio: 0.2 }
+    ],
+    bike: [
+      { id: 'ef', ratio: 0.4 },
+      { id: 'vo2max', ratio: 0.25 },
+      { id: 'leg', ratio: 0.25 },
+      { id: 'co2', ratio: 0.25 }
+    ]
+  },
+  ef: {
+    run: [
+      { id: 'leg', ratio: 0.2 },
+      { id: 'co2', ratio: 0.2 }
+    ],
+    bike: [
+      { id: 'leg', ratio: 0.15 },
+      { id: 'co2', ratio: 0.15 },
+      { id: 'gut', ratio: 0.15 }
+    ]
+  },
+  sprint: {
+    run: [
+      { id: 'leg', ratio: 0.8 },
+      { id: 'plyo', ratio: 0.8 },
+      { id: 'co2', ratio: 0.6 },
+      { id: 'seuil', ratio: 0.3 },
+      { id: 'vo2max', ratio: 0.4 },
+      { id: 'ef', ratio: 0.2 }
+    ],
+    bike: [
+      { id: 'leg', ratio: 0.65 },
+      { id: 'co2', ratio: 0.45 },
+      { id: 'seuil', ratio: 0.2 },
+      { id: 'vo2max', ratio: 0.25 }
+    ]
+  }
+};
+
+export function getQualityImpacts(qualityId, sport = 'run', qualities = DEFAULT_QUALITIES) {
+  if (SPORT_IMPACTS[qualityId]) {
+    const sportKey = sport === 'bike' ? 'bike' : 'run';
+    return SPORT_IMPACTS[qualityId][sportKey] || [];
+  }
+  const found = qualities.find(q => q.id === qualityId);
+  return found?.impacts || [];
+}
+
 export const BLOCK_PRESETS = [
   {
     id: 'force_max',

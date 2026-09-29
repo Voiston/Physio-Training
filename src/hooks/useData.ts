@@ -12,7 +12,8 @@ import {
   computeFosterMetrics,
   computeBanisterPerformance,
   getTaperingAnalysis,
-  computeCardioVsMuscularBalance
+  computeCardioVsMuscularBalance,
+  getQualityImpacts
 } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
@@ -88,6 +89,7 @@ export interface SessionData {
   load: number;
   loadCardio?: number;
   loadMusc?: number;
+  sport?: 'run' | 'bike' | string;
   isEccentric?: boolean;
   isSecondary?: boolean;
   parentQId?: string;
@@ -705,30 +707,30 @@ export function useData() {
   };
 
   const saveEventWithImpacts = (qId: string, dateStr: string, sessionData: SessionData | null, applyImpacts: boolean = true) => {
-    if (!sessionData) {
-      const qDef = qualities.find(q => q.id === qId);
-      if (qDef && qDef.impacts) {
-        qDef.impacts.forEach(imp => {
-          const key = `${dateStr}_${imp.id}`;
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            try {
-              const parsed = JSON.parse(raw);
-              if (parsed.isSecondary && parsed.parentQId === qId) {
-                saveEvent(imp.id, dateStr, null);
-              }
-            } catch (e) {}
+    // 1. Toujours nettoyer les anciens impacts secondaires générés par cette qualité sur cette date
+    qualities.forEach(q => {
+      if (q.id === qId) return;
+      const key = `${dateStr}_${q.id}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.isSecondary && parsed.parentQId === qId) {
+            saveEvent(q.id, dateStr, null);
           }
-        });
+        } catch (e) {}
       }
+    });
+
+    if (!sessionData) {
       saveEvent(qId, dateStr, null);
     } else {
       saveEvent(qId, dateStr, sessionData);
 
       if (applyImpacts) {
-        const qDef = qualities.find(q => q.id === qId);
-        if (qDef && qDef.impacts) {
-          qDef.impacts.forEach(imp => {
+        const impacts = getQualityImpacts(qId, sessionData.sport || 'run', qualities as any) as QualityImpact[];
+        if (impacts && impacts.length > 0) {
+          impacts.forEach(imp => {
             const calculatedSecLoad = Math.round(sessionData.load * imp.ratio);
             const secCardio = sessionData.loadCardio !== undefined ? Math.round(sessionData.loadCardio * imp.ratio) : undefined;
             const secMusc = sessionData.loadMusc !== undefined ? Math.round(sessionData.loadMusc * imp.ratio) : undefined;

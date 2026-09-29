@@ -597,10 +597,14 @@ export default function Grid({
                         cellHeatmapStyle = 'bg-amber-500/12 border-amber-500/25 text-amber-300 hover:bg-amber-500/20';
                       }
 
+                      const cellTitle = sessionData
+                        ? `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${sessionData.load} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
+                        : cellState.tooltip;
+
                       return (
                         <td 
                           key={day.dateStr} 
-                          title={cellState.tooltip}
+                          title={cellTitle}
                           className={`p-1 text-center border-r border-white/5 ${
                             day.offset === 0 ? 'bg-blue-600/10 border-x-2 border-x-blue-500/30' : ''
                           }`}
@@ -615,6 +619,7 @@ export default function Grid({
                              {sessionData ? (
                                <span className="font-mono text-xs font-bold leading-none tracking-tight flex items-center justify-center">
                                  {sessionData.load}
+                                 {sessionData.sport === 'bike' && !sessionData.isSecondary && <span className="text-[9px] ml-0.5" title="Séance Vélo">🚴</span>}
                                  {sessionData.isSecondary && <span className="text-[8px] ml-0.5 opacity-70">s</span>}
                                  {sessionData.isSimulated && <span className="text-[8px] ml-0.5 opacity-90">🔮</span>}
                                </span>
