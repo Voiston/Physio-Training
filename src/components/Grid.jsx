@@ -501,7 +501,7 @@ export default function Grid({
                                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
                                   : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                               }`}
-                              title={isFocusInActiveBlock ? "Qualité ciblée : répétée plus souvent (-25% délai)" : "Maintien : délai prolongé (+35% délai)"}
+                              title={isFocusInActiveBlock ? "Qualité ciblée : fréquence de développement (x0.45 · 2-3x/sem)" : "Qualité hors-bloc : maintien en rémanence nominale (x1.0)"}
                             >
                               {isFocusInActiveBlock ? '⚡ Répéter +' : '🛡️ Maintien'}
                             </span>

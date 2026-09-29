@@ -47,8 +47,8 @@ export default function TrainingBlocksModal({
   const [focusQualities, setFocusQualities] = useState<string[]>([
     'pull', 'push', 'leg', 'abdos', 'descente'
   ]);
-  const [targetMultiplier, setTargetMultiplier] = useState<number>(0.75);
-  const [maintenanceMultiplier, setMaintenanceMultiplier] = useState<number>(1.35);
+  const [targetMultiplier, setTargetMultiplier] = useState<number>(0.45);
+  const [maintenanceMultiplier, setMaintenanceMultiplier] = useState<number>(1.0);
   const [notes, setNotes] = useState<string>('');
   const [autoReorder, setAutoReorder] = useState<boolean>(true);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
@@ -63,8 +63,8 @@ export default function TrainingBlocksModal({
       durationWeeks: 4,
       focusQualities: ['leg', 'pull'],
       description: 'Description du template',
-      targetMultiplier: 0.75,
-      maintenanceMultiplier: 1.35
+      targetMultiplier: 0.45,
+      maintenanceMultiplier: 1.0
     };
   });
   const [templateSavedMsg, setTemplateSavedMsg] = useState<string>('');
@@ -354,7 +354,7 @@ export default function TrainingBlocksModal({
                           <div className="mt-3 pt-2.5 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                             <div>
                               <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                                <Zap size={11} /> Fréquence accrue (-25% délai) :
+                                <Zap size={11} /> Fréquence de dév. (x0.45 · 2-3x/sem) :
                               </span>
                               <div className="flex flex-wrap gap-1">
                                 {b.focusQualities.map(qId => {
@@ -370,7 +370,7 @@ export default function TrainingBlocksModal({
 
                             <div>
                               <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                                <Shield size={11} /> Maintien (+35% délai prolongé) :
+                                <Shield size={11} /> Maintien (x1.0 · Rémanence nominale) :
                               </span>
                               <div className="flex flex-wrap gap-1">
                                 {qualities
@@ -572,11 +572,11 @@ export default function TrainingBlocksModal({
                               <span className="text-[9px] uppercase tracking-wider block">
                                 {isFocus ? (
                                   <span className="text-red-400 font-semibold flex items-center gap-1">
-                                    <Zap size={9} /> Fréquence + (x0.75)
+                                    <Zap size={9} /> Dév. (x0.45)
                                   </span>
                                 ) : (
                                   <span className="text-sky-400 font-semibold flex items-center gap-1">
-                                    <Shield size={9} /> Maintien (x1.35)
+                                    <Shield size={9} /> Maintien (x1.0)
                                   </span>
                                 )}
                               </span>

@@ -23,9 +23,9 @@ export const BLOCK_PRESETS = [
     name: 'Force max',
     durationWeeks: 4,
     focusQualities: ['pull', 'push', 'leg', 'abdos', 'descente'],
-    description: 'Renforcement musculaire intensif répété plus souvent. Délais allongés pour les qualités cardio et proprioceptives.',
-    targetMultiplier: 0.75, // g et o raccourcis -> fréquence de répétition accrue requise
-    maintenanceMultiplier: 1.35, // autres qualités bénéficient d'un délai plus long
+    description: 'Renforcement musculaire intensif en fréquence de développement (x0.45, 2-3x/sem). Délais nominaux pour les autres qualités.',
+    targetMultiplier: 0.45, // g et o réduits de 55% -> incite à répéter 2 à 3 fois par semaine
+    maintenanceMultiplier: 1.0, // autres qualités bénéficient du délai nominal plein (maintien)
     color: '#ef4444',
     badge: '🏋️ Force'
   },
@@ -34,9 +34,9 @@ export const BLOCK_PRESETS = [
     name: 'Endurance de force',
     durationWeeks: 4,
     focusQualities: ['leg', 'pull', 'push', 'abdos', 'plyo'],
-    description: 'Répétition fréquente des séances de résistance musculaire. Les autres qualités sont maintenues avec des délais étendus.',
-    targetMultiplier: 0.75,
-    maintenanceMultiplier: 1.35,
+    description: 'Répétition fréquente des séances de résistance musculaire (x0.45). Les autres qualités sont maintenues en délai nominal.',
+    targetMultiplier: 0.45,
+    maintenanceMultiplier: 1.0,
     color: '#f97316',
     badge: '⚡ Endur. Force'
   },
@@ -45,9 +45,9 @@ export const BLOCK_PRESETS = [
     name: 'Aérobie',
     durationWeeks: 6,
     focusQualities: ['ef', 'gut', 'co2'],
-    description: 'Développement du volume foncier et des capacités métaboliques. Renforcement musculaire espacé en maintien.',
-    targetMultiplier: 0.75,
-    maintenanceMultiplier: 1.35,
+    description: 'Développement du volume foncier et des capacités métaboliques (x0.45). Renforcement musculaire espacé en maintien.',
+    targetMultiplier: 0.45,
+    maintenanceMultiplier: 1.0,
     color: '#06b6d4',
     badge: '🫁 Aérobie'
   },
@@ -56,9 +56,9 @@ export const BLOCK_PRESETS = [
     name: 'Seuil / VMA',
     durationWeeks: 3,
     focusQualities: ['seuil', 'vo2max', 'sprint'],
-    description: 'Forte sollicitation cardio-vasculaire à haute intensité. Renforcement musculaire maintenu avec plus de délai.',
-    targetMultiplier: 0.75,
-    maintenanceMultiplier: 1.35,
+    description: 'Forte sollicitation cardio-vasculaire à haute intensité (x0.45). Renforcement musculaire maintenu en délai nominal.',
+    targetMultiplier: 0.45,
+    maintenanceMultiplier: 1.0,
     color: '#8b5cf6',
     badge: '🔥 Seuil/VMA'
   },
@@ -67,9 +67,9 @@ export const BLOCK_PRESETS = [
     name: 'Explosivité / Plyométrie',
     durationWeeks: 3,
     focusQualities: ['plyo', 'sprint', 'leg'],
-    description: 'Vitesse de contraction, cycle étirement-détente et puissance des membres inférieurs.',
-    targetMultiplier: 0.75,
-    maintenanceMultiplier: 1.35,
+    description: 'Vitesse de contraction, cycle étirement-détente et puissance des membres inférieurs (x0.45).',
+    targetMultiplier: 0.45,
+    maintenanceMultiplier: 1.0,
     color: '#ec4899',
     badge: '💥 Plyo/Vitesse'
   }
@@ -130,7 +130,17 @@ export function getBlockProgress(block, referenceDateStr) {
 export function getSavedBlockTemplates() {
   try {
     const raw = localStorage.getItem('physio_block_templates');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Upgrade legacy multipliers if present (0.75 -> 0.45, 1.35 -> 1.0)
+        return parsed.map(t => ({
+          ...t,
+          targetMultiplier: t.targetMultiplier === 0.75 ? 0.45 : (t.targetMultiplier ?? 0.45),
+          maintenanceMultiplier: t.maintenanceMultiplier === 1.35 ? 1.0 : (t.maintenanceMultiplier ?? 1.0)
+        }));
+      }
+    }
   } catch (e) {}
   return BLOCK_PRESETS;
 }
@@ -318,20 +328,20 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
   if (activeBlock) {
     const isFocus = activeBlock.focusQualities?.includes(qDef.id);
     if (isFocus) {
-      // Séances ciblées / renforcement musculaire : répétées plus souvent (g & o raccourcis)
-      blockMultiplier = activeBlock.targetMultiplier ?? 0.75;
+      // Séances ciblées en développement : répétées plus souvent (multiplicateur x0.45, 2-3x/semaine)
+      blockMultiplier = activeBlock.targetMultiplier ?? 0.45;
       blockStateInfo = {
         name: activeBlock.name,
         type: 'focus',
-        label: 'Fréquence accrue (Bloc spécifique)'
+        label: 'Fréquence de développement (x0.45)'
       };
     } else {
-      // Reste des séances : bénéficient de délais un peu plus longs (maintien)
-      blockMultiplier = activeBlock.maintenanceMultiplier ?? 1.35;
+      // Reste des séances : bénéficient de la durée nominale d'effet résiduel (maintien x1.0)
+      blockMultiplier = activeBlock.maintenanceMultiplier ?? 1.0;
       blockStateInfo = {
         name: activeBlock.name,
         type: 'maintenance',
-        label: 'Délai prolongé (Maintien)'
+        label: 'Maintien nominal (x1.0)'
       };
     }
   }

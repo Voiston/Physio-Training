@@ -207,7 +207,16 @@ export function useData() {
   const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>(() => {
     try {
       const raw = localStorage.getItem('physio_training_blocks');
-      if (raw !== null) return JSON.parse(raw);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map((b: TrainingBlock) => ({
+            ...b,
+            targetMultiplier: b.targetMultiplier === 0.75 ? 0.45 : (b.targetMultiplier ?? 0.45),
+            maintenanceMultiplier: b.maintenanceMultiplier === 1.35 ? 1.0 : (b.maintenanceMultiplier ?? 1.0)
+          }));
+        }
+      }
     } catch (e) {}
     const today = new Date();
     const todayStr = getLocalYYYYMMDD(today);
@@ -219,9 +228,9 @@ export function useData() {
       endDate: computeBlockEndDate(todayStr, 4),
       durationWeeks: 4,
       focusQualities: ['pull', 'push', 'leg', 'abdos', 'descente'],
-      targetMultiplier: 0.75,
-      maintenanceMultiplier: 1.35,
-      notes: 'Bloc de force max : les séances de renforcement musculaire sont répétées plus souvent (-25% délai) et le reste bénéficie de délais plus longs (+35%).'
+      targetMultiplier: 0.45,
+      maintenanceMultiplier: 1.0,
+      notes: 'Bloc de force max : fréquence de développement sur la musculation (x0.45, 2-3 séances/semaine) et maintien nominal pour le cardio.'
     };
     return [initialBlock];
   });
