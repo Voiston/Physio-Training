@@ -2,19 +2,19 @@ import { calculateEMA } from './mathHelpers';
 import { getLocalYYYYMMDD } from './dateHelpers';
 
 export const DEFAULT_QUALITIES = [
-  { id: 'vo2max', name: 'VO2max', g: 4, o: 3, impacts: [{ id: 'seuil', ratio: 0.6 }, { id: 'ef', ratio: 0.4 }, { id: 'leg', ratio: 0.4 }, { id: 'co2', ratio: 0.4 }, { id: 'plyo', ratio: 0.4 }] },
-  { id: 'seuil', name: 'Seuil', g: 5, o: 3, impacts: [{ id: 'vo2max', ratio: 0.3 }, { id: 'ef', ratio: 0.4 }, { id: 'leg', ratio: 0.3 }, { id: 'co2', ratio: 0.3 }, { id: 'plyo', ratio: 0.2 }] },
-  { id: 'ef', name: 'Endurance Fondamentale', g: 7, o: 4, impacts: [{ id: 'leg', ratio: 0.2 }, { id: 'co2', ratio: 0.2 }] },
-  { id: 'sprint', name: 'Sprint / Alactique', g: 4, o: 2, impacts: [{ id: 'seuil', ratio: 0.3 }, { id: 'vo2max', ratio: 0.4 }, { id: 'ef', ratio: 0.2 }, { id: 'leg', ratio: 0.8 }, { id: 'plyo', ratio: 0.8 }, { id: 'co2', ratio: 0.6 }] },
-  { id: 'pull', name: 'Musculation Pull', g: 4, o: 3 },
-  { id: 'push', name: 'Musculation Push', g: 4, o: 3 },
-  { id: 'leg', name: 'Musculation Leg', g: 4, o: 3, impacts: [{ id: 'plyo', ratio: 0.3 }, { id: 'sprint', ratio: 0.2 }] },
-  { id: 'plyo', name: 'Plyométrie', g: 3, o: 2, impacts: [{ id: 'leg', ratio: 0.4 }, { id: 'sprint', ratio: 0.2 }] },
-  { id: 'co2', name: 'Tolérance CO2', g: 4, o: 2 },
-  { id: 'abdos', name: 'Protocole Abdos', g: 5, o: 3 },
-  { id: 'gut', name: 'Gut Training', g: 10, o: 5 },
-  { id: 'descente', name: 'Excentrique Descente', g: 11, o: 7, impacts: [{ id: 'leg', ratio: 0.8 }] },
-  { id: 'proprio', name: 'Proprioception', g: 3, o: 2 }
+  { id: 'vo2max', name: 'VO2max', g: 7, o: 4, impacts: [{ id: 'seuil', ratio: 0.6 }, { id: 'ef', ratio: 0.4 }, { id: 'leg', ratio: 0.4 }, { id: 'co2', ratio: 0.4 }, { id: 'plyo', ratio: 0.4 }] },
+  { id: 'seuil', name: 'Seuil', g: 8, o: 5, impacts: [{ id: 'vo2max', ratio: 0.3 }, { id: 'ef', ratio: 0.4 }, { id: 'leg', ratio: 0.3 }, { id: 'co2', ratio: 0.3 }, { id: 'plyo', ratio: 0.2 }] },
+  { id: 'ef', name: 'Endurance Fondamentale', g: 10, o: 6, impacts: [{ id: 'leg', ratio: 0.2 }, { id: 'co2', ratio: 0.2 }] },
+  { id: 'sprint', name: 'Sprint / Alactique', g: 5, o: 3, impacts: [{ id: 'seuil', ratio: 0.3 }, { id: 'vo2max', ratio: 0.4 }, { id: 'ef', ratio: 0.2 }, { id: 'leg', ratio: 0.8 }, { id: 'plyo', ratio: 0.8 }, { id: 'co2', ratio: 0.6 }] },
+  { id: 'pull', name: 'Musculation Pull', g: 8, o: 5 },
+  { id: 'push', name: 'Musculation Push', g: 8, o: 5 },
+  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, impacts: [{ id: 'plyo', ratio: 0.3 }, { id: 'sprint', ratio: 0.2 }] },
+  { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, impacts: [{ id: 'leg', ratio: 0.4 }, { id: 'sprint', ratio: 0.2 }] },
+  { id: 'co2', name: 'Tolérance CO2', g: 6, o: 4 },
+  { id: 'abdos', name: 'Protocole Abdos', g: 7, o: 4 },
+  { id: 'gut', name: 'Gut Training', g: 14, o: 7 },
+  { id: 'descente', name: 'Excentrique Descente', g: 16, o: 10, impacts: [{ id: 'leg', ratio: 0.8 }] },
+  { id: 'proprio', name: 'Proprioception', g: 5, o: 3 }
 ];
 
 export const BLOCK_PRESETS = [
@@ -343,18 +343,23 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     if (daysSince >= 0) {
       const load = extractSessionLoad(data);
       
-      // On considère qu'une charge de 500 est notre 100% (1.0).
-      // On cap l'intensité max à 1.2 (120%) pour éviter des durées aberrantes.
-      const intensity = Math.min(load / 500, 1.2); 
+      // Calibrage physiologique : charge étalon = 250 pts (~45-50 min RPE 5-6)
+      // Plancher à 0.75 pour séances légères, 1.0 à charge nominale, jusqu'à 1.30 pour grosses charges
+      let loadMultiplier = 1.0;
+      if (load > 0) {
+        const ratio = load / 250;
+        loadMultiplier = Math.min(1.30, Math.max(0.75, 0.75 + 0.25 * Math.min(ratio, 2.2)));
+      } else {
+        loadMultiplier = 0.8;
+      }
       
-      // ALGORITHME DE DIFFUSION ELARGIE
-      // Un exposant de 1.3 lisse légèrement la distribution de l'effet
-      const multiplier = Math.pow(intensity, 1.3) * recoveryMod; 
+      const multiplier = loadMultiplier * recoveryMod; 
 
       const gReal = qDef.g * multiplier * blockMultiplier;
       const oReal = qDef.o * multiplier * blockMultiplier;
 
       // Si la séance date de moins de 3 jours, elle pèse sur la fatigue du Système Nerveux.
+      const intensity = Math.min(load / 400, 1.2);
       if (daysSince <= 3) recentLoadSum += intensity;
 
       if (daysSince < gReal) {

@@ -177,9 +177,22 @@ export function useData() {
       const raw = localStorage.getItem('physio_qualities');
       if (raw) {
         const parsed: Quality[] = JSON.parse(raw);
-        const existingIds = new Set(parsed.map(q => q.id));
+        const defaultMap = new Map(DEFAULT_QUALITIES.map(q => [q.id, q]));
+        const updated = parsed.map(q => {
+          const def = defaultMap.get(q.id);
+          if (def) {
+            return {
+              ...q,
+              g: def.g,
+              o: def.o,
+              impacts: def.impacts || q.impacts
+            };
+          }
+          return q;
+        });
+        const existingIds = new Set(updated.map(q => q.id));
         const missing = DEFAULT_QUALITIES.filter(q => !existingIds.has(q.id));
-        return [...parsed, ...missing];
+        return [...updated, ...missing];
       }
     } catch (e) {}
     return DEFAULT_QUALITIES;
