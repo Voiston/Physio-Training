@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { computeCellState, getActiveBlockForDate } from '../utils/physiology';
 import QualitySparkline from './QualitySparkline';
-import { ChevronDown, ChevronUp, BarChart2, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, BarChart2, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 
 export default function Grid({ 
   timeline, 
@@ -15,11 +15,68 @@ export default function Grid({
   qualitiesEMA, 
   trainingBlocks = [],
   moveQuality,
+  reorderQualities,
   onCellClick, 
   onMetricClick, 
   onQualityClick 
 }) {
   const [expandedQualityId, setExpandedQualityId] = useState(null);
+  const [draggedQualityId, setDraggedQualityId] = useState(null);
+  const [dragOverQualityId, setDragOverQualityId] = useState(null);
+  const [dropPosition, setDropPosition] = useState(null); // 'before' | 'after'
+
+  const handleDragStart = (e, qId, index) => {
+    setDraggedQualityId(qId);
+    e.dataTransfer.setData('text/plain', qId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, targetQId) => {
+    if (!draggedQualityId || draggedQualityId === targetQId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relY = e.clientY - rect.top;
+    const position = relY < rect.height / 2 ? 'before' : 'after';
+
+    if (dragOverQualityId !== targetQId || dropPosition !== position) {
+      setDragOverQualityId(targetQId);
+      setDropPosition(position);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverQualityId(null);
+      setDropPosition(null);
+    }
+  };
+
+  const handleDrop = (e, targetQId) => {
+    e.preventDefault();
+    if (draggedQualityId && targetQId && draggedQualityId !== targetQId) {
+      if (reorderQualities) {
+        reorderQualities(draggedQualityId, targetQId, dropPosition || 'before');
+      } else if (moveQuality) {
+        // Fallback
+        const sourceIdx = qualities.findIndex(q => q.id === draggedQualityId);
+        const targetIdx = qualities.findIndex(q => q.id === targetQId);
+        if (sourceIdx !== -1 && targetIdx !== -1) {
+          moveQuality(draggedQualityId, sourceIdx < targetIdx ? 'down' : 'up');
+        }
+      }
+    }
+    setDraggedQualityId(null);
+    setDragOverQualityId(null);
+    setDropPosition(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedQualityId(null);
+    setDragOverQualityId(null);
+    setDropPosition(null);
+  };
 
   const todayStr = timeline.find(d => d.offset === 0)?.dateStr;
   const activeBlockToday = getActiveBlockForDate(todayStr, trainingBlocks);
@@ -61,7 +118,10 @@ export default function Grid({
             {/* Colonne 1 : Qualité */}
             <th className="p-3 w-48 sticky left-0 bg-[#161619] z-20 shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
               <div className="flex items-center justify-between">
-                <span className="text-slate-300 font-bold tracking-wider">Qualité Physique</span>
+                <span className="text-slate-300 font-bold tracking-wider flex items-center gap-1.5" title="Glisser-déposer les qualités pour réorganiser l'ordre de priorité">
+                  <GripVertical size={12} className="text-slate-500" />
+                  <span>Qualité Physique</span>
+                </span>
                 {activeBlockToday && (
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
                     {activeBlockToday.name}
@@ -184,6 +244,8 @@ export default function Grid({
             const emaInfo = qualitiesEMA?.[q.id];
             const isExpanded = expandedQualityId === q.id;
             const current = emaInfo?.current || { ema3: 0, ema7: 0, ema21: 0, acwr: 1 };
+            const isDragging = draggedQualityId === q.id;
+            const isOver = dragOverQualityId === q.id;
 
             const acwrBadge = current.acwr > 1.5 
               ? 'bg-red-500/20 text-red-400 border-red-500/30'
@@ -197,7 +259,20 @@ export default function Grid({
 
             return (
               <Fragment key={q.id}>
-                <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                <tr 
+                  onDragOver={(e) => handleDragOver(e, q.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, q.id)}
+                  className={`border-b transition-colors ${
+                    isDragging
+                      ? 'opacity-35 bg-blue-950/30'
+                      : isOver && dropPosition === 'before'
+                      ? 'shadow-[inset_0_2px_0_0_#3b82f6] bg-blue-500/10'
+                      : isOver && dropPosition === 'after'
+                      ? 'shadow-[inset_0_-2px_0_0_#3b82f6] bg-blue-500/10'
+                      : 'border-white/5 hover:bg-white/[0.02]'
+                  }`}
+                >
                   {/* Colonne Nom de la Qualité */}
                   <td 
                     className="p-2.5 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)] text-slate-200 cursor-pointer hover:text-blue-400 transition-colors group"
@@ -205,28 +280,34 @@ export default function Grid({
                     title={`Cliquer pour analyser ${q.name} en détail (Priorité #${index + 1})`}
                   >
                     <div className="flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {/* Boutons monter / descendre et rang */}
-                        <div className="flex flex-col items-center justify-center shrink-0 -my-1 text-slate-500">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); moveQuality?.(q.id, 'up'); }}
-                            disabled={index === 0}
-                            className="p-0.5 rounded hover:text-white hover:bg-white/10 disabled:opacity-15 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                            title="Monter cette qualité (priorité plus haute)"
-                          >
-                            <ArrowUp size={10} />
-                          </button>
-                          <span className="text-[9px] font-mono font-bold text-slate-400 leading-none">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Poignée de Glisser-Déposer (remplace les flèches haut/bas) */}
+                        <div
+                          draggable={true}
+                          onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, q.id, index); }}
+                          onDragEnd={handleDragEnd}
+                          onClick={(e) => e.stopPropagation()}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Glisser pour réorganiser la qualité ${q.name}, priorité #${index + 1}`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              moveQuality?.(q.id, 'up');
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              moveQuality?.(q.id, 'down');
+                            }
+                          }}
+                          className="flex items-center gap-1 px-1.5 py-1 -my-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 active:bg-blue-600/30 active:text-blue-200 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10 transition-all shrink-0 select-none group/grip"
+                          title={`Glisser-déposer pour changer la priorité de ${q.name} (Rang #${index + 1})`}
+                        >
+                          <GripVertical size={13} className="text-slate-500 group-hover/grip:text-blue-400 transition-colors" />
+                          <span className="text-[10px] font-mono font-bold text-slate-400 group-hover/grip:text-blue-300">
                             #{index + 1}
                           </span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); moveQuality?.(q.id, 'down'); }}
-                            disabled={index === qualities.length - 1}
-                            className="p-0.5 rounded hover:text-white hover:bg-white/10 disabled:opacity-15 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                            title="Descendre cette qualité (priorité plus basse)"
-                          >
-                            <ArrowDown size={10} />
-                          </button>
                         </div>
 
                         <span className="truncate">{q.name}</span>

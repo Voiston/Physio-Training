@@ -535,6 +535,38 @@ export function useData() {
     });
   };
 
+  const reorderQualities = (sourceId: string, targetId: string, position: 'before' | 'after' = 'before') => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    setQualitiesState(prev => {
+      const sourceIndex = prev.findIndex(q => q.id === sourceId);
+      if (sourceIndex === -1) return prev;
+
+      const next = [...prev];
+      const [movedItem] = next.splice(sourceIndex, 1);
+
+      const targetIndex = next.findIndex(q => q.id === targetId);
+      if (targetIndex === -1) return prev;
+
+      const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
+      next.splice(insertIndex, 0, movedItem);
+
+      localStorage.setItem('physio_qualities', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const moveQualityToIndex = (sourceIndex: number, targetIndex: number) => {
+    if (sourceIndex === targetIndex) return;
+    setQualitiesState(prev => {
+      if (sourceIndex < 0 || sourceIndex >= prev.length || targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [movedItem] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, movedItem);
+      localStorage.setItem('physio_qualities', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const reorderByBlockFocus = (block?: TrainingBlock | null) => {
     const targetBlock = block || activeBlockToday;
     if (!targetBlock || !targetBlock.focusQualities) return;
@@ -700,6 +732,8 @@ export function useData() {
     setQualities,
     moveQuality,
     moveQualityToTop,
+    reorderQualities,
+    moveQualityToIndex,
     reorderByBlockFocus,
     reorderByUrgency,
     resetQualitiesOrder,

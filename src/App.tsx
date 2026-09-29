@@ -28,6 +28,7 @@ export default function App() {
     events, 
     qualities, 
     moveQuality,
+    reorderQualities,
     reorderByBlockFocus,
     reorderByUrgency,
     resetQualitiesOrder,
@@ -464,6 +465,7 @@ export default function App() {
                   qualitiesEMA={qualitiesEMA}
                   trainingBlocks={trainingBlocks}
                   moveQuality={moveQuality}
+                  reorderQualities={reorderQualities}
                   onCellClick={(q: any, dateStr: string, currentData: any) => setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData })}
                   onQualityClick={(q: any) => setQualityChartInfo(q)}
                   onMetricClick={(dateStr: string, type: string, currentValue: any) => {
