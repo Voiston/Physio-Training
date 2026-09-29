@@ -389,10 +389,10 @@ export default function App() {
 
                     <div className="space-y-2.5">
                       {/* EMA 3j */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-red-500/20">
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-sky-500/20">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
-                          <span className="text-xs font-bold text-red-300">EMA 3j · Fatigue Aiguë</span>
+                          <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-sky-300">EMA 3j · Fatigue Aiguë (Court Terme)</span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
                           Stress immédiat du système nerveux. Décroît rapidement après 48h à 72h de repos.
@@ -400,10 +400,10 @@ export default function App() {
                       </div>
 
                       {/* EMA 7j */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-amber-500/20">
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-blue-500/20">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
-                          <span className="text-xs font-bold text-amber-300">EMA 7j · Charge Récente (ATL)</span>
+                          <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-blue-300">EMA 7j · Charge Récente (ATL)</span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
                           Fatigue accumulée sur la semaine. Pilote le ratio de surcharge (ACWR).
@@ -411,10 +411,10 @@ export default function App() {
                       </div>
 
                       {/* EMA 21j */}
-                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-sky-500/20">
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-indigo-500/20">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
-                          <span className="text-xs font-bold text-sky-300">EMA 21j · Condition Durable (CTL)</span>
+                          <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-indigo-300">EMA 21j · Condition Durable (CTL)</span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
                           Fitness de fond acquis sur le cycle. Résistance structurelle à l'effort.

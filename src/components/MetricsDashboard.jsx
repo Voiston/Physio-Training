@@ -7,7 +7,7 @@ import {
   AlertTriangle, TrendingUp, TrendingDown, Activity, Sparkles, 
   Minus, ArrowUp, ArrowDown, Info, Gauge, Trophy, FileText, 
   ShieldAlert, Play, CheckCircle2, Sliders, Heart, Dumbbell, Flame,
-  Search, X, Layers, SlidersHorizontal
+  Search, X, Layers, SlidersHorizontal, BarChart3
 } from 'lucide-react';
 import { calculateEMA } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
@@ -186,9 +186,15 @@ export default function MetricsDashboard({
 
   // Détection de données réelles pour l'état vide propre (Empty State)
   const hasQualityData = useMemo(() => {
-    const series = activeQualityData.series || [];
-    return series.some(d => (d.load > 0 || d.ema3 > 0 || d.ema7 > 0 || d.ema21 > 0));
-  }, [activeQualityData.series]);
+    const series = activeQualityData?.series || [];
+    if (!series || series.length === 0) return false;
+    return series.some(d => (
+      (Number(d.load) || 0) > 0 || 
+      (Number(d.ema3) || 0) > 0.05 || 
+      (Number(d.ema7) || 0) > 0.05 || 
+      (Number(d.ema21) || 0) > 0.05
+    ));
+  }, [activeQualityData?.series]);
 
   // Échantillon récent (10 derniers jours) pour les miniatures sparklines des KPI
   const sparklineSeries = useMemo(() => {
@@ -1821,28 +1827,57 @@ export default function MetricsDashboard({
 
           {/* ZONE GRAPHIQUE OU ÉTAT VIDE NEUTRE (EMPTY STATE PROPRE) */}
           {!hasQualityData ? (
-            <div className="h-[220px] w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-black/30 border border-dashed border-white/10 text-center">
-              <div className="p-3 rounded-full bg-blue-500/10 text-blue-400 mb-2 border border-blue-500/20">
-                <Activity size={24} className="opacity-80" />
+            <div className="h-[250px] w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-black/40 border border-dashed border-white/15 text-center shadow-inner my-1">
+              <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 mb-2.5 border border-blue-500/20 shadow-md shadow-blue-500/10">
+                <BarChart3 size={24} className="opacity-90" />
               </div>
-              <h5 className="text-sm font-bold text-slate-200 m-0">
-                Aucune séance enregistrée pour « {activeQualityData.qDef?.name || selectedQualityId} » sur la période
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono bg-white/5 text-slate-300 border border-white/10 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                Aucune donnée enregistrée
+              </div>
+              <h5 className="text-sm sm:text-base font-bold text-white m-0 tracking-tight">
+                Aucune séance pour « {activeQualityData.qDef?.name || selectedQualityId} » sur la période
               </h5>
-              <p className="text-xs text-[#94A3B8] max-w-md mt-1 mb-0 leading-relaxed">
-                Les courbes de charge (barres), fatigue aiguë (3j), rémanence (7j) et fitness (21j) se modéliseront automatiquement dès qu'une séance sera saisie dans la grille de planification.
+              <p className="text-xs text-[#94A3B8] max-w-lg mt-1.5 mb-0 leading-relaxed">
+                Les valeurs de charge et les dynamiques de rémanence EMA (3j, 7j, 21j) sont actuellement à zéro. Dès qu'une séance sera renseignée dans la grille de planification, la trajectoire physiologique s'affichera ici automatiquement.
               </p>
             </div>
           ) : (
-            <div className="h-[240px] w-full min-h-[200px] relative">
+            <div className="h-[250px] w-full min-h-[220px] relative">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={activeQualityData.series} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                  <XAxis dataKey="day" stroke="#94a3b8" tick={{ fontSize: 10, fill: '#cbd5e1' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} />
-                  <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fill: '#cbd5e1' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} />
+                <ComposedChart data={activeQualityData.series} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                  {/* Quadrillage horizontal renforcé pour repérer facilement les paliers */}
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" vertical={false} />
+                  
+                  {/* Axe X avec contraste élevé, repères nets et dates claires JJ/MM */}
+                  <XAxis 
+                    dataKey="dateStr" 
+                    tickFormatter={(str) => {
+                      if (!str) return '';
+                      const parts = str.split('-');
+                      if (parts.length < 3) return str;
+                      return `${parts[2]}/${parts[1]}`;
+                    }}
+                    stroke="#64748b" 
+                    tick={{ fontSize: 11, fill: '#f1f5f9', fontWeight: 600 }} 
+                    tickLine={{ stroke: '#64748b', strokeWidth: 1.5 }} 
+                    axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                    minTickGap={28}
+                    dy={4}
+                  />
+                  
+                  {/* Axe Y avec contraste renforcé */}
+                  <YAxis 
+                    stroke="#64748b" 
+                    tick={{ fontSize: 10, fill: '#cbd5e1', fontWeight: 500 }} 
+                    tickLine={{ stroke: '#64748b' }} 
+                    axisLine={{ stroke: '#64748b', strokeWidth: 1.2 }} 
+                  />
+                  
                   <Tooltip content={<CustomTooltip />} />
                   <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
                   
-                  <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.2)" radius={[3, 3, 0, 0]} maxBarSize={16} />
+                  <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.25)" radius={[3, 3, 0, 0]} maxBarSize={16} />
                   <Line type="monotone" dataKey="ema3" name="EMA 3j (Court terme)" stroke="#38bdf8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
                   <Line type="monotone" dataKey="ema7" name="EMA 7j (Moyen terme)" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                   <Line type="monotone" dataKey="ema21" name="EMA 21j (Fond durable)" stroke="#818cf8" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4 }} />

@@ -46,37 +46,37 @@ export default function QualitySparkline({ data, current, width = 110, height = 
           strokeWidth="1"
         />
 
-        {/* EMA 21 (Chronique) */}
+        {/* EMA 21 (Chronique / Fond) */}
         <path
           d={pathEma21}
           fill="none"
-          stroke="#38bdf8"
+          stroke="#818cf8"
           strokeWidth="1.5"
           strokeDasharray="3 2"
-          opacity="0.8"
+          opacity="0.85"
         />
 
-        {/* EMA 7 (Récente) */}
+        {/* EMA 7 (Moyen terme / ATL) */}
         <path
           d={pathEma7}
           fill="none"
-          stroke="#f59e0b"
+          stroke="#3b82f6"
           strokeWidth="1.5"
           opacity="0.9"
         />
 
-        {/* EMA 3 (Aiguë) */}
+        {/* EMA 3 (Court terme) */}
         <path
           d={pathEma3}
           fill="none"
-          stroke="#ef4444"
+          stroke="#38bdf8"
           strokeWidth="2"
         />
 
         {/* Dots on today */}
-        <circle cx={lastX} cy={getY(data[lastIndex]?.ema21)} r="2" fill="#38bdf8" />
-        <circle cx={lastX} cy={getY(data[lastIndex]?.ema7)} r="2" fill="#f59e0b" />
-        <circle cx={lastX} cy={getY(data[lastIndex]?.ema3)} r="2.5" fill="#ef4444" />
+        <circle cx={lastX} cy={getY(data[lastIndex]?.ema21)} r="2" fill="#818cf8" />
+        <circle cx={lastX} cy={getY(data[lastIndex]?.ema7)} r="2" fill="#3b82f6" />
+        <circle cx={lastX} cy={getY(data[lastIndex]?.ema3)} r="2.5" fill="#38bdf8" />
       </svg>
     </div>
   );

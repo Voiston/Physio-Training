@@ -33,14 +33,18 @@ export default function Grid({
     if (active && payload && payload.length) {
       const dataPoint = payload[0]?.payload;
       return (
-        <div className="bg-[#121216]/95 backdrop-blur-md p-2.5 border border-white/10 rounded-lg shadow-lg text-[11px]">
-          <p className="m-0 mb-1 font-bold text-slate-200 uppercase text-[10px] tracking-wider border-b border-white/10 pb-1">
-            {dataPoint?.dateStr} (Jour {label})
+        <div className="bg-slate-950/95 backdrop-blur-md p-3 border border-white/15 rounded-xl shadow-2xl text-xs min-w-[170px]">
+          <p className="m-0 mb-1.5 font-bold text-white uppercase text-[10px] tracking-wider border-b border-white/10 pb-1 flex items-center justify-between">
+            <span>{dataPoint?.dateStr}</span>
+            <span className="text-slate-400 font-mono">Jour {label}</span>
           </p>
           {payload.map((p, i) => (
-            <div key={i} className="flex justify-between items-center gap-3 py-0.5 font-medium">
-              <span style={{ color: p.color }}>{p.name}</span>
-              <span className="font-bold text-slate-100">{p.value}</span>
+            <div key={i} className="flex justify-between items-center gap-3 py-0.5 text-[11px] font-medium">
+              <span className="flex items-center gap-1.5" style={{ color: p.color }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+                {p.name}
+              </span>
+              <span className="font-bold font-mono text-white">{p.value}</span>
             </div>
           ))}
         </div>
@@ -53,11 +57,11 @@ export default function Grid({
     <div className="w-full min-w-[1100px]">
       <table className="w-full text-left border-collapse table-fixed">
         <thead>
-          <tr className="bg-[#161619] text-[10px] uppercase text-slate-500 border-b border-white/10">
+          <tr className="bg-[#161619] text-[10px] uppercase text-slate-400 border-b border-white/10">
             {/* Colonne 1 : Qualité */}
             <th className="p-3 w-48 sticky left-0 bg-[#161619] z-20 shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
               <div className="flex items-center justify-between">
-                <span>Qualité Physique</span>
+                <span className="text-slate-300 font-bold tracking-wider">Qualité Physique</span>
                 {activeBlockToday && (
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
                     {activeBlockToday.name}
@@ -69,11 +73,17 @@ export default function Grid({
             {/* Colonne 2 : Courbes EMA 3/7/21j */}
             <th className="p-2 w-64 border-l border-white/5 bg-[#161619] z-10 text-center">
               <div className="flex flex-col items-center justify-center">
-                <span className="text-slate-300 font-bold tracking-wider">Courbes EMA (3j / 7j / 21j)</span>
+                <span className="text-slate-200 font-bold tracking-wider">Courbes EMA (3j / 7j / 21j)</span>
                 <div className="flex items-center gap-2 mt-0.5 text-[9px] font-semibold">
-                  <span className="text-red-400">● 3j Aiguë</span>
-                  <span className="text-amber-400">● 7j Récente</span>
-                  <span className="text-sky-400">● 21j Chronique</span>
+                  <span className="text-sky-300 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span> 3j Court
+                  </span>
+                  <span className="text-blue-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> 7j Récent
+                  </span>
+                  <span className="text-indigo-300 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> 21j Fond
+                  </span>
                 </div>
               </div>
             </th>
@@ -115,19 +125,19 @@ export default function Grid({
         <tbody className="text-xs">
           {/* LIGNE SPECIALE : READINESS */}
           <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-            <td className="p-3 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)] text-blue-400">
+            <td className="p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)] text-blue-400">
               Readiness (1-10)
             </td>
-            <td className="p-2 border-l border-white/5 text-center text-slate-500 text-[11px]">
+            <td className="p-2 border-l border-white/5 text-center text-slate-400 text-[11px] font-medium">
               Modulateur de récupération
             </td>
             {timeline.map((day) => {
               const score = dailyMetrics[day.dateStr]?.readiness || '-';
               
-              const badgeClass = score === '-' ? 'text-slate-600'
-                               : score >= 8 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                               : score >= 5 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                               : 'bg-red-500/20 text-red-400 border border-red-500/30';
+              const badgeClass = score === '-' ? 'text-slate-500 font-normal'
+                               : score >= 8 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                               : score >= 5 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                               : 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
 
               return (
                 <td 
@@ -137,7 +147,7 @@ export default function Grid({
                 >
                   <div className="flex justify-center items-center h-8">
                      <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${badgeClass}`}>
-                        {score !== '-' ? `${score}/10` : '-'}
+                        {score !== '-' ? `${score}/10` : '—'}
                      </span>
                   </div>
                 </td>
@@ -147,10 +157,10 @@ export default function Grid({
 
           {/* LIGNE SPECIALE : VFC */}
           <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-            <td className="p-3 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)] text-emerald-400">
+            <td className="p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.2)] text-emerald-400">
               VFC Matinale (ms)
             </td>
-            <td className="p-2 border-l border-white/5 text-center text-slate-500 text-[11px]">
+            <td className="p-2 border-l border-white/5 text-center text-slate-400 text-[11px] font-medium">
               Indicateur parasympathique
             </td>
             {timeline.map((day) => {
@@ -161,8 +171,8 @@ export default function Grid({
                     className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-l border-white/5 ${day.offset === 0 ? 'bg-blue-500/5 border-x border-x-blue-500/20' : ''}`}
                     onClick={() => onMetricClick(day.dateStr, 'vfc', vfc)}
                 >
-                    <div className={`flex justify-center items-center h-8 font-bold ${vfc !== '-' ? 'text-emerald-300' : 'text-slate-600'}`}>
-                        {vfc}
+                    <div className={`flex justify-center items-center h-8 font-bold font-mono text-[11px] ${vfc !== '-' ? 'text-emerald-300' : 'text-slate-500 font-normal'}`}>
+                        {vfc !== '-' ? vfc : '—'}
                     </div>
                 </td>
                 );
@@ -261,22 +271,22 @@ export default function Grid({
                       {/* Valeurs numériques 3j / 7j / 21j avec indicateurs de tendance */}
                       <div className="flex flex-col text-[10px] leading-tight shrink-0 font-mono">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-red-400 font-bold inline-flex items-center" title={`EMA 3j (Fatigue) : ${current.ema3} (${current.periodDelta3 > 0 ? '+' : ''}${current.periodDelta3 || 0} vs J-3)`}>
+                          <span className="text-sky-300 font-bold inline-flex items-center" title={`EMA 3j (Court terme) : ${current.ema3} (${(current.periodDelta3 ?? 0) > 0 ? '+' : ''}${current.periodDelta3 || 0} vs J-3)`}>
                             {Math.round(current.ema3)}
                             {(current.periodDelta3 ?? 0) > 0.05 && <span className="text-[8px] text-emerald-400 ml-0.5">▲</span>}
-                            {(current.periodDelta3 ?? 0) < -0.05 && <span className="text-[8px] text-red-400 ml-0.5">▼</span>}
+                            {(current.periodDelta3 ?? 0) < -0.05 && <span className="text-[8px] text-rose-400 ml-0.5">▼</span>}
                           </span>
-                          <span className="text-slate-600">/</span>
-                          <span className="text-amber-400 font-bold inline-flex items-center" title={`EMA 7j (Récente) : ${current.ema7} (${current.periodDelta7 > 0 ? '+' : ''}${current.periodDelta7 || 0} vs J-7)`}>
+                          <span className="text-slate-500">/</span>
+                          <span className="text-blue-400 font-bold inline-flex items-center" title={`EMA 7j (Moyen terme / ATL) : ${current.ema7} (${(current.periodDelta7 ?? 0) > 0 ? '+' : ''}${current.periodDelta7 || 0} vs J-7)`}>
                             {Math.round(current.ema7)}
                             {(current.periodDelta7 ?? 0) > 0.05 && <span className="text-[8px] text-emerald-400 ml-0.5">▲</span>}
-                            {(current.periodDelta7 ?? 0) < -0.05 && <span className="text-[8px] text-red-400 ml-0.5">▼</span>}
+                            {(current.periodDelta7 ?? 0) < -0.05 && <span className="text-[8px] text-rose-400 ml-0.5">▼</span>}
                           </span>
-                          <span className="text-slate-600">/</span>
-                          <span className="text-sky-400 font-bold inline-flex items-center" title={`EMA 21j (Fitness) : ${current.ema21} (${current.periodDelta21 > 0 ? '+' : ''}${current.periodDelta21 || 0} vs J-21)`}>
+                          <span className="text-slate-500">/</span>
+                          <span className="text-indigo-300 font-bold inline-flex items-center" title={`EMA 21j (Fond / CTL) : ${current.ema21} (${(current.periodDelta21 ?? 0) > 0 ? '+' : ''}${current.periodDelta21 || 0} vs J-21)`}>
                             {Math.round(current.ema21)}
                             {(current.periodDelta21 ?? 0) > 0.05 && <span className="text-[8px] text-emerald-400 ml-0.5">▲</span>}
-                            {(current.periodDelta21 ?? 0) < -0.05 && <span className="text-[8px] text-red-400 ml-0.5">▼</span>}
+                            {(current.periodDelta21 ?? 0) < -0.05 && <span className="text-[8px] text-rose-400 ml-0.5">▼</span>}
                           </span>
                         </div>
                         <div className="mt-0.5">

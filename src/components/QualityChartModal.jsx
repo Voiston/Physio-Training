@@ -201,28 +201,46 @@ export default function QualityChartModal({ quality, events, onClose }) {
             ))}
           </div>
 
-          <div className="flex items-center gap-4 text-[11px] text-slate-400">
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> EMA 3j</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> EMA 7j</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span> EMA 21j</span>
-            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2 bg-white/20 rounded"></span> Charge brute</span>
+          <div className="flex items-center gap-4 text-[11px] text-slate-300 font-medium">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span> EMA 3j</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> EMA 7j</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span> EMA 21j</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2 bg-white/25 rounded"></span> Charge brute</span>
           </div>
         </div>
 
         {/* Chart */}
-        <div className="h-[340px] w-full min-h-[300px] min-w-0 bg-black/20 p-2 rounded-xl border border-white/5 relative">
+        <div className="h-[340px] w-full min-h-[300px] min-w-0 bg-slate-950/70 p-3 rounded-2xl border border-white/10 relative shadow-inner">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={series} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-              <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" vertical={false} />
+              <XAxis 
+                dataKey="dateStr" 
+                tickFormatter={(str) => {
+                  if (!str) return '';
+                  const parts = str.split('-');
+                  return parts.length >= 3 ? `${parts[2]}/${parts[1]}` : str;
+                }}
+                stroke="#64748b" 
+                tick={{ fontSize: 11, fill: '#f1f5f9', fontWeight: 600 }} 
+                tickLine={{ stroke: '#64748b', strokeWidth: 1.5 }} 
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.5 }}
+                minTickGap={28}
+                dy={3}
+              />
+              <YAxis 
+                stroke="#64748b" 
+                tick={{ fontSize: 10, fill: '#cbd5e1', fontWeight: 500 }} 
+                tickLine={{ stroke: '#64748b' }} 
+                axisLine={{ stroke: '#64748b', strokeWidth: 1.2 }} 
+              />
               <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
+              <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
               
-              <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.15)" radius={[2, 2, 0, 0]} maxBarSize={18} />
-              <Line type="monotone" dataKey="ema3" name="EMA 3j (Fatigue Aiguë)" stroke="#ef4444" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="ema7" name="EMA 7j (Charge Récente)" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="ema21" name="EMA 21j (Capacité Chronique)" stroke="#38bdf8" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4 }} />
+              <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.25)" radius={[2, 2, 0, 0]} maxBarSize={18} />
+              <Line type="monotone" dataKey="ema3" name="EMA 3j (Court terme)" stroke="#38bdf8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="ema7" name="EMA 7j (Moyen terme / ATL)" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="ema21" name="EMA 21j (Fond durable / CTL)" stroke="#818cf8" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
