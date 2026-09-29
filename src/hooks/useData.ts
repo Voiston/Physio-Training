@@ -154,6 +154,7 @@ export type QualitiesEMAMap = Record<string, QualityEMAData>;
 export interface DailyMetrics {
   readiness?: number;
   vfc?: number;
+  hrRest?: number;
   [key: string]: number | undefined;
 }
 
@@ -359,7 +360,7 @@ export function useData() {
           const rawItem = localStorage.getItem(key);
           if (!rawItem) continue;
           const parsed = JSON.parse(rawItem);
-          if (category === 'readiness' || category === 'vfc') {
+          if (category === 'readiness' || category === 'vfc' || category === 'hrRest') {
             if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
             loadedMetrics[dateStr][category] = Number(parsed);
           } else if (loadedEvents[category] !== undefined) {
@@ -367,7 +368,7 @@ export function useData() {
           }
         } catch (e) {
           const rawVal = localStorage.getItem(key);
-          if (category === 'readiness' || category === 'vfc') {
+          if (category === 'readiness' || category === 'vfc' || category === 'hrRest') {
             if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
             loadedMetrics[dateStr][category] = parseInt(rawVal || '0', 10);
           } else if (loadedEvents[category] !== undefined) {

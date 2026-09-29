@@ -365,10 +365,56 @@ export default function Grid({
                       onClick={() => onMetricClick(day.dateStr, 'vfc', vfc)}
                   >
                       <div className={`flex justify-center items-center h-8 font-bold font-mono text-[11px] ${vfc !== '-' ? 'text-emerald-300' : 'text-slate-500 font-normal'}`}>
-                          {vfc !== '-' ? vfc : '—'}
+                          {vfc !== '-' ? `${vfc} ms` : '—'}
                       </div>
                   </td>
                   );
+              })}
+            </tr>
+
+            {/* LIGNE SPECIALE : FC DE REPOS (BPM) */}
+            <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+              <td className="p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-rose-400">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span>FC de Repos (bpm)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-normal">Basal / Réveil</span>
+                </div>
+              </td>
+              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
+                Tonus cardiaque au réveil
+              </td>
+              {timeline.map((day) => {
+                const hrRest = dailyMetrics[day.dateStr]?.hrRest ?? dailyMetrics[day.dateStr]?.rhr ?? '-';
+                
+                let badgeClass = 'text-slate-500 font-normal';
+                if (hrRest !== '-') {
+                  const numHr = Number(hrRest);
+                  if (numHr <= 52) {
+                    badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
+                  } else if (numHr <= 58) {
+                    badgeClass = 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold';
+                  } else if (numHr <= 65) {
+                    badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold';
+                  } else {
+                    badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold';
+                  }
+                }
+
+                return (
+                  <td 
+                    key={`hrRest-${day.dateStr}`} 
+                    className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
+                    onClick={() => onMetricClick(day.dateStr, 'hrRest', hrRest)}
+                  >
+                    <div className="flex justify-center items-center h-8">
+                       <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] ${badgeClass}`}>
+                          {hrRest !== '-' ? `${hrRest} bpm` : '—'}
+                       </span>
+                    </div>
+                  </td>
+                );
               })}
             </tr>
 

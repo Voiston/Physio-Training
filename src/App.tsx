@@ -471,15 +471,41 @@ export default function App() {
                   onCellClick={(q: any, dateStr: string, currentData: any) => setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData })}
                   onQualityClick={(q: any) => setQualityChartInfo(q)}
                   onMetricClick={(dateStr: string, type: string, currentValue: any) => {
+                    let title = 'Métrique Physiologique';
+                    let label = 'Valeur';
+                    let min = 1;
+                    let max = 300;
+                    let placeholder = 'Ex: 50';
+
+                    if (type === 'readiness') {
+                      title = 'Readiness Score';
+                      label = 'Score de Forme (1 à 10)';
+                      min = 1;
+                      max = 10;
+                      placeholder = 'Ex: 7';
+                    } else if (type === 'vfc') {
+                      title = 'VFC Matinale';
+                      label = 'Valeur VFC RMSSD (ms)';
+                      min = 10;
+                      max = 300;
+                      placeholder = 'Ex: 65';
+                    } else if (type === 'hrRest') {
+                      title = 'FC de Repos Matinale';
+                      label = 'Fréquence Cardiaque de Repos (bpm)';
+                      min = 30;
+                      max = 150;
+                      placeholder = 'Ex: 48';
+                    }
+
                     setMetricModalInfo({
                       type,
                       dateStr,
                       currentValue,
-                      title: type === 'readiness' ? 'Readiness Score' : 'VFC Matinale',
-                      label: type === 'readiness' ? 'Score (1 à 10)' : 'Valeur VFC (ms)',
-                      min: 1,
-                      max: type === 'readiness' ? 10 : 300,
-                      placeholder: type === 'readiness' ? 'Ex: 7' : 'Ex: 65'
+                      title,
+                      label,
+                      min,
+                      max,
+                      placeholder
                     });
                   }}
                 />

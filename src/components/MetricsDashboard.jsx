@@ -229,6 +229,8 @@ export default function MetricsDashboard({
       const dateStr = getLocalYYYYMMDD(d);
       
       const vfc = dailyMetrics[dateStr]?.vfc || null;
+      const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
+      const readiness = dailyMetrics[dateStr]?.readiness || null;
       let totalLoad = 0;
       const daySessions = [];
       
@@ -278,6 +280,8 @@ export default function MetricsDashboard({
         isToday: i === 0,
         isFuture: i > 0,
         vfc, 
+        hrRest,
+        readiness,
         load: totalLoad,
         sessions: daySessions
       });
@@ -608,6 +612,15 @@ export default function MetricsDashboard({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Biométrie du réveil */}
+          {(dataItem?.vfc || dataItem?.hrRest || dataItem?.readiness) && (
+            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2 text-[10px] font-mono">
+              {dataItem.readiness && <span className="text-blue-300">⚡ {dataItem.readiness}/10</span>}
+              {dataItem.vfc && <span className="text-emerald-300">🫀 {dataItem.vfc} ms</span>}
+              {dataItem.hrRest && <span className="text-rose-300">💓 {dataItem.hrRest} bpm</span>}
             </div>
           )}
         </div>
@@ -2006,6 +2019,28 @@ export default function MetricsDashboard({
                 <p className="text-xs text-emerald-300 font-medium bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg m-0">
                   🎯 <strong>Conseil d'entraînement :</strong> {banisterInterpretation.prescription}
                 </p>
+
+                {/* Triptyque Biométrique du Réveil (Readiness, VFC, FC de Repos) */}
+                {(currentInspectedDay.readiness || currentInspectedDay.vfc || currentInspectedDay.hrRest) && (
+                  <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-3 text-xs font-mono">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Biométrie du Réveil :</span>
+                    {currentInspectedDay.readiness && (
+                      <span className="inline-flex items-center gap-1 text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
+                        ⚡ Readiness : <strong>{currentInspectedDay.readiness}/10</strong>
+                      </span>
+                    )}
+                    {currentInspectedDay.vfc && (
+                      <span className="inline-flex items-center gap-1 text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                        🫀 VFC : <strong>{currentInspectedDay.vfc} ms</strong>
+                      </span>
+                    )}
+                    {currentInspectedDay.hrRest && (
+                      <span className="inline-flex items-center gap-1 text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
+                        💓 FC Repos : <strong>{currentInspectedDay.hrRest} bpm</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Séances Enregistrées Réalisées Ce Jour-Là */}
