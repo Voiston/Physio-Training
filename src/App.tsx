@@ -19,7 +19,8 @@ import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
-  Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target 
+  Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
+  PanelLeftClose, PanelLeftOpen 
 } from 'lucide-react';
 
 export default function App() {
@@ -66,6 +67,7 @@ export default function App() {
   } = useData();
 
   const [activeTab, setActiveTab] = useState<'grid' | 'physiology' | 'qualities' | 'periodization'>('grid');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [modalInfo, setModalInfo] = useState<any>(null);
   const [metricModalInfo, setMetricModalInfo] = useState<any>(null);
   const [qualityChartInfo, setQualityChartInfo] = useState<any>(null);
@@ -126,12 +128,12 @@ export default function App() {
               onClick={() => toggleSimulation()}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
                 isSimulationActive 
-                  ? 'bg-purple-600 text-white border-purple-400 shadow-lg shadow-purple-500/25 animate-pulse' 
-                  : 'bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border-purple-500/30'
+                  ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/25' 
+                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
               }`}
               title="Tester des séances prévisionnelles et anticiper la forme (TSB) future"
             >
-              <Sparkles size={14} className={isSimulationActive ? 'animate-spin-slow' : ''} />
+              <Sparkles size={14} className={isSimulationActive ? 'text-purple-200' : 'text-purple-400'} />
               <span className="hidden sm:inline">{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
               <span className="sm:hidden">Simu</span>
             </button>
@@ -139,10 +141,10 @@ export default function App() {
             {/* Bouton Calibrage Constantes Physiologiques */}
             <button
               onClick={() => setShowPhysioSettingsModal(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
               title="Calibrer les constantes de rémanence Banister (tau fatigue 5-12j, tau condition 21-45j)"
             >
-              <Sliders size={14} className="text-indigo-400 shrink-0" />
+              <Sliders size={14} className="text-blue-400 shrink-0" />
               <span className="hidden md:inline font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</span>
               <span className="md:hidden">τ</span>
             </button>
@@ -150,7 +152,7 @@ export default function App() {
             {/* Bouton Export Bilan PDF */}
             <button
               onClick={() => setShowReportModal(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
               title="Générer un bilan hebdomadaire ou mensuel PDF pour votre entraîneur"
             >
               <FileText size={14} className="text-blue-400 shrink-0" />
@@ -266,135 +268,194 @@ export default function App() {
 
         {/* ONGLET 1 : GRILLE & PLANIFICATION */}
         {activeTab === 'grid' && (
-          <div className="flex flex-col xl:flex-row gap-6 min-h-0 animate-fadeIn">
-            
-            {/* Left Sidebar */}
-            <aside className="w-full xl:w-80 flex flex-col gap-6 shrink-0">
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
-                <RadarChart 
-                  qualities={qualities} 
-                  events={events} 
-                  dailyMetrics={dailyMetrics} 
-                  trainingBlocks={trainingBlocks}
-                />
+          <div className="flex flex-col gap-4 animate-fadeIn">
+            {/* Barre d'outils secondaire : Masquer / Afficher le volet athlète latéral */}
+            <div className="flex items-center justify-between px-1">
+              <button
+                onClick={() => setIsSidebarOpen(prev => !prev)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
+                title={isSidebarOpen ? "Masquer le volet athlète pour étendre la grille de planification au maximum" : "Afficher le profil athlétique et le bloc actif"}
+              >
+                {isSidebarOpen ? (
+                  <PanelLeftClose size={15} className="text-blue-400 shrink-0" />
+                ) : (
+                  <PanelLeftOpen size={15} className="text-blue-400 shrink-0" />
+                )}
+                <span>{isSidebarOpen ? "Masquer volet athlète (Plein écran)" : "Afficher volet athlète (Radar & Bloc)"}</span>
+              </button>
+
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
+                <span className="hidden sm:inline">Matrice d'entraînement :</span>
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-slate-300">
+                  {qualities.length} qualités · -14j à +14j
+                </span>
               </div>
+            </div>
 
-              {/* Widget Bloc de Préparation Actif */}
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
-                <div className="flex items-center justify-between mb-2.5">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 m-0">
-                    <Calendar size={13} className="text-blue-400" />
-                    Cycle de Préparation
-                  </h3>
-                  <button
-                    onClick={() => setShowBlocksModal(true)}
-                    className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline"
-                  >
-                    {activeBlockToday ? 'Gérer' : 'Planifier'}
-                  </button>
-                </div>
+            <div className="flex flex-col xl:flex-row gap-6 min-h-0">
+              {/* Left Sidebar (escamotable) */}
+              {isSidebarOpen && (
+                <aside className="w-full xl:w-80 flex flex-col gap-5 shrink-0 transition-all">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
+                    <RadarChart 
+                      qualities={qualities} 
+                      events={events} 
+                      dailyMetrics={dailyMetrics} 
+                      trainingBlocks={trainingBlocks}
+                    />
+                  </div>
 
-                {activeBlockToday ? (
-                  <div className="space-y-3">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-purple-950/20 to-transparent border border-blue-500/30">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-white">{activeBlockToday.name}</span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          Sem. {blockProgress?.currentWeek}/{activeBlockToday.durationWeeks}
-                        </span>
-                      </div>
+                  {/* Widget Bloc de Préparation Actif */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5 m-0">
+                        <Calendar size={13} className="text-blue-400" />
+                        Cycle de Préparation
+                      </h3>
+                      <button
+                        onClick={() => setShowBlocksModal(true)}
+                        className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold cursor-pointer underline"
+                      >
+                        {activeBlockToday ? 'Gérer' : 'Planifier'}
+                      </button>
+                    </div>
 
-                      <div className="text-[11px] text-slate-400 font-mono mb-2">
-                        Fin le {activeBlockToday.endDate} • reste {blockProgress?.remainingDays} j
-                      </div>
+                    {activeBlockToday ? (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/40 via-purple-950/20 to-transparent border border-blue-500/30">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold text-sm text-white">{activeBlockToday.name}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              Sem. {blockProgress?.currentWeek}/{activeBlockToday.durationWeeks}
+                            </span>
+                          </div>
 
-                      {/* Progress Bar */}
-                      <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
-                        <div 
-                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
-                          style={{ width: `${blockProgress?.percent || 0}%` }}
-                        />
-                      </div>
+                          <div className="text-[11px] text-slate-400 font-mono mb-2">
+                            Fin le {activeBlockToday.endDate} • reste {blockProgress?.remainingDays} j
+                          </div>
 
-                      {/* Impacts Summary */}
-                      <div className="space-y-1.5 text-[11px] border-t border-white/5 pt-2">
-                        <div className="flex items-center gap-1.5 text-red-300">
-                          <Zap size={11} className="text-red-400 shrink-0" />
-                          <span className="font-semibold">Fréquence accrue (-25%) :</span>
+                          {/* Progress Bar */}
+                          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
+                              style={{ width: `${blockProgress?.percent || 0}%` }}
+                            />
+                          </div>
+
+                          {/* Impacts Summary */}
+                          <div className="space-y-1.5 text-[11px] border-t border-white/5 pt-2">
+                            <div className="flex items-center gap-1.5 text-red-300">
+                              <Zap size={11} className="text-red-400 shrink-0" />
+                              <span className="font-semibold">Fréquence accrue (-25%) :</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
+                              {activeBlockToday.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ')}
+                            </p>
+
+                            <div className="flex items-center gap-1.5 text-sky-300 pt-1">
+                              <Shield size={11} className="text-sky-400 shrink-0" />
+                              <span className="font-semibold">Maintien (+35% délai prolongé) :</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
+                              Reste des séances bénéficient d'un intervalle étendu.
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
-                          {activeBlockToday.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ')}
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-center">
+                        <p className="text-xs text-slate-300 font-medium mb-1">Aucun bloc actif</p>
+                        <p className="text-[10px] text-slate-500 mb-3">
+                          Déclarez un bloc spécifique (ex: Force max 4 sem., Seuil/VMA 3 sem.) pour rythmer votre progression.
                         </p>
+                        <button
+                          onClick={() => setShowBlocksModal(true)}
+                          className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          <Plus size={13} /> Déclarer un bloc (3, 4, 6 sem.)
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                        <div className="flex items-center gap-1.5 text-sky-300 pt-1">
-                          <Shield size={11} className="text-sky-400 shrink-0" />
-                          <span className="font-semibold">Maintien (+35% délai prolongé) :</span>
+                  {/* Guide Physiologique EMA Aéré & Lisible (Polices >= 12px, Interligne Souple) */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-xl text-slate-200">
+                    <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2.5">
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
+                        Guide Physiologique EMA
+                      </h3>
+                      <span className="text-[10px] font-mono text-slate-400">Banister</span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {/* EMA 3j */}
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-red-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-red-300">EMA 3j · Fatigue Aiguë</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
-                          Reste des séances bénéficient d'un intervalle étendu.
+                        <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
+                          Stress immédiat du système nerveux. Décroît rapidement après 48h à 72h de repos.
+                        </p>
+                      </div>
+
+                      {/* EMA 7j */}
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-amber-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-amber-300">EMA 7j · Charge Récente (ATL)</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
+                          Fatigue accumulée sur la semaine. Pilote le ratio de surcharge (ACWR).
+                        </p>
+                      </div>
+
+                      {/* EMA 21j */}
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-sky-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-sky-300">EMA 21j · Condition Durable (CTL)</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
+                          Fitness de fond acquis sur le cycle. Résistance structurelle à l'effort.
+                        </p>
+                      </div>
+
+                      {/* TSB */}
+                      <div className="p-2.5 rounded-xl bg-slate-900/60 border border-emerald-500/20">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                          <span className="text-xs font-bold text-emerald-300">Balance de Forme (TSB)</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
+                          CTL − ATL. Visez +15 à +25 le Jour J pour un affûtage optimal en compétition.
                         </p>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-center">
-                    <p className="text-xs text-slate-300 font-medium mb-1">Aucun bloc actif</p>
-                    <p className="text-[10px] text-slate-500 mb-3">
-                      Déclarez un bloc spécifique (ex: Force max 4 sem., Seuil/VMA 3 sem.) pour rythmer votre progression.
-                    </p>
-                    <button
-                      onClick={() => setShowBlocksModal(true)}
-                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      <Plus size={13} /> Déclarer un bloc (3, 4, 6 sem.)
-                    </button>
-                  </div>
-                )}
-              </div>
+                </aside>
+              )}
 
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md shadow-xl text-sm text-slate-300">
-                <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider m-0">Guide Physiologique EMA</h3>
-                <ul className="space-y-4 text-xs p-0 m-0 list-none">
-                  <li className="flex gap-3 items-start">
-                    <span className="text-red-400 font-bold text-base leading-none mt-0.5">•</span>
-                    <span className="leading-relaxed"><strong>EMA 3j (Aiguë) :</strong> Reflète l'état de fatigue immédiat et le stress du système nerveux.</span>
-                  </li>
-                  <li className="flex gap-3 items-start">
-                    <span className="text-amber-400 font-bold text-base leading-none mt-0.5">•</span>
-                    <span className="leading-relaxed"><strong>EMA 7j (Récente / ATL) :</strong> Fatigue aiguë accumulée sur la semaine courante.</span>
-                  </li>
-                  <li className="flex gap-3 items-start">
-                    <span className="text-sky-400 font-bold text-base leading-none mt-0.5">•</span>
-                    <span className="leading-relaxed"><strong>EMA 21j (Chronique / CTL) :</strong> Charge de fond / condition physique durable (Fitness).</span>
-                  </li>
-                  <li className="flex gap-3 items-start">
-                    <span className="text-emerald-400 font-bold text-base leading-none mt-0.5">•</span>
-                    <span className="leading-relaxed"><strong>Forme Banister (TSB) :</strong> CTL - ATL. Supérieur à +15 pour le pic de forme en compétition.</span>
-                  </li>
-                </ul>
-              </div>
-            </aside>
+              {/* Center Content */}
+              <main className="flex-1 min-w-0 flex flex-col gap-5">
+                {/* Suggestions & Priorités d'entraînement algorithmiques */}
+                <SmartSuggestions 
+                  recommendations={trainingRecommendations}
+                  activeBlock={activeBlockToday}
+                  onOpenSessionModal={(q) => {
+                    setModalInfo({ 
+                      qId: q.id, 
+                      qName: q.name, 
+                      dateStr: todayStr, 
+                      currentData: events[q.id]?.[todayStr] 
+                    });
+                  }}
+                  onReorderByUrgency={reorderByUrgency}
+                  onReorderByBlock={() => reorderByBlockFocus(activeBlockToday)}
+                  onResetOrder={resetQualitiesOrder}
+                />
 
-            {/* Center Content */}
-            <main className="flex-1 min-w-0 flex flex-col gap-6">
-              {/* Suggestions & Priorités d'entraînement algorithmiques */}
-              <SmartSuggestions 
-                recommendations={trainingRecommendations}
-                activeBlock={activeBlockToday}
-                onOpenSessionModal={(q) => {
-                  setModalInfo({ 
-                    qId: q.id, 
-                    qName: q.name, 
-                    dateStr: todayStr, 
-                    currentData: events[q.id]?.[todayStr] 
-                  });
-                }}
-                onReorderByUrgency={reorderByUrgency}
-                onReorderByBlock={() => reorderByBlockFocus(activeBlockToday)}
-                onResetOrder={resetQualitiesOrder}
-              />
-
-              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto backdrop-blur-md shadow-xl custom-scrollbar flex-1 w-full">
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-x-auto backdrop-blur-md shadow-xl custom-scrollbar flex-1 w-full">
                 <Grid 
                   timeline={timeline} 
                   events={events} 
@@ -420,6 +481,7 @@ export default function App() {
                 />
               </div>
             </main>
+            </div>
           </div>
         )}
 

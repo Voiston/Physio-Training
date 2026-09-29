@@ -7,12 +7,12 @@
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   
-  --state-green: rgba(16, 185, 129, 0.6);
-  --state-orange: rgba(245, 158, 11, 0.6);
-  --state-red: rgba(239, 68, 68, 0.4);
+  --state-green: rgba(16, 185, 129, 0.18);
+  --state-orange: rgba(245, 158, 11, 0.18);
+  --state-red: rgba(255, 255, 255, 0.03);
   
-  --j0-highlight: rgba(59, 130, 246, 0.1);
-  --j0-border: rgba(59, 130, 246, 0.2);
+  --j0-highlight: rgba(59, 130, 246, 0.12);
+  --j0-border: rgba(59, 130, 246, 0.35);
 }
 
 body {

@@ -130,67 +130,98 @@ export default function SmartSuggestions({
         </div>
       </div>
 
-      {/* Recommendations Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {displayList.map(item => {
-          const isCritical = item.urgencyLevel === 'CRITICAL';
-          const isHigh = item.urgencyLevel === 'HIGH';
+      {/* Recommendations Cards Grid avec Priorisation Dégradée (#1 Rouge, #2 Orange, #3 Bleu/Gris) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        {displayList.map((item, index) => {
+          // Hiérarchie visuelle dégradée pour éviter le syndrome "tout est rouge/prioritaire"
+          const isRank1 = index === 0;
+          const isRank2 = index === 1;
+          const isRank3 = index >= 2;
+
+          let cardStyle = 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700';
+          let priorityLabel = `Priorité ${index + 1} · En Maintien`;
+          let priorityBadgeClass = 'bg-slate-800/80 text-slate-300 border-slate-700';
+          let PriorityIcon = CheckCircle2;
+          let btnStyle = 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/10';
+
+          if (isRank1) {
+            cardStyle = 'border-rose-500/40 bg-gradient-to-b from-rose-950/20 via-slate-900/60 to-slate-900/90 shadow-[0_4px_20px_rgba(244,63,94,0.08)] hover:border-rose-400/60';
+            priorityLabel = 'Priorité 1 · Séance Clé';
+            priorityBadgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold';
+            PriorityIcon = Flame;
+            btnStyle = 'bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30';
+          } else if (isRank2) {
+            cardStyle = 'border-amber-500/30 bg-gradient-to-b from-amber-950/15 via-slate-900/60 to-slate-900/90 hover:border-amber-400/50';
+            priorityLabel = 'Priorité 2 · À Programmer';
+            priorityBadgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30 font-semibold';
+            PriorityIcon = Clock;
+            btnStyle = 'bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/25';
+          } else {
+            cardStyle = 'border-slate-700/60 bg-gradient-to-b from-slate-900/70 to-slate-950/80 hover:border-blue-500/40';
+            priorityLabel = `Priorité ${index + 1} · Régularité`;
+            priorityBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+            PriorityIcon = Zap;
+            btnStyle = 'bg-blue-600/80 hover:bg-blue-600 text-white shadow-md shadow-blue-600/20';
+          }
           
           return (
             <div 
               key={item.quality.id}
-              className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all ${
-                isCritical 
-                  ? 'bg-red-950/20 border-red-500/40 hover:border-red-500/60 shadow-[0_4px_15px_rgba(239,68,68,0.08)]' 
-                  : isHigh 
-                  ? 'bg-amber-950/20 border-amber-500/30 hover:border-amber-500/50' 
-                  : 'bg-white/[0.02] border-white/10 hover:bg-white/[0.04]'
-              }`}
+              onClick={() => onOpenSessionModal(item.quality)}
+              className={`p-4 rounded-2xl border flex flex-col justify-between transition-all cursor-pointer group hover:scale-[1.01] ${cardStyle}`}
+              title={`Cliquer pour enregistrer une séance pour ${item.quality.name}`}
             >
               <div>
-                {/* Header row with quality name & rank */}
-                <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                {/* Header row with quality name & nuanced priority badge */}
+                <div className="flex items-center justify-between gap-1.5 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-white/10 text-slate-300 border border-white/10">
                       #{item.rank}
                     </span>
-                    <span className="font-bold text-sm text-white truncate">
+                    <span className="font-bold text-sm text-white group-hover:text-blue-300 transition-colors truncate">
                       {item.quality.name}
                     </span>
                   </div>
 
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 shrink-0 ${getBadgeStyle(item.urgencyLevel)}`}>
-                    {getUrgencyIcon(item.urgencyLevel)}
-                    <span>{item.urgencyBadge}</span>
+                  <span className={`px-2 py-0.5 rounded-lg text-[10px] border flex items-center gap-1 shrink-0 ${priorityBadgeClass}`}>
+                    <PriorityIcon className="w-3.5 h-3.5" />
+                    <span>{priorityLabel}</span>
                   </span>
                 </div>
 
                 {/* Block focus indicator if applicable */}
                 {item.isBlockFocus && (
-                  <div className="flex items-center gap-1 text-[10px] text-amber-300 font-semibold mb-1">
-                    <Zap size={11} className="text-amber-400" />
+                  <div className="flex items-center gap-1 text-[10px] text-amber-300 font-semibold mb-2">
+                    <Zap size={11} className="text-amber-400 shrink-0" />
                     <span>Focus du cycle actif : répétition fréquente requise</span>
                   </div>
                 )}
 
                 {/* Reason description */}
-                <p className="text-[11px] text-slate-300 leading-snug mb-2 font-sans">
+                <p className="text-xs text-slate-300 leading-relaxed mb-3 font-sans">
                   {item.reason}
                 </p>
               </div>
 
-              {/* Bottom action bar */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-1 text-[11px]">
-                <span className="text-[10px] text-slate-400 italic">
-                  {item.actionTip}
-                </span>
+              {/* Action and Tip footer */}
+              <div className="pt-2.5 border-t border-white/5 space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="italic truncate pr-2">
+                    {item.actionTip}
+                  </span>
+                </div>
 
+                {/* Valorisation du bouton d'action principal */}
                 <button
-                  onClick={() => onOpenSessionModal(item.quality)}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold text-xs shadow-md transition-colors cursor-pointer shrink-0 ml-2"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenSessionModal(item.quality);
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${btnStyle}`}
                 >
-                  <Play size={11} className="fill-white" />
-                  <span>Saisir</span>
+                  <Play size={13} className="fill-current" />
+                  <span>Saisir la séance ({item.quality.name})</span>
                 </button>
               </div>
             </div>

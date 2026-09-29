@@ -81,27 +81,32 @@ export default function Grid({
             {/* Colonnes Timeline J-2 à J+10 */}
             {timeline.map((day) => {
               const dayBlock = getActiveBlockForDate(day.dateStr, trainingBlocks);
+              const isToday = day.offset === 0;
               return (
                 <th 
                   key={day.dateStr} 
-                  className={`p-2 w-[65px] text-center border-l border-white/5 relative ${
-                    day.offset === 0 
-                      ? 'bg-blue-500/10 text-blue-300 font-extrabold border-x border-t border-t-blue-500/50 border-x-blue-500/20 shadow-[inset_0_2px_10px_rgba(59,130,246,0.1)]' 
-                      : ''
+                  className={`py-1.5 px-1 w-[60px] text-center border-l border-white/5 relative transition-colors ${
+                    isToday 
+                      ? 'bg-blue-600/15 text-blue-200 border-x border-x-blue-500/30' 
+                      : 'hover:bg-white/[0.02]'
                   }`}
                 >
                   {dayBlock && (
                     <span 
-                      className="block text-[8px] font-bold text-amber-300/90 truncate tracking-tight -mt-1 mb-0.5"
+                      className="block text-[7.5px] font-bold text-amber-300 truncate tracking-tight mb-0.5"
                       title={`Bloc actif : ${dayBlock.name}`}
                     >
-                      ⚡ {dayBlock.name.substring(0, 7)}
+                      ⚡ {dayBlock.name.substring(0, 6)}
                     </span>
                   )}
-                  <span>{day.display.prefix}</span><br />
-                  <span className={day.offset === 0 ? 'text-blue-300' : 'text-xs text-slate-400'}>
-                    {day.display.date}
-                  </span>
+                  <div className="flex flex-col items-center justify-center leading-none">
+                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-400' : 'text-slate-400'}`}>
+                      {isToday ? 'Auj.' : day.display.prefix}
+                    </span>
+                    <span className={`text-[11px] font-mono mt-0.5 ${isToday ? 'text-white font-extrabold' : 'text-slate-300 font-medium'}`}>
+                      {day.display.date}
+                    </span>
+                  </div>
                 </th>
               );
             })}
@@ -298,34 +303,52 @@ export default function Grid({
                     const cellState = computeCellState(q, day.dateStr, events[q.id], readiness, trainingBlocks);
                     const sessionData = events[q.id]?.[day.dateStr];
                     
+                    // Logique Heatmap Athlétique : fonds neutres calmes par défaut, saturation réservée aux données
+                    let cellHeatmapStyle = 'bg-slate-900/30 border-white/[0.03] text-slate-600 hover:bg-white/[0.04] hover:border-white/10';
+                    
+                    if (sessionData) {
+                      const loadVal = Number(sessionData.load) || 5;
+                      if (sessionData.isSimulated) {
+                        cellHeatmapStyle = 'bg-purple-600/75 border-purple-400 text-purple-100 shadow-[0_0_8px_rgba(168,85,247,0.35)] font-bold';
+                      } else if (loadVal >= 8) {
+                        cellHeatmapStyle = 'bg-blue-600 border-blue-300 text-white font-black shadow-md shadow-blue-600/30';
+                      } else if (loadVal >= 5) {
+                        cellHeatmapStyle = 'bg-blue-600/60 border-blue-400/60 text-white font-bold';
+                      } else {
+                        cellHeatmapStyle = 'bg-sky-600/35 border-sky-400/40 text-sky-100 font-semibold';
+                      }
+                    } else if (cellState.status === 'green') {
+                      cellHeatmapStyle = 'bg-emerald-500/12 border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/20';
+                    } else if (cellState.status === 'orange') {
+                      cellHeatmapStyle = 'bg-amber-500/12 border-amber-500/25 text-amber-300 hover:bg-amber-500/20';
+                    }
+
                     return (
                       <td 
-                        key={day.dateStr}
+                        key={day.dateStr} 
                         title={cellState.tooltip}
                         className={`p-1 text-center border-l border-white/5 ${
-                          day.offset === 0 ? 'bg-blue-500/5 border-x border-x-blue-500/20' : ''
+                          day.offset === 0 ? 'bg-blue-600/5 border-x border-x-blue-500/20' : ''
                         }`}
                       >
                          <div 
-                            className={`relative flex items-center justify-center w-full h-8 rounded border border-white/5 cursor-pointer cell-interactive bg-${cellState.status} ${cellState.isBurnout ? 'burnout' : ''}`}
-                            style={{ opacity: sessionData ? 1 : Math.max(0.2, cellState.opacity) }}
+                            className={`relative flex items-center justify-center w-full h-8 rounded border transition-all cursor-pointer cell-interactive ${cellHeatmapStyle} ${cellState.isBurnout ? 'burnout' : ''}`}
                             onClick={() => onCellClick(q, day.dateStr, sessionData)}
                          >
-                           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded opacity-50 z-0"></div>
                            {cellState.isBurnout && (
                              <span className="absolute top-0 right-0 -mt-1 -mr-1 text-[10px] z-20">🔥</span>
                            )}
-                           {sessionData && (
-                             <span className={`relative z-10 badge ${sessionData.isSecondary ? 'badge-secondary' : ''} ${
-                               sessionData.isSimulated 
-                                 ? 'bg-purple-600/90 text-purple-100 border border-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.5)] font-bold' 
-                                 : ''
-                             }`}>
+                           {sessionData ? (
+                             <span className="font-mono text-xs font-bold leading-none tracking-tight flex items-center justify-center">
                                {sessionData.load}
-                               {sessionData.isSecondary && <span className="text-[8px] ml-0.5 opacity-60">S</span>}
+                               {sessionData.isSecondary && <span className="text-[8px] ml-0.5 opacity-70">s</span>}
                                {sessionData.isSimulated && <span className="text-[8px] ml-0.5 opacity-90">🔮</span>}
                              </span>
-                           )}
+                           ) : cellState.status === 'green' ? (
+                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60"></span>
+                           ) : cellState.status === 'orange' ? (
+                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60"></span>
+                           ) : null}
                          </div>
                       </td>
                     );

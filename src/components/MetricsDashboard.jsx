@@ -33,6 +33,7 @@ export default function MetricsDashboard({
   // 'period' = période caractéristique (J-3, J-7, J-21), 'daily' = hier (J-1), 'week' = semaine passée (J-7)
   const [trendBasis, setTrendBasis] = useState('period');
   const [qualitySearch, setQualitySearch] = useState('');
+  const [activeTooltip, setActiveTooltip] = useState(null); // 'tsb' | 'atl' | 'ctl' | null
 
   const showPhysiology = viewMode === 'all' || viewMode === 'physiology';
   const showQualities = viewMode === 'all' || viewMode === 'qualities';
@@ -421,6 +422,174 @@ export default function MetricsDashboard({
     return cardioMuscularBalance || computeCardioVsMuscularBalance(events);
   }, [cardioMuscularBalance, events]);
 
+  // Données synthétiques Banister du jour (TSB, ATL, CTL, ACWR, Rampe)
+  const banisterSummary = useMemo(() => {
+    if (chartData.length === 0) return null;
+    const todayIndex = chartData.findIndex(d => d.isToday);
+    const item = todayIndex >= 0 ? chartData[todayIndex] : chartData[chartData.length - 1];
+    const atl = item?.loadEMA7 ?? 0;
+    const ctl = item?.loadEMA21 ?? 0;
+    const tsb = item?.tsb ?? (ctl - atl);
+    const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
+
+    // Rampe de progression CTL sur 7 jours
+    const targetIdx = todayIndex >= 0 ? todayIndex : chartData.length - 1;
+    const sevenDaysAgo = targetIdx >= 7 ? chartData[targetIdx - 7] : chartData[0];
+    const ctlPast = sevenDaysAgo?.loadEMA21 ?? ctl;
+    const ctlRamp = Math.round((ctl - ctlPast) * 10) / 10;
+
+    return { atl, ctl, tsb, acwr, ctlRamp };
+  }, [chartData]);
+
+  // Définitions détaillées, rôles physiologiques et seuils de normalité pour les infobulles (Tooltips)
+  const physioTooltips = useMemo(() => {
+    return {
+      tsb: {
+        id: 'tsb',
+        name: 'TSB',
+        fullTitle: 'Training Stress Balance (Forme & Fraîcheur)',
+        formula: 'TSB = CTL − ATL (Condition durable − Fatigue aiguë)',
+        color: '#10b981',
+        role: "Indicateur central de performance et de fraîcheur neuromusculaire. Il reflète l'équilibre dynamique entre les adaptations physiques de fond acquises (CTL) et la fatigue résiduelle immédiate (ATL). Un TSB positif indique un organisme frais et dispo pour la compétition ; un TSB négatif traduit une phase d'assimilation de charge.",
+        currentValue: banisterSummary ? (banisterSummary.tsb > 0 ? `+${banisterSummary.tsb}` : `${banisterSummary.tsb}`) : '0',
+        currentInterpretation: 
+          !banisterSummary ? 'Données en cours de calcul' :
+          banisterSummary.tsb > 25 ? 'Sur-affûtage (Risque de perte de rythme)' :
+          banisterSummary.tsb >= 10 ? 'Pic de Forme / Compétition (Optimal)' :
+          banisterSummary.tsb >= 0 ? 'Fraîcheur Neutre / Maintien' :
+          banisterSummary.tsb >= -30 ? 'Entraînement Productif / Assimilation' :
+          'Surcharge Critique / Risque Blessure',
+        thresholds: [
+          {
+            zone: '> +25',
+            title: 'Sur-affûtage / Perte de tonus',
+            detail: 'Fraîcheur extrême mais risque d\'atrophie neuromusculaire si prolongé plus de 10 jours.',
+            status: 'warning',
+            tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+          },
+          {
+            zone: '+10 à +25',
+            title: 'Pic de Forme (Sweet Spot Compétition)',
+            detail: 'Zone idéale pour le Jour J : fraîcheur maximale tout en conservant le moteur aérobie et le tonus.',
+            status: 'success',
+            tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          },
+          {
+            zone: '0 à +10',
+            title: 'Fraîcheur Neutre / Maintien',
+            detail: 'Bonne disponibilité physique sans fatigue excessive, parfait pour les séances techniques ou de vitesse.',
+            status: 'info',
+            tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+          },
+          {
+            zone: '-10 à -30',
+            title: 'Entraînement Productif (Surcompensation)',
+            detail: 'Fatigue contrôlée indispensable pour provoquer les adaptations physiologiques au cœur d\'un bloc.',
+            status: 'neutral',
+            tagClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+          },
+          {
+            zone: '< -30',
+            title: 'Surcharge Critique / Risque de Surmenage',
+            detail: 'Fatigue excessive. Risque de blessure tendino-musculaire accru et altération du sommeil. Repos requis.',
+            status: 'danger',
+            tagClass: 'bg-red-500/20 text-red-300 border-red-500/30'
+          }
+        ]
+      },
+      atl: {
+        id: 'atl',
+        name: 'ATL',
+        fullTitle: 'Acute Training Load (Charge Aiguë / Fatigue)',
+        formula: `Moyenne Mobile Exponentielle sur ${tauFatigue} jours (Fatigue)`,
+        color: '#ef4444',
+        role: "Quantifie la charge et la fatigue neuromusculaire immédiate accumulée sur la dernière semaine. L'ATL monte très rapidement après des séances volumineuses ou intenses, et redescend en 4 à 7 jours de récupération.",
+        currentValue: banisterSummary ? `${banisterSummary.atl} pts (Ratio ACWR: ${banisterSummary.acwr}x)` : '0 pts',
+        currentInterpretation:
+          !banisterSummary ? 'Données en cours de calcul' :
+          Number(banisterSummary.acwr) > 1.5 ? 'Zone Danger (Surcharge > 1.5x)' :
+          Number(banisterSummary.acwr) >= 1.3 ? 'Zone d\'Avertissement (1.3 à 1.5x)' :
+          Number(banisterSummary.acwr) >= 0.8 ? 'Sweet Spot Sécuritaire (0.8 à 1.3x)' :
+          'Sous-charge / Affûtage (< 0.8x)',
+        thresholds: [
+          {
+            zone: 'ACWR < 0.8',
+            title: 'Sous-charge / Affûtage',
+            detail: 'Baisse rapide de la fatigue. Très favorable avant une compétition mais risque de désentraînement sur 2+ semaines.',
+            status: 'info',
+            tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+          },
+          {
+            zone: 'ACWR 0.8 à 1.3',
+            title: 'Sweet Spot (Zone Sécuritaire)',
+            detail: 'Équilibre parfait entre progression des charges et minimisation du risque de blessure (modèle de Gabbett).',
+            status: 'success',
+            tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          },
+          {
+            zone: 'ACWR 1.3 à 1.5',
+            title: 'Zone d\'Avertissement',
+            detail: 'Montée rapide de la charge. Stimulus fort tolérable sur 1 semaine de stage ou microcycle de choc.',
+            status: 'warning',
+            tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+          },
+          {
+            zone: 'ACWR > 1.5',
+            title: 'Zone Danger (Risque de Blessure Accru)',
+            detail: 'Risque de blessure multiplié par 2 à 4. Décharge ou allègement impératif sur les 3 à 5 prochains jours.',
+            status: 'danger',
+            tagClass: 'bg-red-500/20 text-red-300 border-red-500/30'
+          }
+        ]
+      },
+      ctl: {
+        id: 'ctl',
+        name: 'CTL',
+        fullTitle: 'Chronic Training Load (Charge Chronique / Fitness)',
+        formula: `Moyenne Mobile Exponentielle sur ${tauFitness} jours (Condition)`,
+        color: '#38bdf8',
+        role: "Représente votre condition physique de fond ('Fitness') et votre capacité à encaisser de gros volumes d'entraînement sans vous épuiser. La CTL se construit patiemment sur plusieurs semaines de travail continu.",
+        currentValue: banisterSummary ? `${banisterSummary.ctl} pts (${banisterSummary.ctlRamp >= 0 ? `+${banisterSummary.ctlRamp}` : banisterSummary.ctlRamp} pts/sem)` : '0 pts',
+        currentInterpretation:
+          !banisterSummary ? 'Données en cours de calcul' :
+          banisterSummary.ctlRamp > 8 ? 'Montée trop rapide (> +8 pts/sem)' :
+          banisterSummary.ctlRamp >= 3 ? 'Progression optimale (+3 à +7 pts/sem)' :
+          banisterSummary.ctlRamp >= -2 ? 'Stabilisation / Maintien (Plateau)' :
+          'Désentraînement (Baisse de condition)',
+        thresholds: [
+          {
+            zone: '+3 à +7 pts/sem',
+            title: 'Rampe de Progression Optimale',
+            detail: 'Rythme idéal de montée en charge pour développer la cylindrée aérobie et musculaire de manière saine.',
+            status: 'success',
+            tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          },
+          {
+            zone: '> +8 à +10 pts/sem',
+            title: 'Rampe Trop Agressive',
+            detail: 'Augmentation trop brutale du volume, conduisant souvent à un effondrement immunitaire ou une blessure.',
+            status: 'warning',
+            tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+          },
+          {
+            zone: 'Plateau stable (±2 pts)',
+            title: 'Phase de Stabilisation / Palier',
+            detail: 'Permet à l\'organisme d\'assimiler un nouveau niveau de travail avant d\'engager un cycle supérieur.',
+            status: 'info',
+            tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+          },
+          {
+            zone: 'Baisse > -4 pts/sem',
+            title: 'Désentraînement / Perte de Fond',
+            detail: 'Perte progressive de condition consécutive à une coupure ou une baisse d\'activité prolongée.',
+            status: 'neutral',
+            tagClass: 'bg-slate-700/60 text-slate-300 border-slate-600'
+          }
+        ]
+      }
+    };
+  }, [banisterSummary, tauFatigue, tauFitness]);
+
   return (
     <div className="p-4 md:p-6 w-full flex flex-col gap-6">
       
@@ -734,6 +903,180 @@ export default function MetricsDashboard({
         </div>
       )}
 
+          {/* BANDEAU KPI BANISTER : TSB · ATL · CTL AVEC INFOBULLES SCIENTIFIQUES AU SURVOL */}
+          <div className="relative">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <Activity size={14} className="text-blue-400" />
+                  Indicateurs de Modélisation Banister (Jour J)
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                  (Survolez les indicateurs pour comprendre leur rôle et leurs seuils)
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                τ₁: {tauFatigue}j · τ₂: {tauFitness}j
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+              {['tsb', 'atl', 'ctl'].map((key) => {
+                const info = physioTooltips[key];
+                const isActive = activeTooltip === key;
+                const isTsb = key === 'tsb';
+                const isAtl = key === 'atl';
+                const isCtl = key === 'ctl';
+
+                let cardBorder = 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
+                let valueColor = 'text-white';
+                if (isTsb) {
+                  cardBorder = (banisterSummary?.tsb ?? 0) >= 0 
+                    ? 'border-emerald-500/30 bg-gradient-to-b from-emerald-950/20 to-slate-900/60 hover:border-emerald-500/50' 
+                    : 'border-amber-500/30 bg-gradient-to-b from-amber-950/20 to-slate-900/60 hover:border-amber-500/50';
+                  valueColor = (banisterSummary?.tsb ?? 0) >= 0 ? 'text-emerald-300' : 'text-amber-300';
+                } else if (isAtl) {
+                  cardBorder = Number(banisterSummary?.acwr ?? 1) > 1.3 
+                    ? 'border-red-500/30 bg-gradient-to-b from-red-950/20 to-slate-900/60 hover:border-red-500/50' 
+                    : 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
+                  valueColor = 'text-red-400';
+                } else if (isCtl) {
+                  cardBorder = 'border-sky-500/30 bg-gradient-to-b from-sky-950/15 to-slate-900/60 hover:border-sky-500/50';
+                  valueColor = 'text-sky-300';
+                }
+
+                return (
+                  <div
+                    key={key}
+                    onMouseEnter={() => setActiveTooltip(key)}
+                    onMouseLeave={() => setActiveTooltip(null)}
+                    onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}
+                    className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer group shadow-lg ${cardBorder} ${isActive ? 'ring-2 ring-blue-500/50 scale-[1.01]' : ''}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded font-black font-mono text-xs border ${info.bgColor} ${info.color}`}>
+                          {info.name}
+                        </span>
+                        <span className="text-xs font-bold text-slate-200 truncate">
+                          {key === 'tsb' ? 'Forme (TSB)' : key === 'atl' ? 'Fatigue Aiguë (ATL)' : 'Condition Durable (CTL)'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                        title="Afficher les détails physiologiques et seuils de normalité"
+                      >
+                        <Info size={14} className={isActive ? 'text-blue-400' : ''} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className={`text-2xl font-black font-mono tracking-tight ${valueColor}`}>
+                        {key === 'tsb' ? `${info.currentValue} TSB` : info.currentValue}
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400 font-mono">
+                        {info.formula.split('(')[0]}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
+                      <span className="font-medium text-slate-300 truncate">
+                        {info.currentInterpretation}
+                      </span>
+                      <span className="text-[10px] text-blue-400 opacity-80 group-hover:opacity-100 group-hover:underline flex items-center gap-0.5 shrink-0 ml-1">
+                        Seuils & Rôle <Info size={10} />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* POPOVER / INFOBULLE DÉTAILLÉE FLOTTANTE AU SURVOL / CLIC */}
+            {activeTooltip && physioTooltips[activeTooltip] && (
+              <div 
+                className="absolute z-50 left-0 right-0 top-full mt-3 p-4 sm:p-5 bg-[#0f172a]/98 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl animate-fadeIn text-slate-100 max-w-3xl mx-auto"
+                onMouseEnter={() => setActiveTooltip(activeTooltip)}
+                onMouseLeave={() => setActiveTooltip(null)}
+              >
+                <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/10 mb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-black font-mono border ${physioTooltips[activeTooltip].bgColor} ${physioTooltips[activeTooltip].color}`}>
+                        {physioTooltips[activeTooltip].name}
+                      </span>
+                      <h4 className="text-sm font-bold text-white m-0">
+                        {physioTooltips[activeTooltip].fullTitle}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-blue-300 font-mono mt-1">
+                      📐 {physioTooltips[activeTooltip].formula}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTooltip(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Section 1 : Rôle physiologique */}
+                <div className="mb-4">
+                  <h5 className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center gap-1.5">
+                    <Activity size={12} className="text-blue-400" />
+                    Rôle Physiologique & Mécanisme
+                  </h5>
+                  <p className="text-xs text-slate-200 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5 m-0">
+                    {physioTooltips[activeTooltip].role}
+                  </p>
+                </div>
+
+                {/* Section 2 : Seuils de normalité & Interprétation */}
+                <div>
+                  <h5 className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2 flex items-center gap-1.5">
+                    <SlidersHorizontal size={12} className="text-blue-400" />
+                    Seuils de Normalité & Zones d'Interprétation
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {physioTooltips[activeTooltip].thresholds.map((t, idx) => (
+                      <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col justify-between gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${t.tagClass}`}>
+                            {t.zone}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-200 truncate">
+                            {t.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-snug m-0">
+                          {t.detail}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 3 : Valeur actuelle de l'athlète */}
+                <div className="mt-3.5 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Votre niveau aujourd'hui :</span>
+                    <span className="font-bold text-white font-mono bg-white/10 px-2 py-0.5 rounded border border-white/10">
+                      {physioTooltips[activeTooltip].currentValue}
+                    </span>
+                    <span className="text-blue-300 font-semibold">
+                      ({physioTooltips[activeTooltip].currentInterpretation})
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 italic">
+                    Cliquez en dehors pour fermer
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* GRAPHIQUES GLOBAUX BANISTER + VFC */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[300px] min-h-0">
             
@@ -741,10 +1084,31 @@ export default function MetricsDashboard({
             <div className="flex flex-col h-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-0 relative">
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold m-0 flex items-center gap-1.5">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold m-0 flex items-center gap-1.5 flex-wrap">
                     <Activity size={12} className="text-blue-400" />
-                    Charge Globale & Forme Banister (ATL, CTL, TSB)
-                  </p>
+                    <span>Charge Globale :</span>
+                    <button
+                      onClick={() => setActiveTooltip('atl')}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-red-500/10 text-red-300 border border-red-500/25 hover:bg-red-500/20 cursor-pointer"
+                      title="Infobulle ATL : Rôle et seuils"
+                    >
+                      ATL ({tauFatigue}j)
+                    </button>
+                    <button
+                      onClick={() => setActiveTooltip('ctl')}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-sky-500/10 text-sky-300 border border-sky-500/25 hover:bg-sky-500/20 cursor-pointer"
+                      title="Infobulle CTL : Rôle et seuils"
+                    >
+                      CTL ({tauFitness}j)
+                    </button>
+                    <button
+                      onClick={() => setActiveTooltip('tsb')}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 hover:bg-emerald-500/20 cursor-pointer"
+                      title="Infobulle TSB : Rôle et seuils"
+                    >
+                      TSB
+                    </button>
+                  </div>
                   {onOpenPhysioSettingsModal && (
                     <button
                       onClick={onOpenPhysioSettingsModal}
