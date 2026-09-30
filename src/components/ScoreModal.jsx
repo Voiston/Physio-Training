@@ -183,19 +183,26 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const hasImpacts = activeImpacts && activeImpacts.length > 0;
 
-  // Calcul Multi-Facteurs (Cardio vs Musculaire vs Excentrique)
+  // Calcul Multi-Facteurs (Cardio vs Musculaire vs Excentrique vs Fatigue)
   const numDur = Number(duration) || 0;
   const numCardio = Number(rpeCardio) || 0;
   const numMusc = Number(rpeMusc) || 0;
+  const numFatigue = Number(fatigue) || 5;
 
   const eccentricMultiplier = isEccentric ? 1.35 : 1.0;
   const loadCardio = Math.round(numDur * numCardio);
   const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier);
   
-  // Charge globale équilibrée
-  const load = numDur && numCardio && numMusc
+  // Modificateur de fatigue perçue post-séance (-12% à fatigue 1, neutre à 5, +15% à fatigue 10)
+  // ±3% par point d'écart avec le niveau neutre standard (5/10)
+  const fatigueMultiplier = Math.max(0.85, Math.min(1.20, 1 + (numFatigue - 5) * 0.03));
+  const fatiguePercentDelta = Math.round((fatigueMultiplier - 1) * 100);
+
+  // Charge globale équilibrée modulée par la fatigue perçue post-séance
+  const baseLoad = numDur && numCardio && numMusc
     ? Math.round((loadCardio + loadMusc) / 2)
     : 0;
+  const load = Math.round(baseLoad * fatigueMultiplier);
 
   // Dominance métabolique
   const totalFactor = (loadCardio + loadMusc) || 1;
@@ -209,8 +216,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         rpeMusc: Number(rpeMusc), 
         rpeCardio: Number(rpeCardio), 
         fatigue: Number(fatigue), 
+        fatigueMultiplier: Math.round(fatigueMultiplier * 100) / 100,
         duration: Number(duration), 
         load,
+        baseLoad,
         loadCardio,
         loadMusc,
         sport: isMultiSport ? sport : (existing?.sport || 'run'),
@@ -525,24 +534,62 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
           </div>
 
           <div className="input-group">
-            <label className="text-xs font-medium text-slate-300">Fatigue Perçue Globale Post-Séance (1-10)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-slate-300">Fatigue Perçue Globale Post-Séance (1-10)</label>
+              {fatigue && (
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold border ${
+                  numFatigue > 5 
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
+                    : numFatigue < 5 
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    : 'bg-white/10 text-slate-300 border-white/10'
+                }`}>
+                  {numFatigue === 5 ? 'Neutre (x1.0)' : `${fatiguePercentDelta > 0 ? `+${fatiguePercentDelta}%` : `${fatiguePercentDelta}%`} charge`}
+                </span>
+              )}
+            </div>
             <input 
               type="number" 
               min="1" 
               max="10" 
               value={fatigue} 
               onChange={(e) => setFatigue(e.target.value)} 
-              placeholder="Niveau d'épuisement général" 
+              placeholder="1 (très frais) à 10 (épuisement total)" 
             />
+            <p className="text-[10px] text-slate-400 mt-1 leading-tight m-0">
+              {numFatigue > 5 
+                ? `⚡ Coût métabolique & nerveux accru (+${fatiguePercentDelta}% sur la charge TRIMP et surtaxe SNC sur 72h).` 
+                : numFatigue < 5 
+                ? `🍃 Fraîcheur préservée (${fatiguePercentDelta}% sur la charge globale, assimilation accélérée).`
+                : '🟢 Niveau nominal standard (5/10) : aucun ajustement sur la charge de base.'}
+            </p>
           </div>
 
           {/* Décomposition TRIMP Multi-Facteurs */}
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-300 font-semibold">Charge Globale Totale :</span>
-              <strong className="text-lg font-mono font-bold text-white">
-                {load > 0 ? load : '-'}
-              </strong>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-300 font-semibold">Charge Globale Totale :</span>
+                {load > 0 && fatigue && fatiguePercentDelta !== 0 && (
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                    fatiguePercentDelta > 0 
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' 
+                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
+                  }`} title={`Base: ${baseLoad} pts x ${fatigueMultiplier.toFixed(2)} (Fatigue ${numFatigue}/10)`}>
+                    {fatiguePercentDelta > 0 ? `+${fatiguePercentDelta}% (fatigue)` : `${fatiguePercentDelta}% (fraîcheur)`}
+                  </span>
+                )}
+              </div>
+              <div className="text-right flex items-baseline gap-1.5">
+                <strong className="text-lg font-mono font-bold text-white">
+                  {load > 0 ? load : '-'}
+                </strong>
+                {load > 0 && fatigue && fatiguePercentDelta !== 0 && (
+                  <span className="text-[10px] text-slate-400 font-mono line-through opacity-70" title="Charge brute avant modulation de fatigue">
+                    {baseLoad}
+                  </span>
+                )}
+              </div>
             </div>
 
             {load > 0 && (

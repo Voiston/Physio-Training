@@ -367,7 +367,9 @@ export function extractSessionLoad(data) {
     const duration = Number(data.duration) || 0;
     const rpeM = Number(data.rpeMusculaire ?? data.rpeMusc ?? 5);
     const rpeC = Number(data.rpeCardio ?? 5);
-    return Math.round(((rpeM + rpeC) / 2) * duration);
+    const fat = Number(data.fatigue ?? 5);
+    const fatMod = Math.max(0.85, Math.min(1.20, 1 + (fat - 5) * 0.03));
+    return Math.round(((rpeM + rpeC) / 2) * duration * fatMod);
   }
   const parsed = Number(data);
   return isNaN(parsed) ? 0 : parsed * 5;
@@ -437,8 +439,11 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
       const gReal = qDef.g * multiplier * blockMultiplier;
       const oReal = qDef.o * multiplier * blockMultiplier;
 
-      // Si la séance date de moins de 3 jours, elle pèse sur la fatigue du Système Nerveux.
-      const intensity = Math.min(load / 400, 1.2);
+      // Si la séance date de moins de 3 jours, elle pèse sur la fatigue du Système Nerveux (SNC).
+      // Le score de fatigue post-séance majore directement la contrainte nerveuse aiguë (+4% par point au-delà de 5/10)
+      const sessionFatigue = typeof data === 'object' && data?.fatigue !== undefined ? Number(data.fatigue) : null;
+      const sncFatigueMod = sessionFatigue ? Math.max(0.85, Math.min(1.25, 1 + (sessionFatigue - 5) * 0.04)) : 1.0;
+      const intensity = Math.min((load * sncFatigueMod) / 400, 1.3);
       if (daysSince <= 3) recentLoadSum += intensity;
 
       if (daysSince < gReal) {

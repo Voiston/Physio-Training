@@ -242,6 +242,7 @@ export default function MetricsDashboard({
           let duration = 0;
           let rpeM = 5;
           let rpeC = 5;
+          let fatigue = null;
           let notes = '';
           let sessionType = '';
 
@@ -250,6 +251,7 @@ export default function MetricsDashboard({
             duration = Number(item.duration) || 0;
             rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
             rpeC = item.rpeCardio ?? 5;
+            fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
             notes = item.notes || '';
             sessionType = item.type || '';
           } else if (typeof item === 'number') {
@@ -266,6 +268,7 @@ export default function MetricsDashboard({
               duration,
               rpeM,
               rpeC,
+              fatigue,
               notes,
               sessionType
             });
@@ -2066,7 +2069,7 @@ export default function MetricsDashboard({
                         </div>
                         <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-1">
                           <span>⏱️ {s.duration} min</span>
-                          <span>RPE Card: {s.rpeC}/10 · Musc: {s.rpeM}/10</span>
+                          <span>RPE C:{s.rpeC} · M:{s.rpeM}{s.fatigue ? ` · Fat:${s.fatigue}/10` : ''}</span>
                         </div>
                         {s.notes && (
                           <p className="text-[10px] text-slate-400 italic line-clamp-1 m-0 pt-1 border-t border-white/5">

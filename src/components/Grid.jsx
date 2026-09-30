@@ -598,7 +598,7 @@ export default function Grid({
                       }
 
                       const cellTitle = sessionData
-                        ? `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${sessionData.load} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
+                        ? `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${sessionData.load} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Fatigue ${sessionData.fatigue !== undefined && sessionData.fatigue !== null ? `${sessionData.fatigue}/10` : '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
                         : cellState.tooltip;
 
                       return (
