@@ -11,6 +11,7 @@ import MetricsDashboard from './components/MetricsDashboard';
 import TrainingBlocksModal from './components/TrainingBlocksModal';
 import SmartSuggestions from './components/SmartSuggestions';
 import { PeriodizationView } from './components/PeriodizationView';
+import { WeeklyAnalysisView } from './components/WeeklyAnalysisView';
 import { CompetitionModal } from './components/CompetitionModal';
 import { TrainingReportModal } from './components/TrainingReportModal';
 import { PhysiologicalSettingsModal } from './components/PhysiologicalSettingsModal';
@@ -18,10 +19,11 @@ import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastProvider, useToast } from './components/Toast';
+import { computeAllWeeksStats } from './utils/weekHelpers';
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
   Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
-  PanelLeftClose, PanelLeftOpen 
+  PanelLeftClose, PanelLeftOpen, BarChart3
 } from 'lucide-react';
 
 function AppContent() {
@@ -70,7 +72,7 @@ function AppContent() {
 
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'grid' | 'physiology' | 'qualities' | 'periodization'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'weeks' | 'physiology' | 'qualities' | 'periodization'>('grid');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [modalInfo, setModalInfo] = useState<any>(null);
   const [metricModalInfo, setMetricModalInfo] = useState<any>(null);
@@ -85,6 +87,12 @@ function AppContent() {
   const blockProgress = useMemo(() => {
     return activeBlockToday ? getBlockProgress(activeBlockToday, todayStr) : null;
   }, [activeBlockToday, todayStr]);
+
+  // Statistiques de la semaine en cours
+  const currentWeekStats = useMemo(() => {
+    const weeks = computeAllWeeksStats(events, qualities, 1, 0);
+    return weeks.find(w => w.isCurrentWeek) || weeks[weeks.length - 1];
+  }, [events, qualities]);
 
   const timeline = useMemo(() => {
     return generateTimeline(21, 14).map(day => ({
@@ -219,6 +227,29 @@ function AppContent() {
           >
             <Calendar size={15} />
             <span>Grille & Planification</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('weeks')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'weeks'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <BarChart3 size={15} />
+            <span>Totaux & Semaines</span>
+            {currentWeekStats && (
+              <span className={`inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0 ${
+                currentWeekStats.comparison.percentLoadChange !== null && currentWeekStats.comparison.percentLoadChange > 15
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : currentWeekStats.comparison.percentLoadChange !== null && currentWeekStats.comparison.percentLoadChange < -15
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                  : 'bg-white/10 text-slate-200 border-white/10'
+              }`}>
+                {currentWeekStats.totalLoad} UA
+              </span>
+            )}
           </button>
 
           <button
@@ -530,10 +561,25 @@ function AppContent() {
                       placeholder
                     });
                   }}
+                  onOpenWeeklyView={() => setActiveTab('weeks')}
                 />
               </div>
             </main>
             </div>
+          </div>
+        )}
+
+        {/* ONGLET NOUVEAU : SYNTHÈSE & VOLUMES HEBDOMADAIRES */}
+        {activeTab === 'weeks' && (
+          <div className="w-full animate-fadeIn">
+            <WeeklyAnalysisView 
+              events={events} 
+              qualities={qualities}
+              onOpenScoreModal={(q: any, dateStr: string, currentData: any) => {
+                setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
+              }}
+              showToast={showToast}
+            />
           </div>
         )}
 

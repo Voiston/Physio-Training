@@ -1,13 +1,15 @@
-import { useState, useRef, useEffect, Fragment } from 'react';
+import { useState, useRef, useEffect, useMemo, Fragment } from 'react';
 import { 
   LineChart, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { computeCellState, getActiveBlockForDate } from '../utils/physiology';
+import { computeAllWeeksStats, formatMinutes } from '../utils/weekHelpers';
 import QualitySparkline from './QualitySparkline';
 import { 
   ChevronDown, ChevronUp, BarChart2, GripVertical, 
-  ChevronLeft, ChevronRight, Calendar, Compass, ArrowLeftRight 
+  ChevronLeft, ChevronRight, Calendar, Compass, ArrowLeftRight,
+  BarChart3, Scale, Zap, Clock
 } from 'lucide-react';
 
 export default function Grid({ 
@@ -21,7 +23,8 @@ export default function Grid({
   reorderQualities,
   onCellClick, 
   onMetricClick, 
-  onQualityClick 
+  onQualityClick,
+  onOpenWeeklyView
 }) {
   const [expandedQualityId, setExpandedQualityId] = useState(null);
   const [draggedQualityId, setDraggedQualityId] = useState(null);
@@ -35,6 +38,32 @@ export default function Grid({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartX, setPanStartX] = useState(0);
   const [panScrollLeft, setPanScrollLeft] = useState(0);
+
+  // Calcul des statistiques de la semaine en cours
+  const currentWeekStats = useMemo(() => {
+    const weeks = computeAllWeeksStats(events, qualities, 1, 0);
+    return weeks.find(w => w.isCurrentWeek) || weeks[weeks.length - 1];
+  }, [events, qualities]);
+
+  // Totaux quotidiens pour chaque colonne jour de la timeline
+  const dailyTotals = useMemo(() => {
+    const map = {};
+    timeline.forEach(day => {
+      let load = 0;
+      let duration = 0;
+      let sessionCount = 0;
+      qualities.forEach(q => {
+        const s = events[q.id]?.[day.dateStr];
+        if (s && !s.isSecondary) {
+          load += (Number(s.load) || 0);
+          duration += (Number(s.duration) || 0);
+          sessionCount += 1;
+        }
+      });
+      map[day.dateStr] = { load, duration, sessionCount };
+    });
+    return map;
+  }, [timeline, events, qualities]);
 
   const handleDragStart = (e, qId, index) => {
     setDraggedQualityId(qId);
@@ -191,6 +220,43 @@ export default function Grid({
             </span>
           </div>
         </div>
+
+        {/* Résumé de la semaine en cours & Bouton vers la vue hebdomadaire */}
+        {currentWeekStats && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs">
+              <span className="text-slate-400 font-medium hidden sm:inline">Semaine en cours :</span>
+              <span className="font-mono font-bold text-amber-300">{currentWeekStats.totalLoad} UA</span>
+              <span className="text-slate-500 font-mono">·</span>
+              <span className="font-mono text-sky-300">{currentWeekStats.totalDurationFormatted}</span>
+              {currentWeekStats.comparison.percentLoadChange !== null && (
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                  currentWeekStats.comparison.percentLoadChange > 15 
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                    : currentWeekStats.comparison.percentLoadChange > 5
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    : currentWeekStats.comparison.percentLoadChange < -15
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                    : 'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                }`}>
+                  {currentWeekStats.comparison.percentLoadChange >= 0 ? `+${currentWeekStats.comparison.percentLoadChange}%` : `${currentWeekStats.comparison.percentLoadChange}%`} vs S-1
+                </span>
+              )}
+            </div>
+
+            {onOpenWeeklyView && (
+              <button
+                type="button"
+                onClick={onOpenWeeklyView}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 transition-all cursor-pointer shadow-sm"
+                title="Consulter le bilan hebdomadaire complet, les graphiques et le comparateur"
+              >
+                <BarChart3 size={13} />
+                <span>Bilan & Comparateur Hebdo</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Boutons de navigation rapide Passé / Aujourd'hui / Futur */}
         <div className="flex items-center gap-1.5">
@@ -678,6 +744,79 @@ export default function Grid({
                 </Fragment>
               );
             })}
+
+            {/* LIGNE DE SYNTHÈSE QUOTIDIENNE : TOTAL CHARGE (UA) */}
+            <tr className="bg-[#161619] border-t-2 border-white/20 font-mono text-xs">
+              <td className="p-3 sticky left-0 bg-[#161619] z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 font-bold text-amber-300 font-sans">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Zap size={13} className="text-amber-400" />
+                    <span>Charge Totale / Jour</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-normal">Somme UA</span>
+                </div>
+              </td>
+              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[10px] font-sans bg-[#161619]/80">
+                Charge réelle cumulée
+              </td>
+              {timeline.map((day) => {
+                const tot = dailyTotals[day.dateStr]?.load || 0;
+                const isToday = day.offset === 0;
+
+                const badgeColor = tot === 0 ? 'text-slate-600'
+                  : tot > 500 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold'
+                  : tot > 250 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold';
+
+                return (
+                  <td 
+                    key={`totalload-${day.dateStr}`}
+                    className={`p-1 text-center border-r border-white/5 ${
+                      isToday ? 'bg-blue-600/10 border-x-2 border-x-blue-500/30' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-center h-7">
+                      <span className={`px-1.5 py-0.5 rounded text-[11px] font-mono ${badgeColor}`}>
+                        {tot > 0 ? tot : '—'}
+                      </span>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+
+            {/* LIGNE DE SYNTHÈSE QUOTIDIENNE : TEMPS D'ENTRAÎNEMENT */}
+            <tr className="bg-[#161619] border-t border-white/10 font-mono text-xs">
+              <td className="p-3 sticky left-0 bg-[#161619] z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 font-bold text-sky-300 font-sans">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={13} className="text-sky-400" />
+                    <span>Temps d'Entraînement</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-normal">Durée</span>
+                </div>
+              </td>
+              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[10px] font-sans bg-[#161619]/80">
+                Volume en min / heures
+              </td>
+              {timeline.map((day) => {
+                const dur = dailyTotals[day.dateStr]?.duration || 0;
+                const isToday = day.offset === 0;
+
+                return (
+                  <td 
+                    key={`totaldur-${day.dateStr}`}
+                    className={`p-1 text-center border-r border-white/5 ${
+                      isToday ? 'bg-blue-600/10 border-x-2 border-x-blue-500/30' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-center h-7 text-[10px] font-mono text-slate-300 font-medium">
+                      {dur > 0 ? formatMinutes(dur) : '—'}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
           </tbody>
         </table>
       </div>
