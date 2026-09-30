@@ -663,8 +663,9 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               <button type="button" className="btn-cancel" onClick={onClose}>
                 Annuler
               </button>
-              <button type="submit" className="btn-save">
-                Valider ({selectedDate})
+              <button type="submit" className="btn-save flex items-center gap-1.5 font-bold">
+                <CheckCircle2 size={14} />
+                <span>Enregistrer ({selectedDate})</span>
               </button>
             </div>
           </div>

@@ -284,7 +284,7 @@ export default function Grid({
                     data-today={isToday ? "true" : undefined}
                     className={`py-2 px-1 w-[64px] min-w-[64px] text-center border-r border-white/5 relative transition-colors ${
                       isToday 
-                        ? 'bg-blue-600/25 text-blue-200 border-x-2 border-x-blue-500/50 shadow-inner' 
+                        ? 'bg-blue-600/25 text-blue-200 border-x-2 border-x-blue-500/50 shadow-inner today-beacon z-10' 
                         : 'hover:bg-white/[0.02]'
                     }`}
                   >
@@ -297,7 +297,8 @@ export default function Grid({
                       </span>
                     )}
                     <div className="flex flex-col items-center justify-center leading-none">
-                      <span className={`text-[9px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-300 font-black' : 'text-slate-400'}`}>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider flex items-center justify-center ${isToday ? 'text-blue-300 font-black' : 'text-slate-400'}`}>
+                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block mr-1 animate-pulse" />}
                         {isToday ? 'AUJ.' : day.display.prefix}
                       </span>
                       <span className={`text-[11px] font-mono mt-0.5 ${isToday ? 'text-white font-extrabold underline decoration-blue-400 decoration-2' : 'text-slate-300 font-medium'}`}>

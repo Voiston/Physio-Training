@@ -17,13 +17,14 @@ import { PhysiologicalSettingsModal } from './components/PhysiologicalSettingsMo
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { ToastProvider, useToast } from './components/Toast';
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
   Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
   PanelLeftClose, PanelLeftOpen 
 } from 'lucide-react';
 
-export default function App() {
+function AppContent() {
   const { 
     events, 
     qualities, 
@@ -67,6 +68,8 @@ export default function App() {
     commitSimulation
   } = useData();
 
+  const { showToast } = useToast();
+
   const [activeTab, setActiveTab] = useState<'grid' | 'physiology' | 'qualities' | 'periodization'>('grid');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [modalInfo, setModalInfo] = useState<any>(null);
@@ -109,13 +112,11 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight">PhysioTracker</h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm">
-                  PRO
-                </span>
+                <span className="text-lg sm:text-xl font-bold tracking-tight text-white">PhysioTracker</span>
+                <span className="text-xs text-blue-400 font-mono font-semibold">Pro</span>
               </div>
-              <p className="text-[11px] text-slate-400 uppercase tracking-widest hidden sm:block">
-                Charge Banister, Courbes EMA & Affûtage
+              <p className="text-[11px] text-slate-400 tracking-wide hidden sm:block m-0">
+                Périodisation par Blocs · Modélisation Banister & Courbes EMA
               </p>
             </div>
           </div>
@@ -126,7 +127,14 @@ export default function App() {
 
             {/* Bouton Mode Simulation (What-If) */}
             <button
-              onClick={() => toggleSimulation()}
+              onClick={() => {
+                toggleSimulation();
+                showToast({
+                  type: 'info',
+                  title: isSimulationActive ? 'Simulation désactivée' : 'Mode simulation activé',
+                  message: isSimulationActive ? 'Retour aux charges réelles.' : 'Testez des séances prévisionnelles sur 14 jours.'
+                });
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
                 isSimulationActive 
                   ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/25' 
@@ -171,12 +179,26 @@ export default function App() {
             <input 
               type="file" 
               ref={fileInputRef} 
-              onChange={importData} 
+              onChange={(e) => {
+                importData(e);
+                showToast({
+                  type: 'success',
+                  title: 'Importation effectuée',
+                  message: 'Données et historique restaurés.'
+                });
+              }} 
               accept=".json" 
               className="hidden" 
             />
             <button 
-              onClick={exportData} 
+              onClick={() => {
+                exportData();
+                showToast({
+                  type: 'success',
+                  title: 'Données exportées',
+                  message: 'Fichier de sauvegarde JSON téléchargé.'
+                });
+              }} 
               className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-xl transition-all cursor-pointer"
               title="Exporter toutes les données en JSON"
             >
@@ -189,27 +211,27 @@ export default function App() {
         <nav className="flex items-center gap-1.5 p-1.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md overflow-x-auto custom-scrollbar shadow-lg">
           <button
             onClick={() => setActiveTab('grid')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'grid'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <Calendar size={15} />
-            <span>1. Grille & Planification</span>
+            <span>Grille & Planification</span>
           </button>
 
           <button
             onClick={() => setActiveTab('physiology')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'physiology'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <TrendingUp size={15} />
-            <span>2. Analyses Physiologiques & Banister</span>
-            <span className={`inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border shrink-0 ${
+            <span>Analyses Banister</span>
+            <span className={`inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0 ${
               (banisterPerformance?.current?.tsb ?? 0) >= 0 
                 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
                 : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
@@ -220,31 +242,31 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('qualities')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'qualities'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <Layers size={15} />
-            <span>3. Qualités & Rémanence EMA</span>
-            <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-white/10 text-slate-300 border border-white/10 shrink-0">
+            <span>Qualités EMA</span>
+            <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-white/10 text-slate-300 border border-white/10 shrink-0">
               {qualities.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('periodization')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'periodization'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
             <Target size={15} />
-            <span>4. Périodisation & Objectifs</span>
+            <span>Cycles & Objectifs</span>
             {activeBlockToday ? (
-              <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 truncate max-w-[110px] shrink-0">
+              <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 truncate max-w-[120px] shrink-0">
                 {activeBlockToday.name}
               </span>
             ) : targetCompetition ? (
@@ -340,7 +362,7 @@ export default function App() {
                           {/* Progress Bar */}
                           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
                             <div 
-                              className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
+                              className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500 shimmer-bar" 
                               style={{ width: `${blockProgress?.percent || 0}%` }}
                             />
                           </div>
@@ -349,7 +371,7 @@ export default function App() {
                           <div className="space-y-1.5 text-[11px] border-t border-white/5 pt-2">
                             <div className="flex items-center gap-1.5 text-red-300">
                               <Zap size={11} className="text-red-400 shrink-0" />
-                              <span className="font-semibold">Fréquence accrue (-25%) :</span>
+                              <span className="font-semibold">Fréquence de développement (x0.45 · 2-3x/sem) :</span>
                             </div>
                             <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
                               {activeBlockToday.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ')}
@@ -357,10 +379,10 @@ export default function App() {
 
                             <div className="flex items-center gap-1.5 text-sky-300 pt-1">
                               <Shield size={11} className="text-sky-400 shrink-0" />
-                              <span className="font-semibold">Maintien (+35% délai prolongé) :</span>
+                              <span className="font-semibold">Maintien nominal (x1.0 · rémanence pleine) :</span>
                             </div>
                             <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
-                              Reste des séances bénéficient d'un intervalle étendu.
+                              Qualités hors-bloc protégées selon leur durée nominale de rémanence.
                             </p>
                           </div>
                         </div>
@@ -592,6 +614,20 @@ export default function App() {
           onSave={(sessionData: any, applyImpacts: boolean, targetDateStr?: string) => {
             const finalDate = targetDateStr || modalInfo.dateStr;
             saveEventWithImpacts(modalInfo.qId, finalDate, sessionData, applyImpacts);
+            if (sessionData) {
+              const sportLabel = sessionData.sport === 'bike' ? '🚴 Vélo' : '🏃 Course';
+              showToast({
+                type: 'success',
+                title: 'Séance enregistrée',
+                message: `${modalInfo.qName} · ${sportLabel} · Charge ${sessionData.load} pts (Fatigue ${sessionData.fatigue}/10)`
+              });
+            } else {
+              showToast({
+                type: 'info',
+                title: 'Séance supprimée',
+                message: `Séance du ${finalDate} pour ${modalInfo.qName} effacée.`
+              });
+            }
           }}
         />
       )}
@@ -600,7 +636,22 @@ export default function App() {
         <MetricModal 
           info={metricModalInfo}
           onClose={() => setMetricModalInfo(null)}
-          onSave={(val: any) => saveDailyMetric(metricModalInfo.dateStr, metricModalInfo.type, val)}
+          onSave={(val: any) => {
+            saveDailyMetric(metricModalInfo.dateStr, metricModalInfo.type, val);
+            if (val !== null) {
+              showToast({
+                type: 'success',
+                title: 'Métrique enregistrée',
+                message: `${metricModalInfo.title} : ${val} (${metricModalInfo.dateStr})`
+              });
+            } else {
+              showToast({
+                type: 'info',
+                title: 'Métrique effacée',
+                message: `${metricModalInfo.title} pour le ${metricModalInfo.dateStr}`
+              });
+            }
+          }}
         />
       )}
 
@@ -623,8 +674,20 @@ export default function App() {
             if (autoReorder) {
               reorderByBlockFocus(block);
             }
+            showToast({
+              type: 'success',
+              title: 'Cycle de préparation enregistré',
+              message: `Bloc « ${block.name} » (${block.durationWeeks} sem.) activé.`
+            });
           }}
-          onDeleteBlock={(blockId) => deleteTrainingBlock(blockId)}
+          onDeleteBlock={(blockId) => {
+            deleteTrainingBlock(blockId);
+            showToast({
+              type: 'info',
+              title: 'Cycle supprimé',
+              message: 'Le bloc de préparation a été retiré.'
+            });
+          }}
           onSaveTemplate={saveBlockTemplate}
           onResetTemplates={resetBlockTemplates}
           onReorderByBlock={(block) => reorderByBlockFocus(block)}
@@ -636,7 +699,14 @@ export default function App() {
           competition={targetCompetition}
           taperingAnalysis={taperingAnalysis}
           fosterMetrics={fosterMetrics}
-          onSave={saveTargetCompetition}
+          onSave={(comp) => {
+            saveTargetCompetition(comp);
+            showToast({
+              type: 'success',
+              title: comp ? 'Objectif de course enregistré' : 'Objectif supprimé',
+              message: comp ? `${comp.name} le ${comp.date} (Affûtage ciblé)` : 'Aucun objectif programmé.'
+            });
+          }}
           onClose={() => setShowCompetitionModal(false)}
         />
       )}
@@ -661,11 +731,26 @@ export default function App() {
           settings={physioSettings}
           events={events}
           dailyMetrics={dailyMetrics}
-          onSave={savePhysioSettings}
+          onSave={(settings) => {
+            savePhysioSettings(settings);
+            showToast({
+              type: 'success',
+              title: 'Constantes Banister calibrées',
+              message: `τ₁ (fatigue): ${settings.tauFatigue}j · τ₂ (condition): ${settings.tauFitness}j`
+            });
+          }}
           onClose={() => setShowPhysioSettingsModal(false)}
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }
 
