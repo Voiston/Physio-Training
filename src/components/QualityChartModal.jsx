@@ -17,29 +17,36 @@ export default function QualityChartModal({ quality, events, onClose }) {
 
   const acwrStatus = useMemo(() => {
     const r = current.acwr;
+    if (r === null) {
+      return { 
+        text: 'Fréquence insuffisante', 
+        badge: 'bg-white/5 text-slate-400 border-white/10',
+        detail: 'Moins de 4 séances sur 28 jours : ratio non calculable de manière fiable.' 
+      };
+    }
     if (r > 1.5) {
       return { 
-        text: 'Risque élevé de blessure / pic aigu', 
+        text: 'Augmentation rapide de charge', 
         badge: 'bg-red-500/20 text-red-400 border-red-500/30',
-        detail: 'Charge aiguë (EMA 7) nettement supérieure au fond chronique (EMA 21).' 
+        detail: 'Charge récente (7j) nettement supérieure à la moyenne (21j).' 
       };
     } else if (r > 1.3) {
       return { 
-        text: 'Surcharge fonctionnelle', 
+        text: 'Surcharge stimulante', 
         badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-        detail: 'Bonne stimulation si planifiée, surveiller la récupération.' 
+        detail: 'Bonne stimulation si planifiée dans un cycle actif.' 
       };
     } else if (r >= 0.8) {
       return { 
-        text: 'Zone Optimale (Sweet Spot)', 
+        text: 'Plage Équilibrée', 
         badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-        detail: 'Progression équilibrée entre stimulus et surcompensation.' 
+        detail: 'Progression continue bien proportionnée.' 
       };
     } else {
       return { 
         text: 'Sous-charge / Affûtage', 
         badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-        detail: 'Charge réduite, utile en affûtage avant objectif ou régénération.' 
+        detail: 'Charge réduite sur cette filière, utile en régénération ou affûtage.' 
       };
     }
   }, [current.acwr]);
@@ -145,7 +152,7 @@ export default function QualityChartModal({ quality, events, onClose }) {
 
           <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-400 uppercase font-semibold">EMA 21j (Chronique)</span>
+              <span className="text-[10px] text-slate-400 uppercase font-semibold">Charge pondérée 21j</span>
               {current.periodDelta21 > 0.05 ? (
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                   <TrendingUp size={11} className="stroke-[2.5]" />
@@ -172,11 +179,11 @@ export default function QualityChartModal({ quality, events, onClose }) {
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col justify-between">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Ratio ACWR (7/21)</span>
+            <span className="text-[10px] text-slate-400 uppercase font-semibold">Ratio ACWR (7/21 · indicatif)</span>
             <div className="flex items-baseline gap-2 mt-1.5">
-              <span className="text-xl font-extrabold text-white">{current.acwr}</span>
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${acwrStatus.badge}`}>
-                {current.acwr >= 0.8 && current.acwr <= 1.3 ? 'Optimal' : current.acwr > 1.3 ? 'Surcharge' : 'Décharge'}
+              <span className="text-xl font-extrabold text-white">{current.acwr !== null ? current.acwr : '—'}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${current.acwr === null ? 'bg-white/5 text-slate-400 border-white/10' : acwrStatus.badge}`}>
+                {current.acwr === null ? 'Données insuffisantes' : current.acwr >= 0.8 && current.acwr <= 1.3 ? 'Optimal' : current.acwr > 1.3 ? 'Surcharge' : 'Décharge'}
               </span>
             </div>
           </div>

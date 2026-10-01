@@ -13,6 +13,8 @@ import {
 import { calculateEMA } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeCardioVsMuscularBalance } from '../utils/physiology';
+import { getDailyAthleteLoad, isPrimary } from '../utils/loadHelpers';
+import { getTsbZone, calculateTsbPercent } from '../utils/zones';
 
 function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }) {
   if (!data || data.length < 2) return null;
@@ -98,56 +100,39 @@ function formatFullInspectionDate(dateStr) {
  */
 function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28) {
   if (!dayData) return null;
-  const { tsb = 0, loadEMA7 = 0, loadEMA21 = 0, load = 0 } = dayData;
+  const { tsb = 0, loadEMA7 = 0, loadEMA21 = 0 } = dayData;
   const atl = loadEMA7;
   const ctl = loadEMA21;
   const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
 
-  let zoneTitle = '';
+  const zone = getTsbZone(ctl, atl);
+  const tsbPercent = calculateTsbPercent(ctl, atl);
+
   let zoneColor = 'text-slate-200';
   let zoneBadge = 'bg-slate-700/30 text-slate-300 border-slate-600';
-  let summary = '';
-  let prescription = '';
-
-  if (tsb > 25) {
-    zoneTitle = 'Sur-affûtage / Repos Prolongé';
-    zoneColor = 'text-amber-400';
-    zoneBadge = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-    summary = `Fraîcheur nerveuse maximale (TSB ${tsb > 0 ? `+${tsb}` : tsb}), mais risque de désentraînement amorcé si cette période dépasse 7 jours. La condition de fond CTL (${ctl} pts) commence à fléchir face au manque de stimulation.`;
-    prescription = 'Programmer un rappel d\'intensité ou une reprise progressive pour relancer l\'adaptation sans accumuler de fatigue excessive.';
-  } else if (tsb >= 10) {
-    zoneTitle = 'Pic de Forme Idéal (Sweet Spot)';
-    zoneColor = 'text-emerald-400';
-    zoneBadge = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-    summary = `Équilibre optimal entre condition acquise (${ctl} pts) et dissipation de la fatigue aiguë (${atl} pts). Fenêtre privilégiée pour performer en compétition ou tester ses records.`;
-    prescription = 'Maintien de la fraîcheur avec quelques intensités courtes et ciblées, sans volume épuisant.';
-  } else if (tsb >= 0) {
-    zoneTitle = 'Zone Neutre / Récupération Active';
-    zoneColor = 'text-sky-400';
-    zoneBadge = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
-    summary = `Fatigue aiguë et condition sont à l'équilibre (TSB ${tsb > 0 ? `+${tsb}` : tsb}). L'organisme a bien absorbé les charges récentes et reste disponible.`;
-    prescription = 'Propice à une séance d\'entretien foncier ou au lancement d\'un nouveau microcycle.';
-  } else if (tsb >= -15) {
-    zoneTitle = 'Entraînement Productif Modéré';
-    zoneColor = 'text-indigo-300';
-    zoneBadge = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
-    summary = `Charge stimulante bien absorbée. L'accumulation de fatigue aiguë (${atl} pts) prépare la future surcompensation de votre condition de fond (${ctl} pts). Ratio ACWR ${acwr}x.`;
-    prescription = 'Poursuivre la progression en veillant au sommeil et aux délais de rémanence des filières.';
-  } else if (tsb >= -30) {
-    zoneTitle = 'Charge d\'Accumulation Intensive';
-    zoneColor = 'text-purple-300';
-    zoneBadge = 'bg-purple-500/20 text-purple-300 border-purple-500/30';
-    summary = `Fatigue aiguë substantielle (TSB ${tsb}, ATL ${atl} pts). L'organisme subit un stress important nécessaire pour franchir un palier athlétique supérieur.`;
-    prescription = 'Prévoir une phase d\'assimilation ou une journée allégée dans les 48 heures pour éviter la rupture.';
-  } else {
-    zoneTitle = 'Surcharge Aiguë Critique';
+  if (zone.color === 'rose') {
     zoneColor = 'text-rose-400';
     zoneBadge = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
-    summary = `Déficit de fraîcheur sévère (TSB ${tsb}, ATL ${atl} pts). Risque élevé de surmenage, d'immuno-dépression ou de blessure musculaire.`;
-    prescription = 'Repos complet ou régénération active impérative. Interdiction de planifier des intensités maximales.';
+  } else if (zone.color === 'amber') {
+    zoneColor = 'text-amber-400';
+    zoneBadge = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+  } else if (zone.color === 'emerald') {
+    zoneColor = 'text-emerald-400';
+    zoneBadge = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+  } else if (zone.color === 'sky') {
+    zoneColor = 'text-sky-400';
+    zoneBadge = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
   }
 
-  return { zoneTitle, zoneColor, zoneBadge, summary, prescription, acwr };
+  return { 
+    zoneTitle: zone.title, 
+    zoneColor, 
+    zoneBadge, 
+    summary: zone.summary, 
+    prescription: zone.prescription, 
+    acwr,
+    tsbPercent 
+  };
 }
 
 export default function MetricsDashboard({ 
@@ -258,9 +243,13 @@ export default function MetricsDashboard({
             sLoad = item * 5;
           }
 
-          totalLoad += sLoad;
+          // Seules les séances principales réalisées par l'athlète contribuent à sa charge réelle du jour
+          const isPrimarySession = isPrimary(item);
+          if (isPrimarySession) {
+            totalLoad += sLoad;
+          }
 
-          if (sLoad > 0 || duration > 0) {
+          if ((sLoad > 0 || duration > 0) && isPrimarySession) {
             daySessions.push({
               qualityId,
               qualityName: qDef?.name || qualityId,
@@ -525,45 +514,47 @@ export default function MetricsDashboard({
   // 2. Le Coach Virtuel (Analyse algorithmique des tendances)
   const coachInsights = useMemo(() => {
     if (chartData.length === 0) return [];
-    const latest = chartData[chartData.length - 1];
+    // Ancrer impérativement l'analyse sur AUJOURD'HUI (J+0) et non sur une projection future à charge nulle
+    const todayEntry = chartData.find(d => d.isToday) || chartData.filter(d => !d.isFuture).slice(-1)[0] || chartData[0];
     const insights = [];
 
-    // Ratio ACWR Global (Aiguë vs Chronique)
-    const acwr = latest.loadEMA21 > 0 ? (latest.loadEMA7 / latest.loadEMA21).toFixed(2) : 1;
+    // Ratio ACWR Global (Aiguë vs Chronique - indicatif)
+    const acwr = todayEntry.loadEMA21 > 5 ? (todayEntry.loadEMA7 / todayEntry.loadEMA21).toFixed(2) : null;
     
-    if (acwr > 1.5) {
+    if (acwr && Number(acwr) > 1.5) {
       insights.push({ 
         type: 'danger', 
         icon: <AlertTriangle size={18}/>, 
-        text: `Surcharge globale ! Votre charge récente (EMA 7) est de ${acwr}x votre niveau chronique (EMA 21). Risque accru de blessure ou de fatigue excessive.` 
+        text: `Augmentation rapide de la charge récente (Ratio charge aiguë/chronique : ${acwr}). Prudence recommandée : veillez à bien assimiler vos séances.` 
       });
-    } else if (acwr > 1.2) {
+    } else if (acwr && Number(acwr) > 1.2) {
       insights.push({ 
         type: 'warning', 
         icon: <TrendingUp size={18}/>, 
-        text: `Surcharge fonctionnelle ciblée (Ratio: ${acwr}). Stimulus d'entraînement efficace si vous êtes en bloc de développement.` 
+        text: `Dynamique de surcharge fonctionnelle (Ratio : ${acwr}). Stimulus d'entraînement efficace si vous êtes en bloc de développement.` 
       });
-    } else if (acwr < 0.8 && latest.loadEMA21 > 0) {
+    } else if (acwr && Number(acwr) < 0.8 && todayEntry.loadEMA21 > 20) {
       insights.push({ 
         type: 'info', 
         icon: <TrendingDown size={18}/>, 
-        text: `Désentraînement ou phase d'affûtage (Ratio: ${acwr}). Parfait avant une compétition.` 
+        text: `Charge récente inférieure au niveau chronique (Ratio : ${acwr}). Phase propice à la surcompensation ou à la régénération active.` 
       });
     }
 
-    // Tendance VFC
-    if (latest.vfcEMA3 && latest.vfcEMA7) {
-      if (latest.vfcEMA3 < latest.vfcEMA7 * 0.9) {
+    // Tendance VFC basée sur la dernière mesure réelle disponible (non future)
+    const latestVfcDay = [...chartData].reverse().find(d => !d.isFuture && d.vfcEMA3 && d.vfcEMA7);
+    if (latestVfcDay) {
+      if (latestVfcDay.vfcEMA3 < latestVfcDay.vfcEMA7 * 0.9) {
         insights.push({ 
           type: 'danger', 
           icon: <Activity size={18}/>, 
-          text: `Système nerveux autonome fatigué. La VFC à court terme (EMA 3: ${latest.vfcEMA3}ms) a chuté sous la référence hebdomadaire (EMA 7: ${latest.vfcEMA7}ms).` 
+          text: `Fléchissement du tonus parasympathique. La VFC récente (EMA 3: ${latestVfcDay.vfcEMA3} ms) est inférieure à votre moyenne 7 jours (${latestVfcDay.vfcEMA7} ms).` 
         });
-      } else if (latest.vfcEMA3 > latest.vfcEMA7 * 1.05) {
+      } else if (latestVfcDay.vfcEMA3 > latestVfcDay.vfcEMA7 * 1.05) {
         insights.push({ 
           type: 'good', 
           icon: <Activity size={18}/>, 
-          text: `Excellente récupération parasympathique. Le corps assimile positivement l'entraînement actuel.` 
+          text: `Excellente récupération autonome. Votre VFC récente (${latestVfcDay.vfcEMA3} ms) est supérieure à votre niveau de base (${latestVfcDay.vfcEMA7} ms).` 
         });
       }
     }
@@ -847,6 +838,8 @@ export default function MetricsDashboard({
     const atl = item?.loadEMA7 ?? 0;
     const ctl = item?.loadEMA21 ?? 0;
     const tsb = item?.tsb ?? (ctl - atl);
+    const tsbPercent = calculateTsbPercent(ctl, atl);
+    const tsbZone = getTsbZone(ctl, atl);
     const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
 
     // Rampe de progression CTL sur 7 jours
@@ -855,7 +848,7 @@ export default function MetricsDashboard({
     const ctlPast = sevenDaysAgo?.loadEMA21 ?? ctl;
     const ctlRamp = Math.round((ctl - ctlPast) * 10) / 10;
 
-    return { atl, ctl, tsb, acwr, ctlRamp };
+    return { atl, ctl, tsb, tsbPercent, tsbZone, acwr, ctlRamp };
   }, [chartData]);
 
   // Définitions détaillées, rôles physiologiques et seuils de normalité pour les infobulles (Tooltips)
@@ -865,50 +858,46 @@ export default function MetricsDashboard({
         id: 'tsb',
         name: 'TSB',
         fullTitle: 'Training Stress Balance (Forme & Fraîcheur)',
-        formula: 'TSB = CTL − ATL (Condition durable − Fatigue aiguë)',
+        formula: 'TSB = CTL − ATL (Condition durable − Fatigue aiguë, exprimé en % de la CTL)',
         color: '#10b981',
         role: "Indicateur central de performance et de fraîcheur neuromusculaire. Il reflète l'équilibre dynamique entre les adaptations physiques de fond acquises (CTL) et la fatigue résiduelle immédiate (ATL). Un TSB positif indique un organisme frais et dispo pour la compétition ; un TSB négatif traduit une phase d'assimilation de charge.",
-        currentValue: banisterSummary ? (banisterSummary.tsb > 0 ? `+${banisterSummary.tsb}` : `${banisterSummary.tsb}`) : '0',
+        currentValue: banisterSummary ? `${banisterSummary.tsb > 0 ? `+${banisterSummary.tsb}` : banisterSummary.tsb} pts${banisterSummary.tsbPercent !== null ? ` (${banisterSummary.tsbPercent > 0 ? `+${banisterSummary.tsbPercent}` : banisterSummary.tsbPercent}% CTL)` : ''}` : '0',
         currentInterpretation: 
           !banisterSummary ? 'Données en cours de calcul' :
-          banisterSummary.tsb > 25 ? 'Sur-affûtage (Risque de perte de rythme)' :
-          banisterSummary.tsb >= 10 ? 'Pic de Forme / Compétition (Optimal)' :
-          banisterSummary.tsb >= 0 ? 'Fraîcheur Neutre / Maintien' :
-          banisterSummary.tsb >= -30 ? 'Entraînement Productif / Assimilation' :
-          'Surcharge Critique / Risque Blessure',
+          banisterSummary.tsbZone.title,
         thresholds: [
           {
-            zone: '> +25',
+            zone: '> +25% CTL',
             title: 'Sur-affûtage / Perte de tonus',
-            detail: 'Fraîcheur extrême mais risque d\'atrophie neuromusculaire si prolongé plus de 10 jours.',
+            detail: 'Fraîcheur extrême mais risque d\'érosion de la condition si prolongé plus de 10 jours.',
             status: 'warning',
             tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
           },
           {
-            zone: '+10 à +25',
-            title: 'Pic de Forme (Sweet Spot Compétition)',
-            detail: 'Zone idéale pour le Jour J : fraîcheur maximale tout en conservant le moteur aérobie et le tonus.',
+            zone: '+5% à +25% CTL',
+            title: 'Pic de Forme (Zone d\'Affûtage Compétition)',
+            detail: 'Zone idéale pour le Jour J : fraîcheur maximale tout en conservant le moteur aérobie et le tonus neuromusculaire.',
             status: 'success',
             tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
           },
           {
-            zone: '0 à +10',
-            title: 'Fraîcheur Neutre / Maintien',
-            detail: 'Bonne disponibilité physique sans fatigue excessive, parfait pour les séances techniques ou de vitesse.',
+            zone: '-10% à +5% CTL',
+            title: 'Zone d\'Équilibre / Entretien',
+            detail: 'Bonne disponibilité physique sans fatigue excessive, parfait pour les séances techniques ou les transitions.',
             status: 'info',
             tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
           },
           {
-            zone: '-10 à -30',
-            title: 'Entraînement Productif (Surcompensation)',
-            detail: 'Fatigue contrôlée indispensable pour provoquer les adaptations physiologiques au cœur d\'un bloc.',
+            zone: '-35% à -10% CTL',
+            title: 'Surcharge Fonctionnelle (Développement)',
+            detail: 'Fatigue contrôlée indispensable pour provoquer les adaptations physiologiques au cœur d\'un bloc actif.',
             status: 'neutral',
             tagClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
           },
           {
-            zone: '< -30',
-            title: 'Surcharge Critique / Risque de Surmenage',
-            detail: 'Fatigue excessive. Risque de blessure tendino-musculaire accru et altération du sommeil. Repos requis.',
+            zone: '< -35% CTL',
+            title: 'Fatigue Aiguë Élevée (Surcharge Critique)',
+            detail: 'Fatigue aiguë très supérieure à votre base chronique. Risque de surmenage si ce niveau persiste. Repos requis.',
             status: 'danger',
             tagClass: 'bg-red-500/20 text-red-300 border-red-500/30'
           }
@@ -918,7 +907,7 @@ export default function MetricsDashboard({
         id: 'atl',
         name: 'ATL',
         fullTitle: 'Acute Training Load (Charge Aiguë / Fatigue)',
-        formula: `Moyenne Mobile Exponentielle sur ${tauFatigue} jours (Fatigue)`,
+        formula: `Moyenne Mobile Exponentielle continue (τ = ${tauFatigue} jours)`,
         color:
           !banisterSummary ? '#38bdf8' :
           Number(banisterSummary.acwr) > 1.5 ? '#ef4444' :
@@ -931,40 +920,40 @@ export default function MetricsDashboard({
           Number(banisterSummary.acwr) >= 1.3 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
           Number(banisterSummary.acwr) >= 0.8 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
           'bg-sky-500/20 text-sky-300 border-sky-500/30',
-        role: "Quantifie la charge et la fatigue neuromusculaire immédiate accumulée sur la dernière semaine. L'ATL monte très rapidement après des séances volumineuses ou intenses, et redescend en 4 à 7 jours de récupération.",
-        currentValue: banisterSummary ? `${banisterSummary.atl} pts (Ratio ACWR: ${banisterSummary.acwr}x)` : '0 pts',
+        role: "Quantifie la charge et la fatigue neuromusculaire immédiate accumulée sur la dernière semaine. L'ATL monte très rapidement après des séances volumineuses ou intenses, et redescend selon la constante de dissipation.",
+        currentValue: banisterSummary ? `${banisterSummary.atl} pts (Ratio aigu/chronique : ${banisterSummary.acwr}x)` : '0 pts',
         currentInterpretation:
           !banisterSummary ? 'Données en cours de calcul' :
-          Number(banisterSummary.acwr) > 1.5 ? 'Zone Danger (Surcharge > 1.5x)' :
-          Number(banisterSummary.acwr) >= 1.3 ? 'Zone d\'Avertissement (1.3 à 1.5x)' :
-          Number(banisterSummary.acwr) >= 0.8 ? 'Sweet Spot Sécuritaire (0.8 à 1.3x)' :
+          Number(banisterSummary.acwr) > 1.5 ? 'Zone d\'Accélération Rapide (> 1.5x)' :
+          Number(banisterSummary.acwr) >= 1.3 ? 'Zone Soutenue (1.3 à 1.5x)' :
+          Number(banisterSummary.acwr) >= 0.8 ? 'Zone Équilibrée (0.8 à 1.3x)' :
           'Sous-charge / Affûtage (< 0.8x)',
         thresholds: [
           {
-            zone: 'ACWR < 0.8',
+            zone: 'Ratio < 0.8',
             title: 'Sous-charge / Affûtage',
-            detail: 'Baisse rapide de la fatigue. Très favorable avant une compétition mais risque de désentraînement sur 2+ semaines.',
+            detail: 'Baisse de la charge récente par rapport au niveau chronique. Favorable en affûtage ou régénération.',
             status: 'info',
             tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
           },
           {
-            zone: 'ACWR 0.8 à 1.3',
-            title: 'Sweet Spot (Zone Sécuritaire)',
-            detail: 'Équilibre parfait entre progression des charges et minimisation du risque de blessure (modèle de Gabbett).',
+            zone: 'Ratio 0.8 à 1.3',
+            title: 'Plage Équilibrée (Progression Saine)',
+            detail: 'Équilibre stable entre progression des charges et tolérance de l\'organisme.',
             status: 'success',
             tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
           },
           {
-            zone: 'ACWR 1.3 à 1.5',
-            title: 'Zone d\'Avertissement',
-            detail: 'Montée rapide de la charge. Stimulus fort tolérable sur 1 semaine de stage ou microcycle de choc.',
+            zone: 'Ratio 1.3 à 1.5',
+            title: 'Accélération de la Charge',
+            detail: 'Montée rapide de la contrainte. Stimulus fort adapté aux stages ou microcycles de développement.',
             status: 'warning',
             tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
           },
           {
-            zone: 'ACWR > 1.5',
-            title: 'Zone Danger (Risque de Blessure Accru)',
-            detail: 'Risque de blessure multiplié par 2 à 4. Décharge ou allègement impératif sur les 3 à 5 prochains jours.',
+            zone: 'Ratio > 1.5',
+            title: 'Augmentation Rapide de Charge',
+            detail: 'La charge aiguë dépasse de plus de 50% la base chronique. Vigilance accrue sur la récupération et le sommeil.',
             status: 'danger',
             tagClass: 'bg-red-500/20 text-red-300 border-red-500/30'
           }
@@ -2556,14 +2545,14 @@ export default function MetricsDashboard({
                 </span>
               </div>
               <div className="flex items-baseline justify-between mt-1">
-                <span className="text-3xl font-black font-mono text-white">{curr.acwr}</span>
+                <span className="text-3xl font-black font-mono text-white">{curr.acwr !== null ? curr.acwr : '—'}</span>
                 <span className="text-[11px] text-[#94A3B8] font-mono">
-                  Sweet Spot : 0.8 - 1.3x
+                  Zone d'équilibre : 0.8 - 1.3x
                 </span>
               </div>
               <div className="pt-2 border-t border-white/5 text-[11px] text-[#94A3B8] flex items-center justify-between">
-                <span>Modèle Gabbett & Banister</span>
-                <span className="text-slate-400 font-semibold">{curr.acwr >= 0.8 && curr.acwr <= 1.3 ? 'Sécuritaire' : 'Surveillance'}</span>
+                <span>Ratio Aigu / Chronique</span>
+                <span className="text-slate-400 font-semibold">{curr.acwr !== null && curr.acwr >= 0.8 && curr.acwr <= 1.3 ? 'Équilibré' : 'Surveillance'}</span>
               </div>
             </div>
           </div>

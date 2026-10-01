@@ -34,6 +34,7 @@ export interface WeekComparison {
   statusBadge: string;
   statusColor: string;
   advice: string;
+  isProrated?: boolean;
 }
 
 export interface WeekStats {
@@ -48,6 +49,8 @@ export interface WeekStats {
   isCurrentWeek: boolean;
   isPastWeek: boolean;
   isFutureWeek: boolean;
+  isPartial: boolean;
+  elapsedDays: number;
   days: string[]; // 7 dates [Mon...Sun]
   totalLoad: number; // Primary sessions total (actual athlete load)
   qualitiesCumulativeLoad: number; // Sum of direct + secondary across all qualities
@@ -162,26 +165,26 @@ export function analyzeLoadProgression(currentLoad: number, prevLoad: number): {
   if (percent > 5 && percent <= 15) {
     return {
       status: 'optimal',
-      badge: `✅ Progression Optimale (+${percent}%)`,
+      badge: `✅ Progression Modérée (+${percent}%)`,
       color: 'emerald',
-      advice: 'Respect parfait de la règle des +10% de Gabbett : adaptation tissulaire sans surcharge excessive.',
+      advice: 'Progression graduelle de la charge propice à la surcompensation sans saut de contrainte excessif.',
       percent
     };
   }
   if (percent > 15 && percent <= 30) {
     return {
       status: 'warning',
-      badge: `⚠️ Surchauffe (+${percent}%)`,
+      badge: `⚠️ Progression Soutenue (+${percent}%)`,
       color: 'amber',
-      advice: 'Augmentation rapide du volume/intensité. Veillez particulièrement au sommeil et à la nutrition.',
+      advice: 'Augmentation sensible du volume ou de l\'intensité. Veillez particulièrement à l\'assimilation et au sommeil.',
       percent
     };
   }
   return {
     status: 'danger',
-    badge: `🚨 Pic de Charge Sévère (+${percent}%)`,
+    badge: `🚨 Pic de Charge Aigu (+${percent}%)`,
     color: 'rose',
-    advice: 'Augmentation brutale de plus de 30% : zone à haut risque de microlésions ou tendinopathies.',
+    advice: 'Augmentation de plus de 30% d\'une semaine sur l\'autre : contrainte aiguë marquée, prudence recommandée.',
     percent
   };
 }
@@ -334,6 +337,23 @@ export function computeAllWeeksStats(
       sportsData.other.percentOfTotal = Math.round((sportsData.other.load / totalLoad) * 100);
     }
 
+    // Calcul des jours écoulés pour la semaine en cours
+    const todayStr = getLocalYYYYMMDD(new Date());
+    let elapsedDays = 7;
+    let isPartial = false;
+
+    if (rw.isCurrent) {
+      isPartial = true;
+      const todayIdx = rw.days.findIndex(d => d.dateStr === todayStr);
+      elapsedDays = todayIdx >= 0 ? todayIdx + 1 : 1;
+    } else if (rw.isFuture) {
+      isPartial = false;
+      elapsedDays = 0;
+    } else {
+      isPartial = false;
+      elapsedDays = 7;
+    }
+
     // Ventilation par qualité
     const qualitiesBreakdown: QualityWeeklyBreakdown[] = qualities.map(q => {
       const stats = qualityStatsMap.get(q.id) || { directLoad: 0, secondaryLoad: 0, duration: 0, count: 0 };
@@ -355,13 +375,26 @@ export function computeAllWeeksStats(
     });
 
     // Monotonie et Strain de Foster sur la semaine
-    const meanDailyLoad = Math.round(totalLoad / 7);
-    const variance = dailyLoads.reduce((acc, d) => acc + Math.pow(d.load - meanDailyLoad, 2), 0) / 7;
+    // Pour la semaine en cours partielle, calculer sur les jours réellement écoulés pour éviter le biais des jours à 0
+    const activeDaysCount = rw.isCurrent ? Math.max(1, elapsedDays) : 7;
+    const activeDailyLoads = rw.isCurrent 
+      ? dailyLoads.slice(0, elapsedDays) 
+      : rw.isFuture 
+      ? [] 
+      : dailyLoads;
+
+    const exactMeanDailyLoad = activeDaysCount > 0 ? (totalLoad / activeDaysCount) : 0;
+    const meanDailyLoad = Math.round(exactMeanDailyLoad);
+
+    const variance = activeDailyLoads.length > 0 
+      ? activeDailyLoads.reduce((acc, d) => acc + Math.pow(d.load - exactMeanDailyLoad, 2), 0) / activeDailyLoads.length 
+      : 0;
     const stdDevLoad = Math.round(Math.sqrt(variance) * 10) / 10;
+
     let monotony = 1.0;
     if (stdDevLoad > 0) {
-      monotony = Math.round((meanDailyLoad / stdDevLoad) * 100) / 100;
-    } else if (meanDailyLoad > 0) {
+      monotony = Math.round((exactMeanDailyLoad / stdDevLoad) * 100) / 100;
+    } else if (exactMeanDailyLoad > 0) {
       monotony = 3.5;
     }
     const strain = Math.round(totalLoad * monotony);
@@ -378,6 +411,8 @@ export function computeAllWeeksStats(
       isCurrentWeek: rw.isCurrent,
       isPastWeek: rw.isPast,
       isFutureWeek: rw.isFuture,
+      isPartial,
+      elapsedDays,
       days: rw.days.map(d => d.dateStr),
       totalLoad,
       qualitiesCumulativeLoad,
@@ -415,13 +450,40 @@ export function computeAllWeeksStats(
     const prev = i > 0 ? computedList[i - 1] : null;
 
     if (prev) {
-      const deltaLoad = cur.totalLoad - prev.totalLoad;
-      const progression = analyzeLoadProgression(cur.totalLoad, prev.totalLoad);
-      const deltaDuration = cur.totalDurationMinutes - prev.totalDurationMinutes;
-      const percentDuration = prev.totalDurationMinutes > 0
+      let deltaLoad = cur.totalLoad - prev.totalLoad;
+      let progression = analyzeLoadProgression(cur.totalLoad, prev.totalLoad);
+      let deltaDuration = cur.totalDurationMinutes - prev.totalDurationMinutes;
+      let percentDuration = prev.totalDurationMinutes > 0
         ? Math.round((deltaDuration / prev.totalDurationMinutes) * 100)
         : null;
-      const deltaSessions = cur.sessionCount - prev.sessionCount;
+      let deltaSessions = cur.sessionCount - prev.sessionCount;
+      let isProrated = false;
+
+      // Si la semaine courante est en cours (partielle), faire la comparaison « à date » avec les mêmes jours de S-1
+      if (cur.isCurrentWeek && cur.isPartial && cur.elapsedDays < 7 && cur.elapsedDays > 0) {
+        const prevSameDaysLoads = prev.dailyLoads.slice(0, cur.elapsedDays);
+        const prevSameDaysTotal = prevSameDaysLoads.reduce((acc, d) => acc + d.load, 0);
+        const prevSameDaysDuration = prevSameDaysLoads.reduce((acc, d) => acc + d.duration, 0);
+
+        deltaLoad = cur.totalLoad - prevSameDaysTotal;
+        progression = analyzeLoadProgression(cur.totalLoad, prevSameDaysTotal);
+        deltaDuration = cur.totalDurationMinutes - prevSameDaysDuration;
+        percentDuration = prevSameDaysDuration > 0
+          ? Math.round((deltaDuration / prevSameDaysDuration) * 100)
+          : null;
+        isProrated = true;
+      }
+
+      // Si c'est une semaine future : statut neutre prévisionnel
+      if (cur.isFutureWeek) {
+        progression = {
+          status: 'neutral',
+          badge: '— Prévu',
+          color: 'slate',
+          advice: 'Semaine future : charges selon planification prévisionnelle.',
+          percent: null
+        };
+      }
 
       cur.comparison = {
         prevWeekId: prev.weekId,
@@ -433,9 +495,12 @@ export function computeAllWeeksStats(
         deltaSessions,
         trend: deltaLoad > 10 ? 'up' : deltaLoad < -10 ? 'down' : 'flat',
         progressionStatus: progression.status,
-        statusBadge: progression.badge,
+        statusBadge: isProrated ? `${progression.badge} (à date)` : progression.badge,
         statusColor: progression.color,
-        advice: progression.advice
+        advice: isProrated 
+          ? `${progression.advice} [Comparaison à date sur les ${cur.elapsedDays} premiers jours de la semaine]`
+          : progression.advice,
+        isProrated
       };
 
       // Mettre à jour les deltas par qualité

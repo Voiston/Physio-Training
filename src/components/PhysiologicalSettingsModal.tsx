@@ -73,11 +73,20 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
   const [tauFatigue, setTauFatigue] = useState<number>(settings.tauFatigue || 7);
   const [tauFitness, setTauFitness] = useState<number>(settings.tauFitness || 28);
   const [profileName, setProfileName] = useState<string>(settings.profileName || 'Standard');
+  const [initialCtl, setInitialCtl] = useState<number | ''>(settings.initialCtl ?? '');
 
   // Calcul live avec les paramètres actuels de l'UI
   const liveBanister = useMemo(() => {
-    return computeBanisterPerformance(events, dailyMetrics, 30, 0, tauFatigue, tauFitness);
-  }, [events, dailyMetrics, tauFatigue, tauFitness]);
+    return computeBanisterPerformance(
+      events, 
+      dailyMetrics, 
+      30, 
+      0, 
+      tauFatigue, 
+      tauFitness, 
+      initialCtl !== '' ? Number(initialCtl) : null
+    );
+  }, [events, dailyMetrics, tauFatigue, tauFitness, initialCtl]);
 
   // Calcul de base avec les paramètres enregistrés originaux
   const originalBanister = useMemo(() => {
@@ -87,7 +96,8 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
       30, 
       0, 
       settings.tauFatigue || 7, 
-      settings.tauFitness || 28
+      settings.tauFitness || 28,
+      settings.initialCtl ?? null
     );
   }, [events, dailyMetrics, settings]);
 
@@ -101,13 +111,15 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
     setTauFatigue(7);
     setTauFitness(28);
     setProfileName('Standard');
+    setInitialCtl('');
   };
 
   const handleSave = () => {
     onSave({
       tauFatigue: Number(tauFatigue),
       tauFitness: Number(tauFitness),
-      profileName
+      profileName,
+      initialCtl: initialCtl !== '' ? Number(initialCtl) : undefined
     });
     onClose();
   };
@@ -233,6 +245,35 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
             />
             <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
               <strong>Interprétation :</strong> Durée de rétention des adaptations cardiovasculaires et enzymatiques chroniques. Une valeur élevée (35 à 42j) protège la condition sur la durée ; une valeur plus courte (21 à 28j) réagit plus vivement aux cycles de relance.
+            </p>
+          </div>
+
+          {/* Optionnel : CTL Initiale de Démarrage (C4) */}
+          <div className="pt-3 border-t border-white/5">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                <Shield size={14} className="text-indigo-400" />
+                Condition Initiale &tau;₀ (CTL de départ) :
+              </label>
+              <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+                Optionnel (défaut : 0 UA)
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                max="250"
+                step="5"
+                placeholder="Ex: 40 (si historique antérieur)"
+                value={initialCtl}
+                onChange={(e) => setInitialCtl(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-44 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-indigo-500"
+              />
+              <span className="text-xs text-slate-400">UA (Unités de Charge)</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+              Permet d'initialiser votre niveau de condition préalable afin d'éviter un démarrage à froid artificiel à 0 UA.
             </p>
           </div>
 

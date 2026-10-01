@@ -1,20 +1,22 @@
-import { calculateEMA } from './mathHelpers';
+import { calculateEMA, calculateExpDecay } from './mathHelpers';
 import { getLocalYYYYMMDD } from './dateHelpers';
+import { getDailyAthleteLoad, isPrimary, extractSessionLoad as loadExtract } from './loadHelpers';
+import { getTsbZone, calculateTsbPercent } from './zones';
 
 export const DEFAULT_QUALITIES = [
-  { id: 'vo2max', name: 'VO2max', g: 7, o: 4, impacts: [{ id: 'seuil', ratio: 0.6 }, { id: 'ef', ratio: 0.4 }, { id: 'leg', ratio: 0.4 }, { id: 'co2', ratio: 0.4 }, { id: 'plyo', ratio: 0.4 }] },
-  { id: 'seuil', name: 'Seuil', g: 8, o: 5, impacts: [{ id: 'vo2max', ratio: 0.3 }, { id: 'ef', ratio: 0.4 }, { id: 'leg', ratio: 0.3 }, { id: 'co2', ratio: 0.3 }, { id: 'plyo', ratio: 0.2 }] },
-  { id: 'ef', name: 'Endurance Fondamentale', g: 10, o: 6, impacts: [{ id: 'leg', ratio: 0.2 }, { id: 'co2', ratio: 0.2 }] },
-  { id: 'sprint', name: 'Sprint / Alactique', g: 5, o: 3, impacts: [{ id: 'seuil', ratio: 0.3 }, { id: 'vo2max', ratio: 0.4 }, { id: 'ef', ratio: 0.2 }, { id: 'leg', ratio: 0.8 }, { id: 'plyo', ratio: 0.8 }, { id: 'co2', ratio: 0.6 }] },
-  { id: 'pull', name: 'Musculation Pull', g: 8, o: 5 },
-  { id: 'push', name: 'Musculation Push', g: 8, o: 5 },
-  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, impacts: [{ id: 'plyo', ratio: 0.3 }, { id: 'sprint', ratio: 0.2 }] },
-  { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, impacts: [{ id: 'leg', ratio: 0.4 }, { id: 'sprint', ratio: 0.2 }] },
-  { id: 'co2', name: 'Tolérance CO2', g: 6, o: 4 },
-  { id: 'abdos', name: 'Protocole Abdos', g: 7, o: 4 },
-  { id: 'gut', name: 'Gut Training', g: 14, o: 7 },
-  { id: 'descente', name: 'Excentrique Descente', g: 16, o: 10, impacts: [{ id: 'leg', ratio: 0.8 }] },
-  { id: 'proprio', name: 'Proprioception', g: 5, o: 3 }
+  { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio', impacts: [{ id: 'seuil', ratio: 0.6, confidence: 'sourcé' }, { id: 'ef', ratio: 0.4, confidence: 'sourcé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }, { id: 'plyo', ratio: 0.3, confidence: 'estimé' }] },
+  { id: 'seuil', name: 'Seuil', g: 8, o: 5, retentionDays: 18, category: 'cardio', impacts: [{ id: 'vo2max', ratio: 0.3, confidence: 'sourcé' }, { id: 'ef', ratio: 0.4, confidence: 'sourcé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.3, confidence: 'estimé' }, { id: 'plyo', ratio: 0.2, confidence: 'estimé' }] },
+  { id: 'ef', name: 'Endurance Fondamentale', g: 10, o: 6, retentionDays: 30, category: 'cardio', impacts: [{ id: 'leg', ratio: 0.2, confidence: 'estimé' }, { id: 'co2', ratio: 0.2, confidence: 'estimé' }] },
+  { id: 'sprint', name: 'Sprint / Alactique', g: 5, o: 3, retentionDays: 5, category: 'mixte', impacts: [{ id: 'seuil', ratio: 0.2, confidence: 'estimé' }, { id: 'vo2max', ratio: 0.25, confidence: 'estimé' }, { id: 'ef', ratio: 0.15, confidence: 'estimé' }, { id: 'leg', ratio: 0.7, confidence: 'sourcé' }, { id: 'plyo', ratio: 0.7, confidence: 'sourcé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }] },
+  { id: 'pull', name: 'Musculation Pull', g: 8, o: 5, retentionDays: 30, category: 'force' },
+  { id: 'push', name: 'Musculation Push', g: 8, o: 5, retentionDays: 30, category: 'force' },
+  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, retentionDays: 30, category: 'force', impacts: [{ id: 'plyo', ratio: 0.3, confidence: 'sourcé' }, { id: 'sprint', ratio: 0.2, confidence: 'sourcé' }] },
+  { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, retentionDays: 5, category: 'force', impacts: [{ id: 'leg', ratio: 0.4, confidence: 'sourcé' }, { id: 'sprint', ratio: 0.2, confidence: 'sourcé' }] },
+  { id: 'co2', name: 'Tolérance CO2', g: 6, o: 4, retentionDays: 10, category: 'cardio' },
+  { id: 'abdos', name: 'Protocole Abdos', g: 7, o: 4, retentionDays: 7, category: 'force' },
+  { id: 'gut', name: 'Gut Training', g: 14, o: 7, retentionDays: 14, category: 'cardio' },
+  { id: 'descente', name: 'Excentrique Descente', g: 16, o: 10, retentionDays: 21, category: 'force', impacts: [{ id: 'leg', ratio: 0.8, confidence: 'sourcé' }] },
+  { id: 'proprio', name: 'Proprioception', g: 5, o: 3, retentionDays: 7, category: 'force' }
 ];
 
 export const SPORT_IMPACTS = {
@@ -260,7 +262,7 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       .filter(d => d <= refDate && qualityEvents[d])
       .sort();
     
-    let daysSinceLastSession = 999;
+    let daysSinceLastSession = null;
     let lastSessionData = null;
     if (sessionDates.length > 0) {
       const lastDate = sessionDates[sessionDates.length - 1];
@@ -271,7 +273,7 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
 
     // Calcul du score d'urgence et de pertinence
     let urgencyScore = 0;
-    let urgencyLevel = 'OPTIMAL'; // CRITICAL, HIGH, MEDIUM, LOW, OPTIMAL, REST
+    let urgencyLevel = 'OPTIMAL'; // CRITICAL, HIGH, MEDIUM, LOW, OPTIMAL, REST, NEVER
     let urgencyBadge = '✅ Maintenu';
     let urgencyColor = 'emerald';
     let reason = '';
@@ -280,27 +282,44 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
     if (cellState.isBurnout) {
       urgencyLevel = 'REST';
       urgencyScore = -50;
-      urgencyBadge = '🛑 Surcharge SNC';
+      urgencyBadge = '🛑 Surcharge Aiguë (SNC)';
       urgencyColor = 'rose';
-      reason = 'Charge accumulée excessive en 3 jours. Système nerveux central saturé.';
+      reason = 'Charge accumulée élevée sur 72h. Fatigue neuromusculaire aiguë.';
       actionTip = 'Privilégier le repos complet ou la régénération active très douce.';
+    } else if (daysSinceLastSession === null) {
+      // Qualité jamais renseignée / non stimulée
+      if (isBlockFocus) {
+        urgencyLevel = 'MEDIUM';
+        urgencyScore = 60 * rankWeight * blockWeight;
+        urgencyBadge = '⚡ Focus Bloc';
+        urgencyColor = 'blue';
+        reason = `Qualité prioritaire du bloc actif « ${activeBlock.name} », sans séance enregistrée.`;
+        actionTip = 'Programmer une première séance pour amorcer le bloc.';
+      } else {
+        urgencyLevel = 'LOW';
+        urgencyScore = 15 * rankWeight;
+        urgencyBadge = 'ℹ️ Non stimulée';
+        urgencyColor = 'slate';
+        reason = 'Aucune séance enregistrée pour cette filière à ce jour.';
+        actionTip = 'Optionnel selon vos objectifs de saison.';
+      }
     } else if (cellState.status === 'red') {
       const deconditionFactor = Math.min(daysSinceLastSession, 21);
-      const baseScore = 80 + deconditionFactor * 2;
+      const baseScore = 75 + deconditionFactor * 1.5;
       urgencyScore = baseScore * rankWeight * blockWeight;
 
-      if (rank <= 4 || isBlockFocus) {
+      if (rank <= 3 || isBlockFocus) {
         urgencyLevel = 'CRITICAL';
-        urgencyBadge = '🚨 Priorité Haute';
+        urgencyBadge = '🚨 Rappel Recommandé';
         urgencyColor = 'red';
-        reason = `Désentraînement avéré (${daysSinceLastSession === 999 ? 'aucune séance' : daysSinceLastSession + ' j sans séance'}). Rang #${rank} dans votre liste${isBlockFocus ? ' • Focus du bloc actif' : ''}.`;
-        actionTip = 'Séance clé à programmer aujourd’hui ou demain en priorité.';
+        reason = `Fenêtre de rémanence expirée (${daysSinceLastSession} j sans séance). Rang #${rank} dans votre profil${isBlockFocus ? ' • Focus du bloc actif' : ''}.`;
+        actionTip = 'Séance clé à programmer sous 24-48h pour stimuler à nouveau cette filière.';
       } else {
         urgencyLevel = 'HIGH';
-        urgencyBadge = '⚠️ Désentraînement';
+        urgencyBadge = '⚠️ Rétention Basse';
         urgencyColor = 'orange';
-        reason = `Qualité dégradée (${daysSinceLastSession === 999 ? 'aucune séance' : daysSinceLastSession + ' j sans travail'}).`;
-        actionTip = 'À stimuler prochainement pour stopper la perte de vos acquis.';
+        reason = `Effet résiduel dissipé (${daysSinceLastSession} j depuis la dernière séance).`;
+        actionTip = 'À stimuler prochainement pour entretenir la rémanence.';
       }
     } else if (cellState.status === 'orange') {
       const daysLeft = cellState.daysLeft || 1;
@@ -367,9 +386,8 @@ export function extractSessionLoad(data) {
     const duration = Number(data.duration) || 0;
     const rpeM = Number(data.rpeMusculaire ?? data.rpeMusc ?? 5);
     const rpeC = Number(data.rpeCardio ?? 5);
-    const fat = Number(data.fatigue ?? 5);
-    const fatMod = Math.max(0.85, Math.min(1.20, 1 + (fat - 5) * 0.03));
-    return Math.round(((rpeM + rpeC) / 2) * duration * fatMod);
+    // Supprimer le multiplicateur fatMod : la fatigue perçue est un marqueur de réponse, pas de stimulus (C3)
+    return Math.round(((rpeM + rpeC) / 2) * duration);
   }
   const parsed = Number(data);
   return isNaN(parsed) ? 0 : parsed * 5;
@@ -377,45 +395,40 @@ export function extractSessionLoad(data) {
 
 export function computeCellState(qDef, targetDateStr, eventsForQuality, readinessForDate = 7, blocks = []) {
   const targetTime = new Date(targetDateStr).getTime();
-  let bestStatus = 'red';
-  let daysLeft = 0;
-  let opacity = 1;
-  let currentLevel = 0; // Pour le graphique Radar (0 à 100%)
-  let recentLoadSum = 0; // Pour tracker le risque de burnout (SNC cramé)
-
-  // Modificateur de récupération :
-  // Basé sur une échelle de 10.
-  const readiness = Number(readinessForDate) || 7;
-  const recoveryMod = readiness < 5 ? 0.8 
-                    : readiness < 8 ? 1 
-                    : readiness < 10 ? 1.1 
-                    : 1.2;
 
   // Détection du bloc de préparation spécifique actif pour la date cible
   const activeBlock = getActiveBlockForDate(targetDateStr, blocks);
-  let blockMultiplier = 1;
-  let blockStateInfo = null;
+  const isFocus = !!(activeBlock && activeBlock.focusQualities?.includes(qDef.id));
+  const prescriptionMultiplier = isFocus 
+    ? (activeBlock.targetMultiplier ?? 0.45) 
+    : (activeBlock?.maintenanceMultiplier ?? 1.0);
 
-  if (activeBlock) {
-    const isFocus = activeBlock.focusQualities?.includes(qDef.id);
-    if (isFocus) {
-      // Séances ciblées en développement : répétées plus souvent (multiplicateur x0.45, 2-3x/semaine)
-      blockMultiplier = activeBlock.targetMultiplier ?? 0.45;
-      blockStateInfo = {
-        name: activeBlock.name,
-        type: 'focus',
-        label: 'Fréquence de développement (x0.45)'
-      };
-    } else {
-      // Reste des séances : bénéficient de la durée nominale d'effet résiduel (maintien x1.0)
-      blockMultiplier = activeBlock.maintenanceMultiplier ?? 1.0;
-      blockStateInfo = {
-        name: activeBlock.name,
-        type: 'maintenance',
-        label: 'Maintien nominal (x1.0)'
-      };
+  let bestStatusPrescription = 'red';
+  let daysLeftPrescription = 0;
+  let opacityPrescription = 1;
+  let currentLevelPrescription = 0;
+
+  let bestStatusPhysio = 'red';
+  let daysLeftPhysio = 0;
+  let opacityPhysio = 1;
+  let currentLevelPhysio = 0;
+
+  let recent3DaysLoad = 0;
+  let total28dLoad = 0;
+  let sessionCount28d = 0;
+
+  // Calcul de la charge médiane de cette qualité pour doseScale continue
+  const pastLoads = [];
+  for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
+    const eventTime = new Date(eventDate).getTime();
+    const daysSince = Math.round((targetTime - eventTime) / (1000 * 3600 * 24));
+    if (daysSince >= 0 && daysSince <= 60) {
+      const l = extractSessionLoad(data);
+      if (l > 0) pastLoads.push(l);
     }
   }
+  pastLoads.sort((a, b) => a - b);
+  const refLoad_q = pastLoads.length > 0 ? pastLoads[Math.floor(pastLoads.length / 2)] : 240;
 
   for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
     const eventTime = new Date(eventDate).getTime();
@@ -423,73 +436,114 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
 
     if (daysSince >= 0) {
       const load = extractSessionLoad(data);
-      
-      // Calibrage physiologique : charge étalon = 250 pts (~45-50 min RPE 5-6)
-      // Plancher à 0.75 pour séances légères, 1.0 à charge nominale, jusqu'à 1.30 pour grosses charges
-      let loadMultiplier = 1.0;
-      if (load > 0) {
-        const ratio = load / 250;
-        loadMultiplier = Math.min(1.30, Math.max(0.75, 0.75 + 0.25 * Math.min(ratio, 2.2)));
-      } else {
-        loadMultiplier = 0.8;
+
+      if (daysSince <= 3) {
+        recent3DaysLoad += load;
       }
-      
-      const multiplier = loadMultiplier * recoveryMod; 
+      if (daysSince <= 28) {
+        total28dLoad += load;
+        if (load > 0) sessionCount28d++;
+      }
 
-      const gReal = qDef.g * multiplier * blockMultiplier;
-      const oReal = qDef.o * multiplier * blockMultiplier;
+      // Dose-réponse continue (B3): doseScale(load / refLoad_q)
+      // Sans plancher fixe à 0.75 ni saut artificiel
+      let doseScale = 1.0;
+      if (load > 0) {
+        const ratio = load / refLoad_q;
+        doseScale = Math.max(0.2, Math.min(1.4, 0.4 + 0.6 * Math.sqrt(Math.max(0, ratio))));
+      } else {
+        doseScale = 0.5;
+      }
 
-      // Si la séance date de moins de 3 jours, elle pèse sur la fatigue du Système Nerveux (SNC).
-      // Le score de fatigue post-séance majore directement la contrainte nerveuse aiguë (+4% par point au-delà de 5/10)
-      const sessionFatigue = typeof data === 'object' && data?.fatigue !== undefined ? Number(data.fatigue) : null;
-      const sncFatigueMod = sessionFatigue ? Math.max(0.85, Math.min(1.25, 1 + (sessionFatigue - 5) * 0.04)) : 1.0;
-      const intensity = Math.min((load * sncFatigueMod) / 400, 1.3);
-      if (daysSince <= 3) recentLoadSum += intensity;
+      // 1. Calcul Physiologique Pur (sans multiplicateur de bloc, pour Radar et rémanence réelle - B5)
+      const gPhysio = qDef.g * doseScale;
+      const oPhysio = qDef.o * doseScale;
 
-      if (daysSince < gReal) {
-        // État VERT : on vérifie si c'est la séance la plus "protectrice" pour cette date
-        const currentDaysLeft = gReal - daysSince;
-        if (bestStatus !== 'green' || currentDaysLeft > daysLeft) {
-          bestStatus = 'green';
-          daysLeft = Math.max(0.1, Math.round(currentDaysLeft * 10) / 10);
-          // Effet de dégradé : le vert s'assombrit au fil des jours (de 1 à 0.5)
-          opacity = 1 - (daysSince / gReal) * 0.5; 
-          currentLevel = 100 - (daysSince / gReal) * 20; // Vert = 80-100% de la jauge
+      if (daysSince < gPhysio) {
+        const dLeft = gPhysio - daysSince;
+        if (bestStatusPhysio !== 'green' || dLeft > daysLeftPhysio) {
+          bestStatusPhysio = 'green';
+          daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          opacityPhysio = 1 - (daysSince / gPhysio) * 0.5;
+          currentLevelPhysio = 100 - (daysSince / gPhysio) * 20;
         }
-      } else if (daysSince < (gReal + oReal) && bestStatus !== 'green') {
-        // État ORANGE
-        const currentDaysLeft = (gReal + oReal) - daysSince;
-        if (bestStatus !== 'orange' || currentDaysLeft > daysLeft) {
-          bestStatus = 'orange';
-          daysLeft = Math.max(0.1, Math.round(currentDaysLeft * 10) / 10);
-          // L'orange s'assombrit également
-          opacity = 1 - ((daysSince - gReal) / oReal) * 0.5;
-          currentLevel = Math.max(0, 60 - ((daysSince - gReal) / oReal) * 40); // Orange = 20-60%
+      } else if (daysSince < (gPhysio + oPhysio) && bestStatusPhysio !== 'green') {
+        const dLeft = (gPhysio + oPhysio) - daysSince;
+        if (bestStatusPhysio !== 'orange' || dLeft > daysLeftPhysio) {
+          bestStatusPhysio = 'orange';
+          daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          opacityPhysio = 1 - ((daysSince - gPhysio) / oPhysio) * 0.5;
+          currentLevelPhysio = Math.max(0, 60 - ((daysSince - gPhysio) / oPhysio) * 40);
+        }
+      }
+
+      // 2. Calcul Prescription (avec multiplicateur de bloc x0.45 pour la Grille et les alertes)
+      const gPrescription = gPhysio * prescriptionMultiplier;
+      const oPrescription = oPhysio * prescriptionMultiplier;
+
+      if (daysSince < gPrescription) {
+        const dLeft = gPrescription - daysSince;
+        if (bestStatusPrescription !== 'green' || dLeft > daysLeftPrescription) {
+          bestStatusPrescription = 'green';
+          daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          opacityPrescription = 1 - (daysSince / gPrescription) * 0.5;
+          currentLevelPrescription = 100 - (daysSince / gPrescription) * 20;
+        }
+      } else if (daysSince < (gPrescription + oPrescription) && bestStatusPrescription !== 'green') {
+        const dLeft = (gPrescription + oPrescription) - daysSince;
+        if (bestStatusPrescription !== 'orange' || dLeft > daysLeftPrescription) {
+          bestStatusPrescription = 'orange';
+          daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          opacityPrescription = 1 - ((daysSince - gPrescription) / oPrescription) * 0.5;
+          currentLevelPrescription = Math.max(0, 60 - ((daysSince - gPrescription) / oPrescription) * 40);
         }
       }
     }
   }
 
-  // Si on a fait l'équivalent de 1.8x une charge max en 3 jours -> Surcharge / Burnout
-  const isBurnout = recentLoadSum > 1.8;
+  // Évaluation de la fatigue aiguë élevée (B8)
+  const dailyAverage28d = sessionCount28d > 0 ? (total28dLoad / 28) : 40;
+  const isAcuteFatigueHigh = recent3DaysLoad > Math.max(500, dailyAverage28d * 3 * 1.8);
+  const isBurnout = isAcuteFatigueHigh;
 
-  // Création du texte pour le Tooltip
+  let blockStateInfo = null;
+  if (activeBlock) {
+    blockStateInfo = {
+      name: activeBlock.name,
+      type: isFocus ? 'focus' : 'maintenance',
+      label: isFocus ? 'Fréquence de développement (x0.45)' : 'Maintien nominal (x1.0)'
+    };
+  }
+
   let tooltip = 'Qualité dégradée (Rouge)';
-  if (bestStatus === 'green') tooltip = `Effet Actif : Reste ${daysLeft} jours`;
-  if (bestStatus === 'orange') tooltip = `Fenêtre de rappel : Reste ${daysLeft} jours`;
+  if (bestStatusPrescription === 'green') tooltip = `Effet Actif : Reste ${daysLeftPrescription} jours`;
+  if (bestStatusPrescription === 'orange') tooltip = `Fenêtre de rappel : Reste ${daysLeftPrescription} jours`;
   if (blockStateInfo) {
     tooltip += ` • [Bloc ${blockStateInfo.name} : ${blockStateInfo.label}]`;
   }
-  if (isBurnout) tooltip += ' ⚠️ RISQUE DE SUR-ENTRAÎNEMENT';
+  if (isAcuteFatigueHigh) tooltip += ' ⚠️ FATIGUE AIGUË ÉLEVÉE (3 jours de charge intense)';
 
   return { 
-    status: bestStatus, 
-    opacity, 
-    daysLeft, 
-    currentLevel: Math.max(0, currentLevel), 
+    status: bestStatusPrescription, 
+    opacity: opacityPrescription, 
+    daysLeft: daysLeftPrescription, 
+    currentLevel: Math.max(0, currentLevelPrescription), 
     tooltip, 
     isBurnout,
-    blockStateInfo 
+    isAcuteFatigueHigh,
+    blockStateInfo,
+    physio: {
+      status: bestStatusPhysio,
+      opacity: opacityPhysio,
+      daysLeft: daysLeftPhysio,
+      currentLevel: Math.max(0, currentLevelPhysio)
+    },
+    prescription: {
+      status: bestStatusPrescription,
+      opacity: opacityPrescription,
+      daysLeft: daysLeftPrescription,
+      currentLevel: Math.max(0, currentLevelPrescription)
+    }
   };
 }
 
@@ -566,9 +620,17 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const weekPercent7 = prevWeek && prevWeek.ema7 > 0 ? Math.round((weekDelta7 / prevWeek.ema7) * 1000) / 10 : (weekDelta7 > 0 ? 100 : 0);
   const weekPercent21 = prevWeek && prevWeek.ema21 > 0 ? Math.round((weekDelta21 / prevWeek.ema21) * 1000) / 10 : (weekDelta21 > 0 ? 100 : 0);
 
-  const acwr = current && current.ema21 > 0 
+  // Validation statistique de l'ACWR par filière :
+  // Nécessite au moins 4 séances sur les 28 derniers jours et une EMA 21j significative (> 5 UA)
+  // pour éviter les ratios aberrants (ex: 3.8) après une simple reprise d'une qualité peu fréquente.
+  const recentSessionsCount28d = rawData
+    .filter(d => d.offset <= 0 && d.offset >= -28)
+    .filter(d => d.load > 0).length;
+
+  const isAcwrValid = recentSessionsCount28d >= 4 && current && current.ema21 > 5;
+  const acwr = isAcwrValid 
     ? Math.round((current.ema7 / current.ema21) * 100) / 100 
-    : 1;
+    : null;
 
   const trend = prev 
     ? (current.ema3 > prev.ema3 + 0.5 ? 'up' : current.ema3 < prev.ema3 - 0.5 ? 'down' : 'flat') 
@@ -652,26 +714,24 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
     d.setDate(refDate.getDate() - i);
     const dateStr = getLocalYYYYMMDD(d);
 
-    let load = 0;
-    Object.values(events || {}).forEach(qEvents => {
-      if (qEvents && qEvents[dateStr]) {
-        load += extractSessionLoad(qEvents[dateStr]);
-      }
-    });
+    // Charge réelle de l'athlète (exclut les impacts secondaires pour éviter tout double-comptage)
+    const load = getDailyAthleteLoad(events, dateStr);
     dailyLoads.push({ dateStr, load });
   }
 
   const totalLoad = dailyLoads.reduce((acc, d) => acc + d.load, 0);
-  const meanLoad = Math.round(totalLoad / windowDays);
+  const exactMeanLoad = totalLoad / windowDays;
+  const meanLoad = Math.round(exactMeanLoad);
 
-  const variance = dailyLoads.reduce((acc, d) => acc + Math.pow(d.load - meanLoad, 2), 0) / windowDays;
+  // Variance calculée sur la moyenne exacte non tronquée pour éviter tout biais numérique
+  const variance = dailyLoads.reduce((acc, d) => acc + Math.pow(d.load - exactMeanLoad, 2), 0) / windowDays;
   const stdDev = Math.sqrt(variance);
 
   // Si l'écart-type est nul mais qu'il y a de la charge (même charge tous les jours sans repos)
   let monotony = 1.0;
   if (stdDev > 0) {
-    monotony = Math.round((meanLoad / stdDev) * 100) / 100;
-  } else if (meanLoad > 0) {
+    monotony = Math.round((exactMeanLoad / stdDev) * 100) / 100;
+  } else if (exactMeanLoad > 0) {
     monotony = 3.5; // Monotonie maximale
   }
 
@@ -680,7 +740,7 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
   let riskLevel = 'OPTIMAL'; // OPTIMAL, MODERATE, HIGH, CRITICAL
   let riskBadge = '✅ Équilibré';
   let riskColor = 'emerald';
-  let advice = 'Excellente alternance entre séances intenses et régénération.';
+  let advice = 'Excellente alternance entre séances stimulantes et régénération.';
 
   if (monotony > 2.0 || strain > 4500) {
     riskLevel = 'CRITICAL';
@@ -691,12 +751,12 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
     riskLevel = 'HIGH';
     riskBadge = '⚠️ Monotonie Élevée';
     riskColor = 'amber';
-    advice = 'Les charges journalières se ressemblent trop. Variez les intensités (polarisation) pour stimuler la surcompensation.';
+    advice = 'Les charges journalières se ressemblent trop. Variez les intensités (jours légers vs jours durs) pour stimuler la surcompensation.';
   } else if (monotony < 1.0 && totalLoad > 0) {
     riskLevel = 'OPTIMAL';
-    riskBadge = '🎯 Très Bien Polarisé';
+    riskBadge = '🎯 Forte Variabilité Journalière';
     riskColor = 'emerald';
-    advice = 'Forte variabilité des charges : propice à une excellente assimilation.';
+    advice = 'Forte variabilité des charges (alternance de jours très légers et de séances clés) : propice à une excellente assimilation.';
   }
 
   return {
@@ -727,27 +787,48 @@ export function computeBanisterPerformance(
   daysHistory = 30, 
   daysFuture = 14,
   tauFatigue = 7,
-  tauFitness = 28
+  tauFitness = 28,
+  initialCtl = null
 ) {
   const today = new Date();
-  const rawData = [];
 
-  for (let i = -daysHistory; i <= daysFuture; i++) {
+  // Déterminer la date de la plus ancienne séance enregistrée pour connaître l'historique réel
+  let earliestSessionDate = null;
+  Object.values(events || {}).forEach(qDates => {
+    if (qDates) {
+      Object.entries(qDates).forEach(([dateStr, session]) => {
+        if (session && isPrimary(session) && extractSessionLoad(session) > 0) {
+          const d = new Date(dateStr);
+          if (!isNaN(d.getTime())) {
+            if (!earliestSessionDate || d < earliestSessionDate) {
+              earliestSessionDate = d;
+            }
+          }
+        }
+      });
+    }
+  });
+
+  const historyDays = earliestSessionDate 
+    ? Math.max(0, Math.round((today.getTime() - earliestSessionDate.getTime()) / (1000 * 3600 * 24)))
+    : 0;
+
+  // Période d'échauffement mathématique : au moins 90 jours passés pour assurer la convergence de la CTL (tau=28j)
+  const warmupDays = Math.max(90, daysHistory + 60);
+  const fullRawData = [];
+
+  for (let i = -warmupDays; i <= daysFuture; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     const dateStr = getLocalYYYYMMDD(d);
 
-    let load = 0;
-    Object.values(events || {}).forEach(qEvents => {
-      if (qEvents && qEvents[dateStr]) {
-        load += extractSessionLoad(qEvents[dateStr]);
-      }
-    });
+    // Charge réelle de l'athlète (exclut les impacts secondaires pour éviter toute surévaluation)
+    const load = getDailyAthleteLoad(events, dateStr);
 
     const vfc = dailyMetrics?.[dateStr]?.vfc || null;
     const readiness = dailyMetrics?.[dateStr]?.readiness || null;
 
-    rawData.push({
+    fullRawData.push({
       dateStr,
       day: d.getDate(),
       month: d.getMonth() + 1,
@@ -760,24 +841,45 @@ export function computeBanisterPerformance(
     });
   }
 
-  const loads = rawData.map(d => d.load);
-  const atlArray = calculateEMA(loads, tauFatigue, true);
-  const ctlArray = calculateEMA(loads, tauFitness, true);
+  const loads = fullRawData.map(d => d.load);
+  const atlArray = calculateExpDecay(loads, tauFatigue, { decayToZero: true });
+  const ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true, initialValue: initialCtl });
 
-  const series = rawData.map((d, idx) => {
+  const fullSeries = fullRawData.map((d, idx) => {
     const atl = Math.round(atlArray[idx] * 10) / 10;
     const ctl = Math.round(ctlArray[idx] * 10) / 10;
     const tsb = Math.round((ctl - atl) * 10) / 10;
+    const tsbPercent = calculateTsbPercent(ctl, atl);
+
+    // ACWR couplé classique
     const acwr = ctl > 0 ? Math.round((atl / ctl) * 100) / 100 : 1;
+
+    // ACWR non couplé (aiguë J-0..J-6 vs chronique non couplée J-7..J-27)
+    let acwrUncoupled = acwr;
+    if (idx >= 27) {
+      const acuteLoads = loads.slice(idx - 6, idx + 1);
+      const chronicLoads = loads.slice(idx - 27, idx - 6);
+      const acuteMean = acuteLoads.reduce((a, b) => a + b, 0) / 7;
+      const chronicMean = chronicLoads.reduce((a, b) => a + b, 0) / 21;
+      if (chronicMean > 0) {
+        acwrUncoupled = Math.round((acuteMean / chronicMean) * 100) / 100;
+      }
+    }
 
     return {
       ...d,
-      atl, // Fatigue (tauFatigue j)
-      ctl, // Fitness (tauFitness j)
-      tsb, // Forme (CTL - ATL)
-      acwr
+      atl, // Fatigue aiguë (tauFatigue j)
+      ctl, // Fitness chronique (tauFitness j)
+      tsb, // Forme absolue (CTL - ATL)
+      tsbPercent, // Forme relative en % de la CTL
+      acwr,
+      acwrUncoupled
     };
   });
+
+  // Ne renvoyer pour l'affichage que la fenêtre demandée [-daysHistory, daysFuture]
+  const displayStartIndex = fullSeries.findIndex(s => s.offset === -daysHistory);
+  const series = displayStartIndex >= 0 ? fullSeries.slice(displayStartIndex) : fullSeries;
 
   const todayIndex = series.findIndex(s => s.isToday);
   const current = todayIndex >= 0 ? series[todayIndex] : series[0];
@@ -795,6 +897,9 @@ export function computeBanisterPerformance(
     });
   }
 
+  // Zone centrale TSB selon les pourcentages de CTL
+  const tsbZone = getTsbZone(current.ctl, current.atl, historyDays);
+
   return {
     tauFatigue,
     tauFitness,
@@ -802,7 +907,10 @@ export function computeBanisterPerformance(
     current,
     todayIndex,
     futureSeries,
-    peakDay
+    peakDay,
+    historyDays,
+    isWarmedUp: historyDays >= 21,
+    tsbZone
   };
 }
 
@@ -814,7 +922,8 @@ export function getTaperingAnalysis(
   events, 
   dailyMetrics = {},
   tauFatigue = 7,
-  tauFitness = 28
+  tauFitness = 28,
+  initialCtl = null
 ) {
   if (!targetCompetition || !targetCompetition.date) return null;
 
@@ -827,15 +936,18 @@ export function getTaperingAnalysis(
 
   // Modèle Banister sur 30j passés et projection jusqu'à la compétition
   const projectionDays = Math.max(7, Math.min(30, Math.max(0, daysRemaining) + 3));
-  const banister = computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness);
+  const banister = computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness, initialCtl);
 
   const compDayData = banister.series.find(s => s.dateStr === targetCompetition.date) || 
                       banister.futureSeries[banister.futureSeries.length - 1] || 
                       banister.current;
 
   const targetTsb = targetCompetition.targetTsb ?? 15;
+  const targetTsbUnit = targetCompetition.targetTsbUnit || 'points';
   const projectedTsb = compDayData?.tsb ?? 0;
+  const projectedTsbPercent = calculateTsbPercent(compDayData?.ctl ?? 0, compDayData?.atl ?? 0);
   const tsbGap = Math.round((projectedTsb - targetTsb) * 10) / 10;
+  const tsbZone = getTsbZone(compDayData?.ctl ?? 0, compDayData?.atl ?? 0, banister.historyDays);
 
   // Monotonie sur les 7 derniers jours
   const foster = computeFosterMetrics(events);
@@ -846,6 +958,14 @@ export function getTaperingAnalysis(
   let statusColor = 'blue';
   let advice = '';
 
+  // Compter les séances futures planifiées entre aujourd'hui et le Jour J
+  let futureSessionsCount = 0;
+  banister.series
+    .filter(s => s.offset > 0 && s.dateStr <= targetCompetition.date)
+    .forEach(s => {
+      if (s.load > 0) futureSessionsCount += 1;
+    });
+
   if (daysRemaining > 21) {
     status = 'BUILD';
     statusBadge = '⚡ Cycle de Charge';
@@ -855,23 +975,31 @@ export function getTaperingAnalysis(
     status = 'TAPER_START';
     statusBadge = '📉 Début d\'Affûtage';
     statusColor = 'cyan';
-    advice = 'Amorcez la réduction progressive du volume (-25% à -30%) tout en maintenant l\'intensité cible pour conserver le recrutement neuromusculaire.';
+    advice = 'Amorcez la réduction progressive du volume (-40% à -50%) tout en maintenant l\'intensité cible pour conserver le recrutement neuromusculaire.';
   } else if (daysRemaining > 0) {
-    if (projectedTsb >= 10 && projectedTsb <= 30) {
-      status = 'TAPER_OPTIMAL';
-      statusBadge = '🎯 Affûtage Optimal (Pic de Forme)';
-      statusColor = 'emerald';
-      advice = `Excellente projection ! Votre forme TSB prévue le jour J est de +${projectedTsb} (cible: +${targetTsb}). Fatigue minimale et motricité préservée.`;
-    } else if (projectedTsb < 10) {
+    const isOptimalTsb = (projectedTsbPercent !== null && projectedTsbPercent >= 5 && projectedTsbPercent <= 25) || (projectedTsb >= 10 && projectedTsb <= 25);
+    if (isOptimalTsb) {
+      if (futureSessionsCount === 0) {
+        status = 'TAPER_PASSIVE';
+        statusBadge = '💤 Repos Passif Projeté';
+        statusColor = 'sky';
+        advice = `Hypothèse de repos total jusqu'au Jour J (aucune séance future planifiée). TSB passif projeté : +${projectedTsb}${projectedTsbPercent !== null ? ` (+${projectedTsbPercent}% de la CTL)` : ''}. Planifiez vos rappels d'affûtage dans la grille pour une modélisation active.`;
+      } else {
+        status = 'TAPER_OPTIMAL';
+        statusBadge = '🎯 Affûtage Actif (Pic de Forme)';
+        statusColor = 'emerald';
+        advice = `Planification d'affûtage active (${futureSessionsCount} séance(s) planifiée(s)). TSB prévu le Jour J : +${projectedTsb}${projectedTsbPercent !== null ? ` (+${projectedTsbPercent}% de la CTL)` : ''} (cible : +${targetTsb}).`;
+      }
+    } else if ((projectedTsbPercent !== null && projectedTsbPercent < 5) || projectedTsb < 10) {
       status = 'TAPER_OVERREACHING';
       statusBadge = '⚠️ Fatigue Résiduelle Élevée';
       statusColor = 'amber';
-      advice = `Votre TSB prévu est trop bas (+${projectedTsb}). Diminuez drastiquement la charge pour évacuer la fatigue (ATL) avant l'épreuve.`;
+      advice = `Votre TSB prévu est trop bas (+${projectedTsb}${projectedTsbPercent !== null ? `, ${projectedTsbPercent}% CTL` : ''}). Diminuez la charge pour évacuer la fatigue (ATL) avant l'épreuve.`;
     } else {
       status = 'PEAK';
       statusBadge = '🕊️ Légèreté / Risque Désaffûtage';
       statusColor = 'yellow';
-      advice = `TSB très élevé (+${projectedTsb}). Attention au manque de tonus musculaire : prévoyez 1 ou 2 rappels courts et nerveux sous 48h.`;
+      advice = `TSB très élevé (+${projectedTsb}${projectedTsbPercent !== null ? `, +${projectedTsbPercent}% CTL` : ''}). Attention au manque de tonus neuromusculaire : prévoyez 1 ou 2 rappels courts et nerveux sous 48h.`;
     }
   } else if (daysRemaining === 0) {
     status = 'PEAK';
@@ -891,9 +1019,13 @@ export function getTaperingAnalysis(
     banister,
     compDayData,
     targetTsb,
+    targetTsbUnit,
     projectedTsb,
+    projectedTsbPercent,
     tsbGap,
+    tsbZone,
     foster,
+    futureSessionsCount,
     status,
     statusBadge,
     statusColor,
@@ -926,6 +1058,9 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
     Object.values(events || {}).forEach(qEvents => {
       if (qEvents && qEvents[dateStr]) {
         const item = qEvents[dateStr];
+        // Exclure les impacts secondaires pour éviter de fausser la balance réelle de l'athlète
+        if (!isPrimary(item)) return;
+
         let cLoad = 0;
         let mLoad = 0;
         let gLoad = 0;

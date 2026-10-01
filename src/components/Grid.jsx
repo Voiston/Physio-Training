@@ -493,7 +493,9 @@ export default function Grid({
               const isDragging = draggedQualityId === q.id;
               const isOver = dragOverQualityId === q.id;
 
-              const acwrBadge = current.acwr > 1.5 
+              const acwrBadge = current.acwr === null
+                ? 'bg-white/5 text-slate-500 border-white/10 font-normal'
+                : current.acwr > 1.5 
                 ? 'bg-red-500/20 text-red-400 border-red-500/30 font-bold'
                 : current.acwr > 1.3
                 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 font-semibold'
@@ -615,15 +617,15 @@ export default function Grid({
                               {(current.periodDelta7 ?? 0) < -0.05 && <span className="text-[8px] text-rose-400 ml-0.5">▼</span>}
                             </span>
                             <span className="text-slate-500">/</span>
-                            <span className="text-indigo-300 font-bold inline-flex items-center" title={`EMA 21j (Fond / CTL) : ${current.ema21} (${(current.periodDelta21 ?? 0) > 0 ? '+' : ''}${current.periodDelta21 || 0} vs J-21)`}>
+                            <span className="text-indigo-300 font-bold inline-flex items-center" title={`Charge pondérée 21j : ${current.ema21} (${(current.periodDelta21 ?? 0) > 0 ? '+' : ''}${current.periodDelta21 || 0} vs J-21)`}>
                               {Math.round(current.ema21)}
                               {(current.periodDelta21 ?? 0) > 0.05 && <span className="text-[8px] text-emerald-400 ml-0.5">▲</span>}
                               {(current.periodDelta21 ?? 0) < -0.05 && <span className="text-[8px] text-rose-400 ml-0.5">▼</span>}
                             </span>
                           </div>
                           <div className="mt-0.5">
-                            <span className={`px-1 py-0.2 rounded text-[9px] font-bold border ${acwrBadge}`}>
-                              ACWR {current.acwr}
+                            <span className={`px-1 py-0.2 rounded text-[9px] font-bold border ${acwrBadge}`} title={current.acwr === null ? 'Fréquence insuffisante (< 4 séances sur 28j)' : `Ratio 7j / 21j : ${current.acwr}`}>
+                              ACWR {current.acwr !== null ? current.acwr : '—'}
                             </span>
                           </div>
                         </div>
@@ -712,7 +714,7 @@ export default function Grid({
                                 Courbes EMA (3j, 7j, 21j) & Charges Quotidiennes : {q.name}
                               </span>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${acwrBadge}`}>
-                                Ratio Aiguë:Chronique (ACWR) : {current.acwr}
+                                Ratio Aiguë:Chronique (ACWR) : {current.acwr !== null ? current.acwr : '— (fréquence insuffisante, < 4 séances sur 28j)'}
                               </span>
                             </div>
 

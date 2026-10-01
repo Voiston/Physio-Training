@@ -183,7 +183,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const hasImpacts = activeImpacts && activeImpacts.length > 0;
 
-  // Calcul Multi-Facteurs (Cardio vs Musculaire vs Excentrique vs Fatigue)
+  // Calcul Multi-Facteurs physiologique (C3: Dissociation Charge vs Réponse)
   const numDur = Number(duration) || 0;
   const numCardio = Number(rpeCardio) || 0;
   const numMusc = Number(rpeMusc) || 0;
@@ -193,16 +193,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const loadCardio = Math.round(numDur * numCardio);
   const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier);
   
-  // Modificateur de fatigue perçue post-séance (-12% à fatigue 1, neutre à 5, +15% à fatigue 10)
-  // ±3% par point d'écart avec le niveau neutre standard (5/10)
-  const fatigueMultiplier = Math.max(0.85, Math.min(1.20, 1 + (numFatigue - 5) * 0.03));
-  const fatiguePercentDelta = Math.round((fatigueMultiplier - 1) * 100);
-
-  // Charge globale équilibrée modulée par la fatigue perçue post-séance
-  const baseLoad = numDur && numCardio && numMusc
-    ? Math.round((loadCardio + loadMusc) / 2)
+  // RPE et Charge globale selon le domaine physiologique de la filière
+  const isCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(info.qId);
+  const isForce = ['pull', 'push', 'leg', 'plyo', 'descente', 'abdos', 'proprio'].includes(info.qId);
+  
+  const load = numDur > 0
+    ? (isCardio ? loadCardio : isForce ? loadMusc : Math.round((loadCardio + loadMusc) / 2))
     : 0;
-  const load = Math.round(baseLoad * fatigueMultiplier);
 
   // Dominance métabolique
   const totalFactor = (loadCardio + loadMusc) || 1;
@@ -216,10 +213,8 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         rpeMusc: Number(rpeMusc), 
         rpeCardio: Number(rpeCardio), 
         fatigue: Number(fatigue), 
-        fatigueMultiplier: Math.round(fatigueMultiplier * 100) / 100,
         duration: Number(duration), 
         load,
-        baseLoad,
         loadCardio,
         loadMusc,
         sport: isMultiSport ? sport : (existing?.sport || 'run'),
@@ -558,10 +553,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             />
             <p className="text-[10px] text-slate-400 mt-1 leading-tight m-0">
               {numFatigue > 5 
-                ? `⚡ Coût métabolique & nerveux accru (+${fatiguePercentDelta}% sur la charge TRIMP et surtaxe SNC sur 72h).` 
+                ? `⚡ Marqueur de réponse : Fatigue perçue élevée (${numFatigue}/10). Veillez particulièrement à l'assimilation et au sommeil.` 
                 : numFatigue < 5 
-                ? `🍃 Fraîcheur préservée (${fatiguePercentDelta}% sur la charge globale, assimilation accélérée).`
-                : '🟢 Niveau nominal standard (5/10) : aucun ajustement sur la charge de base.'}
+                ? `🍃 Marqueur de réponse : Séance très bien tolérée (${numFatigue}/10). Disponibilité préservée.`
+                : '🟢 Marqueur de réponse : Niveau de fatigue habituel (5/10).'}
             </p>
           </div>
 
@@ -569,26 +564,17 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-300 font-semibold">Charge Globale Totale :</span>
-                {load > 0 && fatigue && fatiguePercentDelta !== 0 && (
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                    fatiguePercentDelta > 0 
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/25' 
-                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
-                  }`} title={`Base: ${baseLoad} pts x ${fatigueMultiplier.toFixed(2)} (Fatigue ${numFatigue}/10)`}>
-                    {fatiguePercentDelta > 0 ? `+${fatiguePercentDelta}% (fatigue)` : `${fatiguePercentDelta}% (fraîcheur)`}
+                <span className="text-xs text-slate-300 font-semibold">Charge Stimulus de Séance :</span>
+                {load > 0 && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-white/10 text-slate-300">
+                    {isCardio ? 'Filière Cardio' : isForce ? 'Filière Musculaire' : 'Mixte'}
                   </span>
                 )}
               </div>
               <div className="text-right flex items-baseline gap-1.5">
                 <strong className="text-lg font-mono font-bold text-white">
-                  {load > 0 ? load : '-'}
+                  {load > 0 ? `${load} UA` : '-'}
                 </strong>
-                {load > 0 && fatigue && fatiguePercentDelta !== 0 && (
-                  <span className="text-[10px] text-slate-400 font-mono line-through opacity-70" title="Charge brute avant modulation de fatigue">
-                    {baseLoad}
-                  </span>
-                )}
               </div>
             </div>
 

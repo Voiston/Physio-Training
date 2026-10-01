@@ -112,7 +112,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
       `⚡ Charge Totale : ${activeWeek.totalLoad} UA (${activeWeek.comparison.percentLoadChange !== null ? `${activeWeek.comparison.percentLoadChange >= 0 ? '+' : ''}${activeWeek.comparison.percentLoadChange}% vs S-1` : '1ère semaine'})`,
       `⏱️ Temps d'entraînement : ${activeWeek.totalDurationFormatted} (${activeWeek.totalDurationMinutes} min)`,
       `📅 Séances effectuées : ${activeWeek.sessionCount}`,
-      `🎯 Ratio ACWR (Gabbett) : ${activeWeek.acwr !== null ? activeWeek.acwr : '—'}`,
+      `🎯 Ratio Charge Aiguë/Chronique (indicatif) : ${activeWeek.acwr !== null ? activeWeek.acwr : '—'}`,
       `📈 Monotonie Foster : ${activeWeek.monotony} (Strain: ${activeWeek.strain})`,
       ``,
       `🏆 VENTILATION PAR QUALITÉ PHYSIQUE :`,
@@ -283,13 +283,13 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             </div>
           </div>
 
-          {/* KPI 4 : ACWR & Monotonie (Gabbett & Foster) */}
+          {/* KPI 4 : ACWR & Monotonie (Charge Aiguë/Chronique & Foster) */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 relative overflow-hidden group hover:border-blue-500/40 transition-all">
             <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
               <span className="flex items-center gap-1 font-medium">
-                <Sparkles size={13} className="text-purple-400" /> ACWR & Foster
+                <Sparkles size={13} className="text-purple-400" /> Aigu/Chronique & Foster
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Gabbett Ratio</span>
+              <span className="text-[10px] font-mono text-slate-400">Ratio Aigu:Chronique</span>
             </div>
             <div className="flex items-baseline gap-2">
               <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">

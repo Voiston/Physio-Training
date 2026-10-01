@@ -15,10 +15,12 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
     return qualities.map((q) => {
       const state = computeCellState(q, todayStr, events[q.id], readiness, trainingBlocks);
       const shortName = q.name.length > 12 ? q.name.substring(0, 11) + '…' : q.name;
+      // B5: Le radar reflète la rétention physiologique pure (sans distorsion par le multiplicateur de prescription)
+      const level = state.physio ? state.physio.currentLevel : state.currentLevel;
       return {
         quality: shortName,
         fullName: q.name,
-        niveau: Math.max(0, Math.round(state.currentLevel)),
+        niveau: Math.max(0, Math.round(level)),
         fullMark: 100,
       };
     });
@@ -28,10 +30,10 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
     <div className="w-full h-[300px] flex flex-col">
       <div className="flex items-center justify-between mb-2 px-1">
         <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
-          Profil d'Aptitude Athlétique
+          Niveau de Rétention Physiologique
         </h3>
         <span className="text-[10px] font-mono text-blue-400 font-semibold">
-          Effet résiduel
+          Rétention pure
         </span>
       </div>
       <div className="flex-1 w-full min-h-[220px]">

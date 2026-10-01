@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Quality, TrainingBlock, TargetCompetition } from '../hooks/useData';
 import { extractSessionLoad } from '../utils/physiology';
+import { isPrimary } from '../utils/loadHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { 
   Printer, X, FileText, Download, Calendar, Activity, 
@@ -70,13 +71,20 @@ export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
         if (item) {
           const load = extractSessionLoad(item);
           const dur = Number(item.duration) || 0;
-          totalLoad += load;
-          totalDuration += dur;
-          totalSessions += 1;
+          const isPrimarySession = isPrimary(item);
+
+          // Seules les séances principales comptent pour le volume de l'athlète
+          if (isPrimarySession) {
+            totalLoad += load;
+            totalDuration += dur;
+            totalSessions += 1;
+          }
 
           if (qualitySummary[qId]) {
-            qualitySummary[qId].count += 1;
-            qualitySummary[qId].duration += dur;
+            if (isPrimarySession) {
+              qualitySummary[qId].count += 1;
+              qualitySummary[qId].duration += dur;
+            }
             qualitySummary[qId].load += load;
           }
         }

@@ -17,6 +17,8 @@ import {
 } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
+import { CURRENT_SCHEMA_VERSION, migrateData } from '../utils/migration';
+
 export interface QualityImpact {
   id: string;
   ratio: number;
@@ -27,6 +29,8 @@ export interface Quality {
   name: string;
   g: number;
   o: number;
+  retentionDays?: number;
+  category?: 'cardio' | 'force' | 'mixte' | string;
   impacts?: QualityImpact[];
 }
 
@@ -164,6 +168,7 @@ export interface PhysiologicalSettings {
   tauFatigue: number; // 5 to 12 days, default 7
   tauFitness: number; // 21 to 45 days, default 28
   profileName?: string;
+  initialCtl?: number;
 }
 
 export const DEFAULT_PHYSIO_SETTINGS: PhysiologicalSettings = {
@@ -184,10 +189,11 @@ export function useData() {
           const def = defaultMap.get(q.id);
           if (def) {
             return {
+              ...def,
               ...q,
-              g: def.g,
-              o: def.o,
-              impacts: def.impacts || q.impacts
+              retentionDays: def.retentionDays,
+              category: def.category,
+              impacts: q.impacts || def.impacts
             };
           }
           return q;
@@ -220,21 +226,8 @@ export function useData() {
         }
       }
     } catch (e) {}
-    const today = new Date();
-    const todayStr = getLocalYYYYMMDD(today);
-    const initialBlock: TrainingBlock = {
-      id: 'block_default_force',
-      name: 'Force max',
-      type: 'force_max',
-      startDate: todayStr,
-      endDate: computeBlockEndDate(todayStr, 4),
-      durationWeeks: 4,
-      focusQualities: ['pull', 'push', 'leg', 'abdos', 'descente'],
-      targetMultiplier: 0.45,
-      maintenanceMultiplier: 1.0,
-      notes: 'Bloc de force max : fréquence de développement sur la musculation (x0.45, 2-3 séances/semaine) et maintien nominal pour le cardio.'
-    };
-    return [initialBlock];
+    // Empty state propre : aucun bloc imposé par défaut
+    return [];
   });
 
   // Objectif Compétition / Épreuve cible
@@ -243,16 +236,8 @@ export function useData() {
       const raw = localStorage.getItem('physio_target_competition');
       if (raw) return JSON.parse(raw);
     } catch (e) {}
-    const today = new Date();
-    const d14 = new Date(today);
-    d14.setDate(today.getDate() + 14);
-    return {
-      name: 'Course Objectif / Compétition',
-      date: getLocalYYYYMMDD(d14),
-      type: 'course',
-      targetTsb: 18,
-      notes: 'Pic de forme visé (TSB entre +15 et +22) avec fraîcheur neuromusculaire.'
-    };
+    // Empty state propre : aucune compétition imposée par défaut
+    return null;
   });
 
   const saveTargetCompetition = (comp: TargetCompetition | null) => {
@@ -431,7 +416,8 @@ export function useData() {
       30, 
       isSimulationActive ? 14 : 7,
       physioSettings.tauFatigue,
-      physioSettings.tauFitness
+      physioSettings.tauFitness,
+      physioSettings.initialCtl
     );
   }, [effectiveEvents, dailyMetrics, isSimulationActive, physioSettings]);
 
@@ -447,7 +433,8 @@ export function useData() {
       effectiveEvents, 
       dailyMetrics,
       physioSettings.tauFatigue,
-      physioSettings.tauFitness
+      physioSettings.tauFitness,
+      physioSettings.initialCtl
     );
   }, [targetCompetition, effectiveEvents, dailyMetrics, physioSettings]);
 
@@ -642,6 +629,7 @@ export function useData() {
 
   const exportData = () => {
     const data = { 
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       events, 
       dailyMetrics, 
       trainingBlocks,
@@ -667,7 +655,8 @@ export function useData() {
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
-        const imported = JSON.parse(content);
+        const rawImported = JSON.parse(content);
+        const imported = migrateData(rawImported);
         if (imported.events) {
           localStorage.clear();
           Object.entries(imported.events as Record<string, Record<string, SessionData>>).forEach(([qId, dates]) => {
