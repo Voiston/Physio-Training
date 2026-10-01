@@ -246,13 +246,31 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
   const readiness = dailyMetrics?.[refDate]?.readiness || 7;
   const numQualities = qualities.length || 1;
 
+  const HARD_QUALITIES = new Set(['vo2max', 'seuil', 'sprint', 'pull', 'push', 'leg', 'plyo', 'descente']);
+
+  // Détection de séance intense réalisée la veille (J-1) ou le jour même (J-0) pour alternance physiologique (D3)
+  const refDateObj = new Date(refDate);
+  const yesterdayObj = new Date(refDateObj);
+  yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+  const yesterdayStr = getLocalYYYYMMDD(yesterdayObj);
+
+  let recentHardSessionDone = false;
+  Object.entries(events || {}).forEach(([qId, dates]) => {
+    if (dates?.[yesterdayStr] && isPrimary(dates[yesterdayStr]) && HARD_QUALITIES.has(qId) && extractSessionLoad(dates[yesterdayStr]) > 150) {
+      recentHardSessionDone = true;
+    }
+    if (dates?.[refDate] && isPrimary(dates[refDate]) && HARD_QUALITIES.has(qId) && extractSessionLoad(dates[refDate]) > 150) {
+      recentHardSessionDone = true;
+    }
+  });
+
   const list = qualities.map((q, idx) => {
     const rank = idx + 1; // 1 = le plus prioritaire
-    // La ligne 1 a le coefficient le plus élevé
     const rankWeight = 1 + ((numQualities - idx) / numQualities) * 1.5;
 
     const isBlockFocus = Boolean(activeBlock?.focusQualities?.includes(q.id));
     const blockWeight = isBlockFocus ? 1.6 : 1.0;
+    const isHardQuality = HARD_QUALITIES.has(q.id);
 
     const cellState = computeCellState(q, refDate, events?.[q.id] || {}, readiness, activeBlock ? [activeBlock] : []);
 
@@ -279,7 +297,7 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
     let reason = '';
     let actionTip = '';
 
-    if (cellState.isBurnout) {
+    if (cellState.isBurnout || cellState.isAcuteFatigueHigh) {
       urgencyLevel = 'REST';
       urgencyScore = -50;
       urgencyBadge = '🛑 Surcharge Aiguë (SNC)';
@@ -359,10 +377,22 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       }
     }
 
+    // Modulation d'alternance des contraintes (D3) : si séance intense récente et filière HARD
+    if (recentHardSessionDone && isHardQuality && urgencyScore > 0) {
+      urgencyScore = Math.round(urgencyScore * 0.55);
+      if (urgencyLevel === 'CRITICAL') urgencyLevel = 'HIGH';
+      else if (urgencyLevel === 'HIGH') urgencyLevel = 'MEDIUM';
+      reason += ' • [Vigilance alternance : séance intense récente, priorité à la régénération active]';
+    } else if (recentHardSessionDone && !isHardQuality && urgencyScore > 0) {
+      // Filière aérobie légère ou proprioception favorisée après un jour dur
+      urgencyScore = Math.round(urgencyScore * 1.25);
+    }
+
     return {
       quality: q,
       rank,
       isBlockFocus,
+      isHardQuality,
       cellState,
       daysSinceLastSession,
       lastSessionData,
