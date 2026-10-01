@@ -215,7 +215,7 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
               className="w-full accent-emerald-500 h-2 bg-white/10 rounded-lg cursor-pointer"
             />
             <p className="text-[10px] text-slate-400 mt-1">
-              En science du sport (modèle Banister/Coggan), un TSB compris entre +15 et +22 garantit une fraîcheur maximale (ATL basse) sans perte de condition physique (CTL conservée).
+              En sciences du sport (modèle de dynamique de charge type Coggan/PMC), un TSB compris entre +5% et +25% de la CTL (ou environ +10 à +20 pts) vise un équilibre optimal entre fraîcheur (ATL basse) et maintien de la condition (CTL).
             </p>
           </div>
 

@@ -10,11 +10,12 @@ import {
   Search, X, Layers, SlidersHorizontal, BarChart3, Calendar, Clock,
   Pin, RotateCcw, Zap, Filter
 } from 'lucide-react';
-import { calculateEMA } from '../utils/mathHelpers';
+import { calculateEMA, calculateExpDecay } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeCardioVsMuscularBalance } from '../utils/physiology';
 import { getDailyAthleteLoad, isPrimary } from '../utils/loadHelpers';
 import { getTsbZone, calculateTsbPercent } from '../utils/zones';
+import { computeVfcAnalysis, computeHrRestAnalysis } from '../utils/vfcHelpers';
 
 function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }) {
   if (!data || data.length < 2) return null;
@@ -98,14 +99,14 @@ function formatFullInspectionDate(dateStr) {
 /**
  * Interprétation dynamique en langage clair du bilan Banister
  */
-function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28) {
+function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28, historyDays = 30) {
   if (!dayData) return null;
   const { tsb = 0, loadEMA7 = 0, loadEMA21 = 0 } = dayData;
   const atl = loadEMA7;
   const ctl = loadEMA21;
   const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
 
-  const zone = getTsbZone(ctl, atl);
+  const zone = getTsbZone(ctl, atl, historyDays);
   const tsbPercent = calculateTsbPercent(ctl, atl);
 
   let zoneColor = 'text-slate-200';
@@ -141,6 +142,7 @@ export default function MetricsDashboard({
   qualities = [], 
   qualitiesEMA = {},
   fosterMetrics = null,
+  banisterPerformance = null,
   taperingAnalysis = null,
   cardioMuscularBalance = null,
   isSimulationActive = false,
@@ -203,6 +205,72 @@ export default function MetricsDashboard({
 
   // 1. Préparation des données globales Banister & VFC pour Recharts (avec projection future et sessions détaillées)
   const chartData = useMemo(() => {
+    // Si banisterPerformance est injecté depuis useData, utiliser sa série échauffée (>=90j) comme source unique de vérité
+    if (banisterPerformance && banisterPerformance.series && banisterPerformance.series.length > 0) {
+      return banisterPerformance.series.map(point => {
+        const dateStr = point.dateStr;
+        const vfc = dailyMetrics[dateStr]?.vfc || null;
+        const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
+        const readiness = dailyMetrics[dateStr]?.readiness || null;
+        
+        const daySessions = [];
+        Object.entries(events).forEach(([qualityId, qualityDates]) => {
+          if (qualityDates && qualityDates[dateStr]) {
+            const item = qualityDates[dateStr];
+            const qDef = qualities.find(q => q.id === qualityId);
+            let sLoad = 0;
+            let duration = 0;
+            let rpeM = 5;
+            let rpeC = 5;
+            let fatigue = null;
+            let notes = '';
+            let sessionType = '';
+
+            if (typeof item === 'object' && item !== null) {
+              sLoad = Number(item.load) || 0;
+              duration = Number(item.duration) || 0;
+              rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
+              rpeC = item.rpeCardio ?? 5;
+              fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
+              notes = item.notes || '';
+              sessionType = item.type || '';
+            } else if (typeof item === 'number') {
+              sLoad = item * 5;
+            }
+
+            const isPrimarySession = isPrimary(item);
+            if ((sLoad > 0 || duration > 0) && isPrimarySession) {
+              daySessions.push({
+                qualityId,
+                qualityName: qDef?.name || qualityId,
+                load: sLoad,
+                duration,
+                rpeM,
+                rpeC,
+                fatigue,
+                notes,
+                sessionType
+              });
+            }
+          }
+        });
+
+        return {
+          ...point,
+          day: point.day,
+          vfc,
+          hrRest,
+          readiness,
+          loadEMA7: point.atl,
+          loadEMA21: point.ctl,
+          loadEMA3: point.load,
+          tsb: point.tsb,
+          tsbPercent: point.tsbPercent,
+          sessions: daySessions
+        };
+      });
+    }
+
     const today = new Date();
     const rawData = [];
     const futureDays = isSimulationActive ? 14 : (taperingAnalysis ? 7 : 0);
@@ -293,6 +361,7 @@ export default function MetricsDashboard({
       const atl = Math.round(loadEMA7[i]);
       const ctl = Math.round(loadEMA21[i]);
       const tsb = ctl - atl;
+      const tsbPercent = calculateTsbPercent(ctl, atl);
       return {
         ...data,
         vfcEMA3: vfcEMA3[i] ? Math.round(vfcEMA3[i]) : null,
@@ -301,10 +370,11 @@ export default function MetricsDashboard({
         loadEMA7: atl,
         loadEMA21: ctl,
         tsb,
+        tsbPercent,
         sessions: data.sessions || []
       };
     });
-  }, [events, dailyMetrics, isSimulationActive, taperingAnalysis, tauFatigue, tauFitness, qualities]);
+  }, [events, dailyMetrics, isSimulationActive, taperingAnalysis, tauFatigue, tauFitness, qualities, banisterPerformance]);
 
   // Jour inspecté actif (synchronisé par clic ou survol sur la courbe Banister)
   const currentInspectedDay = useMemo(() => {
@@ -315,10 +385,24 @@ export default function MetricsDashboard({
     return nonFuture[nonFuture.length - 1] || chartData[chartData.length - 1] || null;
   }, [selectedBanisterDay, chartData]);
 
-  // Interprétation dynamique Banister pour le jour inspecté
+  // Interprétation dynamique Banister pour le jour inspecté (avec garde CTL en construction)
   const banisterInterpretation = useMemo(() => {
-    return getDynamicBanisterInterpretation(currentInspectedDay, tauFatigue, tauFitness);
-  }, [currentInspectedDay, tauFatigue, tauFitness]);
+    return getDynamicBanisterInterpretation(
+      currentInspectedDay, 
+      tauFatigue, 
+      tauFitness, 
+      banisterPerformance?.historyDays ?? 30
+    );
+  }, [currentInspectedDay, tauFatigue, tauFitness, banisterPerformance?.historyDays]);
+
+  // Analyses personnalisées de VFC et FC Repos par rapport à la baseline individuelle
+  const vfcAnalysis = useMemo(() => {
+    return computeVfcAnalysis(dailyMetrics, currentInspectedDay?.dateStr || null);
+  }, [dailyMetrics, currentInspectedDay?.dateStr]);
+
+  const hrRestAnalysis = useMemo(() => {
+    return computeHrRestAnalysis(dailyMetrics, currentInspectedDay?.dateStr || null);
+  }, [dailyMetrics, currentInspectedDay?.dateStr]);
 
   // 1b. Calcul du ruban de rémanence immédiat pour toutes les qualités
   const remanenceStatusList = useMemo(() => {

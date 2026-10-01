@@ -356,7 +356,7 @@ export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
           {/* Pied de page du rapport */}
           <div className="pt-4 border-t border-white/10 print:border-gray-300 flex items-center justify-between text-[10px] text-slate-500 print:text-gray-500">
             <span>PhysioTracker PRO • Édité le {new Date().toLocaleDateString('fr-FR')}</span>
-            <span>Document certifié - Modélisation physiologique EWMA & Banister</span>
+            <span>Bilan d'entraînement • Modélisation de cinétique de charge EWMA (descripteur indicatif)</span>
           </div>
 
         </div>

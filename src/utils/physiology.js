@@ -4,18 +4,18 @@ import { getDailyAthleteLoad, isPrimary, extractSessionLoad as loadExtract } fro
 import { getTsbZone, calculateTsbPercent } from './zones';
 
 export const DEFAULT_QUALITIES = [
-  { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio', impacts: [{ id: 'seuil', ratio: 0.6, confidence: 'sourcé' }, { id: 'ef', ratio: 0.4, confidence: 'sourcé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }, { id: 'plyo', ratio: 0.3, confidence: 'estimé' }] },
-  { id: 'seuil', name: 'Seuil', g: 8, o: 5, retentionDays: 18, category: 'cardio', impacts: [{ id: 'vo2max', ratio: 0.3, confidence: 'sourcé' }, { id: 'ef', ratio: 0.4, confidence: 'sourcé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.3, confidence: 'estimé' }, { id: 'plyo', ratio: 0.2, confidence: 'estimé' }] },
+  { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio', impacts: [{ id: 'seuil', ratio: 0.6, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }, { id: 'plyo', ratio: 0.3, confidence: 'estimé' }] },
+  { id: 'seuil', name: 'Seuil', g: 8, o: 5, retentionDays: 18, category: 'cardio', impacts: [{ id: 'vo2max', ratio: 0.3, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.3, confidence: 'estimé' }, { id: 'plyo', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'ef', name: 'Endurance Fondamentale', g: 10, o: 6, retentionDays: 30, category: 'cardio', impacts: [{ id: 'leg', ratio: 0.2, confidence: 'estimé' }, { id: 'co2', ratio: 0.2, confidence: 'estimé' }] },
-  { id: 'sprint', name: 'Sprint / Alactique', g: 5, o: 3, retentionDays: 5, category: 'mixte', impacts: [{ id: 'seuil', ratio: 0.2, confidence: 'estimé' }, { id: 'vo2max', ratio: 0.25, confidence: 'estimé' }, { id: 'ef', ratio: 0.15, confidence: 'estimé' }, { id: 'leg', ratio: 0.7, confidence: 'sourcé' }, { id: 'plyo', ratio: 0.7, confidence: 'sourcé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }] },
+  { id: 'sprint', name: 'Sprint / Alactique', g: 5, o: 3, retentionDays: 5, category: 'mixte', impacts: [{ id: 'seuil', ratio: 0.2, confidence: 'estimé' }, { id: 'vo2max', ratio: 0.25, confidence: 'estimé' }, { id: 'ef', ratio: 0.15, confidence: 'estimé' }, { id: 'leg', ratio: 0.7, confidence: 'estimé' }, { id: 'plyo', ratio: 0.7, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }] },
   { id: 'pull', name: 'Musculation Pull', g: 8, o: 5, retentionDays: 30, category: 'force' },
   { id: 'push', name: 'Musculation Push', g: 8, o: 5, retentionDays: 30, category: 'force' },
-  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, retentionDays: 30, category: 'force', impacts: [{ id: 'plyo', ratio: 0.3, confidence: 'sourcé' }, { id: 'sprint', ratio: 0.2, confidence: 'sourcé' }] },
-  { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, retentionDays: 5, category: 'force', impacts: [{ id: 'leg', ratio: 0.4, confidence: 'sourcé' }, { id: 'sprint', ratio: 0.2, confidence: 'sourcé' }] },
+  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, retentionDays: 30, category: 'force', impacts: [{ id: 'plyo', ratio: 0.3, confidence: 'estimé' }, { id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
+  { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, retentionDays: 5, category: 'force', impacts: [{ id: 'leg', ratio: 0.4, confidence: 'estimé' }, { id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'co2', name: 'Tolérance CO2', g: 6, o: 4, retentionDays: 10, category: 'cardio' },
   { id: 'abdos', name: 'Protocole Abdos', g: 7, o: 4, retentionDays: 7, category: 'force' },
   { id: 'gut', name: 'Gut Training', g: 14, o: 7, retentionDays: 14, category: 'cardio' },
-  { id: 'descente', name: 'Excentrique Descente', g: 16, o: 10, retentionDays: 21, category: 'force', impacts: [{ id: 'leg', ratio: 0.8, confidence: 'sourcé' }] },
+  { id: 'descente', name: 'Excentrique Descente', g: 16, o: 10, retentionDays: 21, category: 'force', impacts: [{ id: 'leg', ratio: 0.8, confidence: 'estimé' }] },
   { id: 'proprio', name: 'Proprioception', g: 5, o: 3, retentionDays: 7, category: 'force' }
 ];
 
@@ -24,14 +24,14 @@ export const SPORT_IMPACTS = {
     run: [
       { id: 'seuil', ratio: 0.6 },
       { id: 'ef', ratio: 0.4 },
-      { id: 'leg', ratio: 0.4 },
+      { id: 'leg', ratio: 0.3 },
       { id: 'co2', ratio: 0.4 },
-      { id: 'plyo', ratio: 0.4 }
+      { id: 'plyo', ratio: 0.3 }
     ],
     bike: [
       { id: 'seuil', ratio: 0.55 },
       { id: 'ef', ratio: 0.4 },
-      { id: 'leg', ratio: 0.3 },
+      { id: 'leg', ratio: 0.25 },
       { id: 'co2', ratio: 0.35 }
     ]
   },
@@ -63,16 +63,16 @@ export const SPORT_IMPACTS = {
   },
   sprint: {
     run: [
-      { id: 'leg', ratio: 0.8 },
-      { id: 'plyo', ratio: 0.8 },
-      { id: 'co2', ratio: 0.6 },
-      { id: 'seuil', ratio: 0.3 },
-      { id: 'vo2max', ratio: 0.4 },
-      { id: 'ef', ratio: 0.2 }
+      { id: 'leg', ratio: 0.7 },
+      { id: 'plyo', ratio: 0.7 },
+      { id: 'co2', ratio: 0.4 },
+      { id: 'seuil', ratio: 0.2 },
+      { id: 'vo2max', ratio: 0.25 },
+      { id: 'ef', ratio: 0.15 }
     ],
     bike: [
-      { id: 'leg', ratio: 0.65 },
-      { id: 'co2', ratio: 0.45 },
+      { id: 'leg', ratio: 0.6 },
+      { id: 'co2', ratio: 0.35 },
       { id: 'seuil', ratio: 0.2 },
       { id: 'vo2max', ratio: 0.25 }
     ]
@@ -93,10 +93,10 @@ export const BLOCK_PRESETS = [
     id: 'force_max',
     name: 'Force max',
     durationWeeks: 4,
-    focusQualities: ['pull', 'push', 'leg', 'abdos', 'descente'],
-    description: 'Renforcement musculaire intensif en fréquence de développement (x0.45, 2-3x/sem). Délais nominaux pour les autres qualités.',
-    targetMultiplier: 0.45, // g et o réduits de 55% -> incite à répéter 2 à 3 fois par semaine
-    maintenanceMultiplier: 1.0, // autres qualités bénéficient du délai nominal plein (maintien)
+    focusQualities: ['pull', 'push', 'leg'],
+    description: 'Renforcement musculaire intensif en fréquence de développement concentrée (x0.45, 2-3x/sem). Délais nominaux pour les autres qualités.',
+    targetMultiplier: 0.45,
+    maintenanceMultiplier: 1.0,
     color: '#ef4444',
     badge: '🏋️ Force'
   },
@@ -104,7 +104,7 @@ export const BLOCK_PRESETS = [
     id: 'endurance_force',
     name: 'Endurance de force',
     durationWeeks: 4,
-    focusQualities: ['leg', 'pull', 'push', 'abdos', 'plyo'],
+    focusQualities: ['leg', 'pull', 'push'],
     description: 'Répétition fréquente des séances de résistance musculaire (x0.45). Les autres qualités sont maintenues en délai nominal.',
     targetMultiplier: 0.45,
     maintenanceMultiplier: 1.0,
@@ -115,7 +115,7 @@ export const BLOCK_PRESETS = [
     id: 'aerobie',
     name: 'Aérobie',
     durationWeeks: 6,
-    focusQualities: ['ef', 'gut', 'co2'],
+    focusQualities: ['ef', 'gut'],
     description: 'Développement du volume foncier et des capacités métaboliques (x0.45). Renforcement musculaire espacé en maintien.',
     targetMultiplier: 0.45,
     maintenanceMultiplier: 1.0,
@@ -126,7 +126,7 @@ export const BLOCK_PRESETS = [
     id: 'seuil_vma',
     name: 'Seuil / VMA',
     durationWeeks: 3,
-    focusQualities: ['seuil', 'vo2max', 'sprint'],
+    focusQualities: ['seuil', 'vo2max'],
     description: 'Forte sollicitation cardio-vasculaire à haute intensité (x0.45). Renforcement musculaire maintenu en délai nominal.',
     targetMultiplier: 0.45,
     maintenanceMultiplier: 1.0,
@@ -137,7 +137,7 @@ export const BLOCK_PRESETS = [
     id: 'explosivite_plyo',
     name: 'Explosivité / Plyométrie',
     durationWeeks: 3,
-    focusQualities: ['plyo', 'sprint', 'leg'],
+    focusQualities: ['plyo', 'sprint'],
     description: 'Vitesse de contraction, cycle étirement-détente et puissance des membres inférieurs (x0.45).',
     targetMultiplier: 0.45,
     maintenanceMultiplier: 1.0,
@@ -1007,7 +1007,14 @@ export function getTaperingAnalysis(
     statusColor = 'cyan';
     advice = 'Amorcez la réduction progressive du volume (-40% à -50%) tout en maintenant l\'intensité cible pour conserver le recrutement neuromusculaire.';
   } else if (daysRemaining > 0) {
-    const isOptimalTsb = (projectedTsbPercent !== null && projectedTsbPercent >= 5 && projectedTsbPercent <= 25) || (projectedTsb >= 10 && projectedTsb <= 25);
+    const isOptimalTsb = projectedTsbPercent !== null 
+      ? (projectedTsbPercent >= 5 && projectedTsbPercent <= 25)
+      : (projectedTsb >= 10 && projectedTsb <= 25);
+
+    const isUnderTsb = projectedTsbPercent !== null
+      ? (projectedTsbPercent < 5)
+      : (projectedTsb < 10);
+
     if (isOptimalTsb) {
       if (futureSessionsCount === 0) {
         status = 'TAPER_PASSIVE';
@@ -1020,16 +1027,16 @@ export function getTaperingAnalysis(
         statusColor = 'emerald';
         advice = `Planification d'affûtage active (${futureSessionsCount} séance(s) planifiée(s)). TSB prévu le Jour J : +${projectedTsb}${projectedTsbPercent !== null ? ` (+${projectedTsbPercent}% de la CTL)` : ''} (cible : +${targetTsb}).`;
       }
-    } else if ((projectedTsbPercent !== null && projectedTsbPercent < 5) || projectedTsb < 10) {
+    } else if (isUnderTsb) {
       status = 'TAPER_OVERREACHING';
       statusBadge = '⚠️ Fatigue Résiduelle Élevée';
       statusColor = 'amber';
-      advice = `Votre TSB prévu est trop bas (+${projectedTsb}${projectedTsbPercent !== null ? `, ${projectedTsbPercent}% CTL` : ''}). Diminuez la charge pour évacuer la fatigue (ATL) avant l'épreuve.`;
+      advice = `Votre TSB prévu est bas (+${projectedTsb}${projectedTsbPercent !== null ? `, ${projectedTsbPercent}% CTL` : ''}). Réduisez le volume pour dissiper la fatigue aiguë (ATL) avant l'épreuve.`;
     } else {
       status = 'PEAK';
-      statusBadge = '🕊️ Légèreté / Risque Désaffûtage';
+      statusBadge = '🕊️ Fraîcheur Élevée / Maintien Tonicité';
       statusColor = 'yellow';
-      advice = `TSB très élevé (+${projectedTsb}${projectedTsbPercent !== null ? `, +${projectedTsbPercent}% CTL` : ''}). Attention au manque de tonus neuromusculaire : prévoyez 1 ou 2 rappels courts et nerveux sous 48h.`;
+      advice = `TSB très élevé (+${projectedTsb}${projectedTsbPercent !== null ? `, +${projectedTsbPercent}% CTL` : ''}). Pour éviter la perte de tonus neuromusculaire, placez une courte piqûre de rappel 48-72h avant.`;
     }
   } else if (daysRemaining === 0) {
     status = 'PEAK';

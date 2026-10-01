@@ -225,7 +225,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
                     <Zap size={13} className="text-rose-400 shrink-0" />
-                    <span>Qualités Prioritaires Renforcées (Fréquence accrue +25%) :</span>
+                    <span>Qualités ciblées en développement prioritaire (délais raccourcis x0.45) :</span>
                   </div>
                   <div className="flex flex-wrap gap-2 pl-4">
                     {activeBlock.focusQualities.map(id => {
@@ -246,10 +246,10 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300">
                     <Shield size={13} className="text-sky-400 shrink-0" />
-                    <span>Qualités en Maintien (Intervalle Étendu +35%) :</span>
+                    <span>Qualités en Maintien (délais nominaux pleins) :</span>
                   </div>
                   <p className="text-xs text-slate-300 pl-4 leading-relaxed m-0">
-                    Les autres filières sont sollicitées à cadence espacée pour préserver les adaptations sans accumuler de fatigue résiduelle.
+                    Les autres filières conservent leur délai nominal de maintien pour préserver les adaptations sans surcharger la semaine.
                   </p>
                 </div>
               </div>

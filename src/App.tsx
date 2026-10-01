@@ -592,6 +592,7 @@ function AppContent() {
               qualities={qualities}
               qualitiesEMA={qualitiesEMA}
               fosterMetrics={fosterMetrics}
+              banisterPerformance={banisterPerformance}
               taperingAnalysis={taperingAnalysis}
               cardioMuscularBalance={cardioMuscularBalance}
               isSimulationActive={isSimulationActive}
@@ -614,6 +615,7 @@ function AppContent() {
               qualities={qualities}
               qualitiesEMA={qualitiesEMA}
               fosterMetrics={fosterMetrics}
+              banisterPerformance={banisterPerformance}
               taperingAnalysis={taperingAnalysis}
               cardioMuscularBalance={cardioMuscularBalance}
               isSimulationActive={isSimulationActive}

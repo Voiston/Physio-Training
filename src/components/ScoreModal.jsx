@@ -189,7 +189,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const numMusc = Number(rpeMusc) || 0;
   const numFatigue = Number(fatigue) || 5;
 
-  const eccentricMultiplier = isEccentric ? 1.35 : 1.0;
+  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
   const loadCardio = Math.round(numDur * numCardio);
   const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier);
   
@@ -245,7 +245,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               </span>
             </div>
             <p className="text-xs font-semibold text-slate-400 mt-1 mb-0">
-              Renseignez la charge aiguë TRIMP et les impacts physiologiques
+              Renseignez la durée, la difficulté perçue (RPE) et les impacts
             </p>
           </div>
 
@@ -522,7 +522,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   <Flame size={12} className="text-amber-400" /> Stress Excentrique & Impacts Musculaires Élevés
                 </span>
                 <span className="text-[10px] text-slate-400 block leading-tight mt-0.5">
-                  Descente trail, pliométrie, charges lourdes. Multiplie la contrainte structurelle (+35% créatine-kinase, 72h de régénération).
+                  Descente trail, pliométrie, charges lourdes (majore la contrainte structurelle mécanique de +15%).
                 </span>
               </div>
             </label>
@@ -533,13 +533,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               <label className="text-xs font-medium text-slate-300">Fatigue Perçue Globale Post-Séance (1-10)</label>
               {fatigue && (
                 <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold border ${
-                  numFatigue > 5 
+                  numFatigue > 6 
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
                     : numFatigue < 5 
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                     : 'bg-white/10 text-slate-300 border-white/10'
                 }`}>
-                  {numFatigue === 5 ? 'Neutre (x1.0)' : `${fatiguePercentDelta > 0 ? `+${fatiguePercentDelta}%` : `${fatiguePercentDelta}%`} charge`}
+                  {numFatigue > 6 ? 'Fatigue marquée' : numFatigue > 4 ? 'Tolérance normale' : 'Très bien toléré'}
                 </span>
               )}
             </div>
@@ -552,7 +552,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               placeholder="1 (très frais) à 10 (épuisement total)" 
             />
             <p className="text-[10px] text-slate-400 mt-1 leading-tight m-0">
-              {numFatigue > 5 
+              {numFatigue > 6 
                 ? `⚡ Marqueur de réponse : Fatigue perçue élevée (${numFatigue}/10). Veillez particulièrement à l'assimilation et au sommeil.` 
                 : numFatigue < 5 
                 ? `🍃 Marqueur de réponse : Séance très bien tolérée (${numFatigue}/10). Disponibilité préservée.`
@@ -560,7 +560,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             </p>
           </div>
 
-          {/* Décomposition TRIMP Multi-Facteurs */}
+          {/* Décomposition Charge Multi-Facteurs */}
           <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -594,7 +594,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       <Dumbbell size={10} /> Charge Musculaire
                     </span>
                     <span className="font-bold font-mono text-red-200">
-                      {loadMusc} {isEccentric && <span className="text-[9px] text-amber-400 font-normal">x1.35</span>}
+                      {loadMusc} {isEccentric && <span className="text-[9px] text-amber-400 font-normal">x1.15</span>}
                     </span>
                     <span className="text-[9px] text-slate-400 block">{muscPercent}%</span>
                   </div>

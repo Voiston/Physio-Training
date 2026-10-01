@@ -117,6 +117,19 @@ export default function Grid({
     setDropPosition(null);
   };
 
+  const hrRestBaselineMedian = useMemo(() => {
+    const values = [];
+    Object.values(dailyMetrics || {}).forEach(m => {
+      const val = m?.hrRest ?? m?.rhr;
+      if (val !== undefined && val !== null && Number(val) > 0) {
+        values.push(Number(val));
+      }
+    });
+    if (values.length === 0) return null;
+    values.sort((a, b) => a - b);
+    return values[Math.floor(values.length / 2)];
+  }, [dailyMetrics]);
+
   const todayStr = timeline.find(d => d.offset === 0)?.dateStr;
   const activeBlockToday = getActiveBlockForDate(todayStr, trainingBlocks);
 
@@ -458,11 +471,13 @@ export default function Grid({
                 let badgeClass = 'text-slate-500 font-normal';
                 if (hrRest !== '-') {
                   const numHr = Number(hrRest);
-                  if (numHr <= 52) {
+                  const median = hrRestBaselineMedian || 55;
+                  const delta = numHr - median;
+                  if (delta <= 1) {
                     badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
-                  } else if (numHr <= 58) {
+                  } else if (delta <= 4) {
                     badgeClass = 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold';
-                  } else if (numHr <= 65) {
+                  } else if (delta <= 7) {
                     badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold';
                   } else {
                     badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold';
