@@ -475,57 +475,59 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
         if (load > 0) sessionCount28d++;
       }
 
-      // Dose-réponse continue (B3): doseScale(load / refLoad_q)
-      // Sans plancher fixe à 0.75 ni saut artificiel
-      let doseScale = 1.0;
-      if (load > 0) {
+      // Dose-réponse continue avec seuil minimal effectif (load >= 15 UA)
+      let doseScale = 0;
+      if (load >= 15) {
         const ratio = load / refLoad_q;
-        doseScale = Math.max(0.2, Math.min(1.4, 0.4 + 0.6 * Math.sqrt(Math.max(0, ratio))));
-      } else {
-        doseScale = 0.5;
+        doseScale = Math.max(0.3, Math.min(1.3, 0.45 + 0.55 * Math.sqrt(Math.max(0, ratio))));
       }
 
-      // 1. Calcul Physiologique Pur (sans multiplicateur de bloc, pour Radar et rémanence réelle - B5)
-      const gPhysio = qDef.g * doseScale;
-      const oPhysio = qDef.o * doseScale;
+      if (doseScale > 0) {
+        // 1. Calcul Physiologique Pur (fondé sur retentionDays et délais nominaux g et o)
+        const gBase = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
+        const oBase = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
 
-      if (daysSince < gPhysio) {
-        const dLeft = gPhysio - daysSince;
-        if (bestStatusPhysio !== 'green' || dLeft > daysLeftPhysio) {
-          bestStatusPhysio = 'green';
-          daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
-          opacityPhysio = 1 - (daysSince / gPhysio) * 0.5;
-          currentLevelPhysio = 100 - (daysSince / gPhysio) * 20;
-        }
-      } else if (daysSince < (gPhysio + oPhysio) && bestStatusPhysio !== 'green') {
-        const dLeft = (gPhysio + oPhysio) - daysSince;
-        if (bestStatusPhysio !== 'orange' || dLeft > daysLeftPhysio) {
-          bestStatusPhysio = 'orange';
-          daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
-          opacityPhysio = 1 - ((daysSince - gPhysio) / oPhysio) * 0.5;
-          currentLevelPhysio = Math.max(0, 60 - ((daysSince - gPhysio) / oPhysio) * 40);
-        }
-      }
+        const gPhysio = gBase * doseScale;
+        const oPhysio = oBase * doseScale;
 
-      // 2. Calcul Prescription (avec multiplicateur de bloc x0.45 pour la Grille et les alertes)
-      const gPrescription = gPhysio * prescriptionMultiplier;
-      const oPrescription = oPhysio * prescriptionMultiplier;
-
-      if (daysSince < gPrescription) {
-        const dLeft = gPrescription - daysSince;
-        if (bestStatusPrescription !== 'green' || dLeft > daysLeftPrescription) {
-          bestStatusPrescription = 'green';
-          daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
-          opacityPrescription = 1 - (daysSince / gPrescription) * 0.5;
-          currentLevelPrescription = 100 - (daysSince / gPrescription) * 20;
+        if (daysSince < gPhysio) {
+          const dLeft = gPhysio - daysSince;
+          if (bestStatusPhysio !== 'green' || dLeft > daysLeftPhysio) {
+            bestStatusPhysio = 'green';
+            daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
+            opacityPhysio = 1 - (daysSince / gPhysio) * 0.5;
+            currentLevelPhysio = 100 - (daysSince / gPhysio) * 20;
+          }
+        } else if (daysSince < (gPhysio + oPhysio) && bestStatusPhysio !== 'green') {
+          const dLeft = (gPhysio + oPhysio) - daysSince;
+          if (bestStatusPhysio !== 'orange' || dLeft > daysLeftPhysio) {
+            bestStatusPhysio = 'orange';
+            daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
+            opacityPhysio = 1 - ((daysSince - gPhysio) / oPhysio) * 0.5;
+            currentLevelPhysio = Math.max(0, 60 - ((daysSince - gPhysio) / oPhysio) * 40);
+          }
         }
-      } else if (daysSince < (gPrescription + oPrescription) && bestStatusPrescription !== 'green') {
-        const dLeft = (gPrescription + oPrescription) - daysSince;
-        if (bestStatusPrescription !== 'orange' || dLeft > daysLeftPrescription) {
-          bestStatusPrescription = 'orange';
-          daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
-          opacityPrescription = 1 - ((daysSince - gPrescription) / oPrescription) * 0.5;
-          currentLevelPrescription = Math.max(0, 60 - ((daysSince - gPrescription) / oPrescription) * 40);
+
+        // 2. Calcul Prescription (avec multiplicateur de bloc x0.45 pour la Grille et les alertes)
+        const gPrescription = gPhysio * prescriptionMultiplier;
+        const oPrescription = oPhysio * prescriptionMultiplier;
+
+        if (daysSince < gPrescription) {
+          const dLeft = gPrescription - daysSince;
+          if (bestStatusPrescription !== 'green' || dLeft > daysLeftPrescription) {
+            bestStatusPrescription = 'green';
+            daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
+            opacityPrescription = 1 - (daysSince / gPrescription) * 0.5;
+            currentLevelPrescription = 100 - (daysSince / gPrescription) * 20;
+          }
+        } else if (daysSince < (gPrescription + oPrescription) && bestStatusPrescription !== 'green') {
+          const dLeft = (gPrescription + oPrescription) - daysSince;
+          if (bestStatusPrescription !== 'orange' || dLeft > daysLeftPrescription) {
+            bestStatusPrescription = 'orange';
+            daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
+            opacityPrescription = 1 - ((daysSince - gPrescription) / oPrescription) * 0.5;
+            currentLevelPrescription = Math.max(0, 60 - ((daysSince - gPrescription) / oPrescription) * 40);
+          }
         }
       }
     }
@@ -843,8 +845,8 @@ export function computeBanisterPerformance(
     ? Math.max(0, Math.round((today.getTime() - earliestSessionDate.getTime()) / (1000 * 3600 * 24)))
     : 0;
 
-  // Période d'échauffement mathématique : au moins 90 jours passés pour assurer la convergence de la CTL (tau=28j)
-  const warmupDays = Math.max(90, daysHistory + 60);
+  // Période d'échauffement mathématique : englobe tout l'historique de l'athlète + au moins 90 jours
+  const warmupDays = Math.max(90, historyDays + 60, daysHistory + 60);
   const fullRawData = [];
 
   for (let i = -warmupDays; i <= daysFuture; i++) {
@@ -873,7 +875,26 @@ export function computeBanisterPerformance(
 
   const loads = fullRawData.map(d => d.load);
   const atlArray = calculateExpDecay(loads, tauFatigue, { decayToZero: true });
-  const ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true, initialValue: initialCtl });
+  
+  // Injection propre de initialCtl : semée au jour de la première séance réelle de l'athlète
+  let ctlArray;
+  if (initialCtl !== null && Number(initialCtl) > 0) {
+    const firstSessionIdx = fullRawData.findIndex(d => d.offset === -historyDays);
+    if (firstSessionIdx > 0 && firstSessionIdx < fullRawData.length) {
+      const preLoads = loads.slice(0, firstSessionIdx);
+      const preCtl = calculateExpDecay(preLoads, tauFitness, { decayToZero: true });
+      const postLoads = loads.slice(firstSessionIdx);
+      const postCtl = calculateExpDecay(postLoads, tauFitness, { decayToZero: true, initialValue: Number(initialCtl) });
+      ctlArray = [...preCtl, ...postCtl];
+    } else {
+      ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true, initialValue: Number(initialCtl) });
+    }
+  } else {
+    ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true });
+  }
+
+  const minWarmupThreshold = Math.max(28, Math.round(tauFitness * 1.0));
+  const isWarmedUp = historyDays >= minWarmupThreshold;
 
   const fullSeries = fullRawData.map((d, idx) => {
     const atl = Math.round(atlArray[idx] * 10) / 10;
@@ -881,12 +902,12 @@ export function computeBanisterPerformance(
     const tsb = Math.round((ctl - atl) * 10) / 10;
     const tsbPercent = calculateTsbPercent(ctl, atl);
 
-    // ACWR couplé classique
-    const acwr = ctl > 0 ? Math.round((atl / ctl) * 100) / 100 : 1;
+    // ACWR couplé classique (avec neutralisation si CTL non convergée)
+    const acwr = (ctl > 0 && isWarmedUp) ? Math.round((atl / ctl) * 100) / 100 : 1;
 
     // ACWR non couplé (aiguë J-0..J-6 vs chronique non couplée J-7..J-27)
     let acwrUncoupled = acwr;
-    if (idx >= 27) {
+    if (idx >= 27 && isWarmedUp) {
       const acuteLoads = loads.slice(idx - 6, idx + 1);
       const chronicLoads = loads.slice(idx - 27, idx - 6);
       const acuteMean = acuteLoads.reduce((a, b) => a + b, 0) / 7;
@@ -939,7 +960,7 @@ export function computeBanisterPerformance(
     futureSeries,
     peakDay,
     historyDays,
-    isWarmedUp: historyDays >= 21,
+    isWarmedUp,
     tsbZone
   };
 }

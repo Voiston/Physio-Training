@@ -17,7 +17,8 @@ import {
 } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
-import { CURRENT_SCHEMA_VERSION, migrateData } from '../utils/migration';
+import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
+import { isPrimary } from '../utils/loadHelpers';
 
 export interface QualityImpact {
   id: string;
@@ -353,6 +354,9 @@ export function useData() {
   };
 
   useEffect(() => {
+    // Migration ascendante automatique des données présentes dans localStorage
+    migrateLocalStorage();
+
     const loadedEvents: Record<string, Record<string, SessionData>> = {};
     qualities.forEach(q => (loadedEvents[q.id] = {}));
     const loadedMetrics: Record<string, DailyMetrics> = {};
@@ -714,23 +718,49 @@ export function useData() {
     if (!sessionData) {
       saveEvent(qId, dateStr, null);
     } else {
-      saveEvent(qId, dateStr, sessionData);
+      // Déterminer le sport adapté : ne pas forcer 'run' sur les filières de musculation
+      const isCardio = ['vo2max', 'seuil', 'ef', 'sprint'].includes(qId);
+      const normalizedSport = sessionData.sport || (isCardio ? 'run' : 'muscu');
+      const normalizedSession: SessionData = {
+        ...sessionData,
+        sport: normalizedSport,
+        isSecondary: false
+      };
+
+      saveEvent(qId, dateStr, normalizedSession);
 
       if (applyImpacts) {
-        const impacts = getQualityImpacts(qId, sessionData.sport || 'run', qualities as any) as QualityImpact[];
+        const impacts = getQualityImpacts(qId, normalizedSport, qualities as any) as QualityImpact[];
         if (impacts && impacts.length > 0) {
           impacts.forEach(imp => {
-            const calculatedSecLoad = Math.round(sessionData.load * imp.ratio);
-            const secCardio = sessionData.loadCardio !== undefined ? Math.round(sessionData.loadCardio * imp.ratio) : undefined;
-            const secMusc = sessionData.loadMusc !== undefined ? Math.round(sessionData.loadMusc * imp.ratio) : undefined;
+            // RÈGLE CRITIQUE D'INTÉGRITÉ : Ne JAMAIS écraser une séance principale existante
+            const existingRaw = localStorage.getItem(`${dateStr}_${imp.id}`);
+            let existingSession: any = null;
+            if (existingRaw) {
+              try { existingSession = JSON.parse(existingRaw); } catch (e) {}
+            }
+            if (existingSession && isPrimary(existingSession)) {
+              // Créneau déjà occupé par une séance directe de l'athlète -> Conserver la séance principale
+              return;
+            }
+
+            const calculatedSecLoad = Math.round(normalizedSession.load * imp.ratio);
+            const secCardio = normalizedSession.loadCardio !== undefined ? Math.round(normalizedSession.loadCardio * imp.ratio) : undefined;
+            const secMusc = normalizedSession.loadMusc !== undefined ? Math.round(normalizedSession.loadMusc * imp.ratio) : undefined;
+            
+            // Si un impact secondaire d'un autre parent existe déjà, cumuler les charges
+            const previousLoad = (existingSession && existingSession.isSecondary) ? (Number(existingSession.load) || 0) : 0;
+            const previousCardio = (existingSession && existingSession.isSecondary) ? (Number(existingSession.loadCardio) || 0) : 0;
+            const previousMusc = (existingSession && existingSession.isSecondary) ? (Number(existingSession.loadMusc) || 0) : 0;
+
             const secData: SessionData = {
-              ...sessionData,
-              load: calculatedSecLoad,
-              loadCardio: secCardio,
-              loadMusc: secMusc,
+              ...normalizedSession,
+              load: previousLoad + calculatedSecLoad,
+              loadCardio: secCardio !== undefined ? previousCardio + secCardio : undefined,
+              loadMusc: secMusc !== undefined ? previousMusc + secMusc : undefined,
               isSecondary: true,
               parentQId: qId,
-              originalLoad: sessionData.load
+              originalLoad: normalizedSession.load
             };
             saveEvent(imp.id, dateStr, secData);
           });

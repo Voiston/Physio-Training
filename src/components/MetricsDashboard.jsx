@@ -207,7 +207,11 @@ export default function MetricsDashboard({
   const chartData = useMemo(() => {
     // Si banisterPerformance est injecté depuis useData, utiliser sa série échauffée (>=90j) comme source unique de vérité
     if (banisterPerformance && banisterPerformance.series && banisterPerformance.series.length > 0) {
-      return banisterPerformance.series.map(point => {
+      const vfcRaw = banisterPerformance.series.map(point => dailyMetrics[point.dateStr]?.vfc || null);
+      const vfcEMA3 = calculateEMA(vfcRaw, 3, false);
+      const vfcEMA7 = calculateEMA(vfcRaw, 7, false);
+
+      return banisterPerformance.series.map((point, idx) => {
         const dateStr = point.dateStr;
         const vfc = dailyMetrics[dateStr]?.vfc || null;
         const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
@@ -259,6 +263,8 @@ export default function MetricsDashboard({
           ...point,
           day: point.day,
           vfc,
+          vfcEMA3: vfcEMA3[idx] ? Math.round(vfcEMA3[idx]) : null,
+          vfcEMA7: vfcEMA7[idx] ? Math.round(vfcEMA7[idx]) : null,
           hrRest,
           readiness,
           loadEMA7: point.atl,
@@ -442,11 +448,12 @@ export default function MetricsDashboard({
 
       if (daysSince === null) {
         remainingPercent = 0;
-        statusKey = 'decondition';
-        statusLabel = 'Non stimulée';
+        statusKey = 'uninitialized';
+        statusLabel = 'Non initialisée';
         statusColor = 'text-slate-400';
         statusBg = 'bg-white/5 text-slate-400 border-white/10';
-        actionAdvice = 'Aucune séance enregistrée';
+        statusIcon = Clock;
+        actionAdvice = 'À programmer selon vos objectifs';
       } else if (daysSince === 0) {
         remainingPercent = 100;
         statusKey = 'optimal';
@@ -1944,6 +1951,59 @@ export default function MetricsDashboard({
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+
+              {/* Analyse statistique personnalisée VFC (SWC Plews et al.) et FC de Repos */}
+              {(vfcAnalysis || hrRestAnalysis) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 border-t border-white/10 text-xs">
+                  {vfcAnalysis && (
+                    <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-300">Variabilité Cardiaque (VFC)</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          vfcAnalysis.status === 'optimal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                          vfcAnalysis.status === 'low' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                          vfcAnalysis.status === 'high' ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' :
+                          'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                        }`}>
+                          {vfcAnalysis.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 m-0 leading-tight">
+                        {vfcAnalysis.interpretation}
+                      </p>
+                      {vfcAnalysis.corridorLower !== null && vfcAnalysis.corridorUpper !== null && (
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          Corridor SWC (0.5 SD) : {vfcAnalysis.corridorLower} – {vfcAnalysis.corridorUpper} ms • Base 7j : {vfcAnalysis.baseline7d} ms
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {hrRestAnalysis && (
+                    <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-300">FC de Repos au Réveil</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          hrRestAnalysis.status === 'optimal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                          hrRestAnalysis.status === 'elevated' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                          hrRestAnalysis.status === 'low' ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' :
+                          'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                        }`}>
+                          {hrRestAnalysis.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 m-0 leading-tight">
+                        {hrRestAnalysis.interpretation}
+                      </p>
+                      {hrRestAnalysis.median28d !== null && (
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          Médiane 28j : {hrRestAnalysis.median28d} bpm • Écart à date : {hrRestAnalysis.deltaBpm !== null && hrRestAnalysis.deltaBpm > 0 ? `+${hrRestAnalysis.deltaBpm}` : hrRestAnalysis.deltaBpm} bpm
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
           </div>

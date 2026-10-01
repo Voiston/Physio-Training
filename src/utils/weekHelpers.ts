@@ -392,10 +392,10 @@ export function computeAllWeeksStats(
     const stdDevLoad = Math.round(Math.sqrt(variance) * 10) / 10;
 
     let monotony = 1.0;
-    if (stdDevLoad > 0) {
+    if (activeDailyLoads.length >= 3 && stdDevLoad > 0) {
       monotony = Math.round((exactMeanDailyLoad / stdDevLoad) * 100) / 100;
-    } else if (exactMeanDailyLoad > 0) {
-      monotony = 3.5;
+    } else if (activeDailyLoads.length >= 3 && exactMeanDailyLoad > 0) {
+      monotony = 2.5;
     }
     const strain = Math.round(totalLoad * monotony);
 
@@ -516,13 +516,16 @@ export function computeAllWeeksStats(
     }
 
     // ACWR (Acute:Chronic Workload Ratio)
-    // Aiguë = charge de la semaine en cours
+    // Aiguë = charge de la semaine en cours (proratisée si semaine partielle)
     // Chronique = moyenne des 3 à 4 semaines précédentes
     const chronicWeeks = computedList.slice(Math.max(0, i - 4), i);
     if (chronicWeeks.length > 0) {
       const chronicAvg = chronicWeeks.reduce((acc, w) => acc + w.totalLoad, 0) / chronicWeeks.length;
       if (chronicAvg > 0) {
-        cur.acwr = Math.round((cur.totalLoad / chronicAvg) * 100) / 100;
+        const acuteLoad = (cur.isCurrentWeek && cur.isPartial && cur.elapsedDays > 0 && cur.elapsedDays < 7)
+          ? (cur.totalLoad / cur.elapsedDays) * 7
+          : cur.totalLoad;
+        cur.acwr = Math.round((acuteLoad / chronicAvg) * 100) / 100;
       }
     }
   }

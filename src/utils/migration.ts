@@ -141,3 +141,45 @@ export function ensureLocalStorageSchema(): number {
     return CURRENT_SCHEMA_VERSION;
   }
 }
+
+/**
+ * Migre directement toutes les entrées présentes dans localStorage si la version est obsolète
+ */
+export function migrateLocalStorage(): void {
+  try {
+    const currentVer = Number(localStorage.getItem('physio_schema_version')) || 0;
+    if (currentVer >= CURRENT_SCHEMA_VERSION) return;
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
+      if (match) {
+        const qualityId = match[2];
+        if (CARDIO_QUALITIES.has(qualityId) || FORCE_QUALITIES.has(qualityId) || qualityId === 'sprint') {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            try {
+              const session = JSON.parse(raw);
+              if (session && typeof session === 'object') {
+                const dur = Number(session.duration) || 0;
+                const rM = session.rpeMusculaire ?? session.rpeMusc ?? 5;
+                const rC = session.rpeCardio ?? 5;
+                const isEcc = !!session.isEccentric;
+                if (dur > 0 && !session.isSecondary) {
+                  const { load, loadCardio, loadMusc } = calculateCleanSessionLoad(qualityId, dur, rM, rC, isEcc);
+                  session.load = load;
+                  session.loadCardio = loadCardio;
+                  session.loadMusc = loadMusc;
+                  session.isSecondary = false;
+                  localStorage.setItem(key, JSON.stringify(session));
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      }
+    }
+    localStorage.setItem('physio_schema_version', String(CURRENT_SCHEMA_VERSION));
+  } catch (e) {}
+}
