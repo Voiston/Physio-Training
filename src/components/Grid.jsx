@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { computeCellState, getActiveBlockForDate } from '../utils/physiology';
 import { computeAllWeeksStats, formatMinutes } from '../utils/weekHelpers';
+import { computeHrRestAnalysis, computeVfcAnalysis } from '../utils/vfcHelpers';
 import QualitySparkline from './QualitySparkline';
 import { 
   ChevronDown, ChevronUp, BarChart2, GripVertical, 
@@ -116,19 +117,6 @@ export default function Grid({
     setDragOverQualityId(null);
     setDropPosition(null);
   };
-
-  const hrRestBaselineMedian = useMemo(() => {
-    const values = [];
-    Object.values(dailyMetrics || {}).forEach(m => {
-      const val = m?.hrRest ?? m?.rhr;
-      if (val !== undefined && val !== null && Number(val) > 0) {
-        values.push(Number(val));
-      }
-    });
-    if (values.length === 0) return null;
-    values.sort((a, b) => a - b);
-    return values[Math.floor(values.length / 2)];
-  }, [dailyMetrics]);
 
   const todayStr = timeline.find(d => d.offset === 0)?.dateStr;
   const activeBlockToday = getActiveBlockForDate(todayStr, trainingBlocks);
@@ -437,15 +425,37 @@ export default function Grid({
                 Indicateur parasympathique
               </td>
               {timeline.map((day) => {
-                  const vfc = dailyMetrics[day.dateStr]?.vfc || '-';
+                  const vfcAnalysis = computeVfcAnalysis(dailyMetrics, day.dateStr);
+                  const rawVfc = dailyMetrics[day.dateStr]?.vfc;
+                  const vfc = (rawVfc !== undefined && rawVfc !== null && rawVfc > 0) ? `${rawVfc}` : '-';
+                  
+                  let badgeClass = 'text-slate-500 font-normal';
+                  let cellTitle = 'VFC non renseignée';
+
+                  if (vfc !== '-') {
+                    cellTitle = vfcAnalysis.interpretation;
+                    if (vfcAnalysis.status === 'low') {
+                      badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold';
+                    } else if (vfcAnalysis.status === 'optimal') {
+                      badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
+                    } else if (vfcAnalysis.status === 'high') {
+                      badgeClass = 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold';
+                    } else {
+                      badgeClass = 'bg-white/10 text-slate-300 border border-white/10 font-bold';
+                    }
+                  }
+
                   return (
                   <td 
                       key={`vfc-${day.dateStr}`} 
                       className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
                       onClick={() => onMetricClick(day.dateStr, 'vfc', vfc)}
+                      title={cellTitle}
                   >
-                      <div className={`flex justify-center items-center h-8 font-bold font-mono text-[11px] ${vfc !== '-' ? 'text-emerald-300' : 'text-slate-500 font-normal'}`}>
+                      <div className="flex justify-center items-center h-8">
+                        <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] ${badgeClass}`}>
                           {vfc !== '-' ? `${vfc} ms` : '—'}
+                        </span>
                       </div>
                   </td>
                   );
@@ -466,21 +476,22 @@ export default function Grid({
                 Tonus cardiaque au réveil
               </td>
               {timeline.map((day) => {
-                const hrRest = dailyMetrics[day.dateStr]?.hrRest ?? dailyMetrics[day.dateStr]?.rhr ?? '-';
+                const hrAnalysis = computeHrRestAnalysis(dailyMetrics, day.dateStr);
+                const hrRest = hrAnalysis.currentValue !== null ? `${hrAnalysis.currentValue}` : '-';
                 
                 let badgeClass = 'text-slate-500 font-normal';
-                if (hrRest !== '-') {
-                  const numHr = Number(hrRest);
-                  const median = hrRestBaselineMedian || 55;
-                  const delta = numHr - median;
-                  if (delta <= 1) {
-                    badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
-                  } else if (delta <= 4) {
-                    badgeClass = 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold';
-                  } else if (delta <= 7) {
-                    badgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold';
-                  } else {
+                let cellTitle = 'FC Repos non renseignée';
+
+                if (hrAnalysis.currentValue !== null) {
+                  cellTitle = hrAnalysis.interpretation;
+                  if (hrAnalysis.status === 'elevated') {
                     badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold';
+                  } else if (hrAnalysis.status === 'optimal') {
+                    badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
+                  } else if (hrAnalysis.status === 'low') {
+                    badgeClass = 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold';
+                  } else {
+                    badgeClass = 'bg-white/10 text-slate-300 border border-white/10 font-bold';
                   }
                 }
 
@@ -489,6 +500,7 @@ export default function Grid({
                     key={`hrRest-${day.dateStr}`} 
                     className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
                     onClick={() => onMetricClick(day.dateStr, 'hrRest', hrRest)}
+                    title={cellTitle}
                   >
                     <div className="flex justify-center items-center h-8">
                        <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] ${badgeClass}`}>

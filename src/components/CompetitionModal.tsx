@@ -90,11 +90,16 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
             {/* KPIs Clés */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
               <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
-                <span className="text-[10px] text-slate-400 block">Forme TSB Prévue</span>
+                <span className="text-[10px] text-slate-400 block">Forme TSB Jour J</span>
                 <span className="text-base font-bold font-mono text-emerald-400">
-                  {taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb}` : taperingAnalysis.projectedTsb}
+                  {taperingAnalysis.projectedTsbPercent !== null 
+                    ? (taperingAnalysis.projectedTsbPercent > 0 ? `+${taperingAnalysis.projectedTsbPercent}%` : `${taperingAnalysis.projectedTsbPercent}%`)
+                    : (taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb} pts` : `${taperingAnalysis.projectedTsb} pts`)}
                 </span>
-                <span className="text-[10px] text-slate-500 block">Cible : +{taperingAnalysis.targetTsb}</span>
+                <span className="text-[10px] text-slate-400 block">
+                  Cible : +{taperingAnalysis.targetTsb}{taperingAnalysis.targetTsbUnit === 'percent' ? '% CTL' : ' pts'}
+                  {taperingAnalysis.projectedTsbPercent !== null && ` (${taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb}` : taperingAnalysis.projectedTsb} pts)`}
+                </span>
               </div>
 
               <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">

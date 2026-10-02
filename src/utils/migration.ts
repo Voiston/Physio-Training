@@ -35,7 +35,7 @@ export function calculateCleanSessionLoad(
   if (CARDIO_QUALITIES.has(qualityId)) {
     rpeGlobal = rC;
   } else if (FORCE_QUALITIES.has(qualityId)) {
-    rpeGlobal = isEccentric ? Math.min(10, rM * 1.15) : rM;
+    rpeGlobal = isEccentric ? rM * 1.15 : rM;
   } else {
     // Mixte (sprint, etc.)
     rpeGlobal = (rM + rC) / 2;
@@ -43,7 +43,7 @@ export function calculateCleanSessionLoad(
 
   const load = Math.round(dur * rpeGlobal);
   const loadCardio = Math.round(dur * rC);
-  const loadMusc = Math.round(dur * (isEccentric ? Math.min(10, rM * 1.15) : rM));
+  const loadMusc = Math.round(dur * rM * (isEccentric ? 1.15 : 1.0));
 
   return { load, loadCardio, loadMusc };
 }

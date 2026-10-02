@@ -23,59 +23,59 @@ export const DEFAULT_QUALITIES = [
 export const SPORT_IMPACTS = {
   vo2max: {
     run: [
-      { id: 'seuil', ratio: 0.6 },
-      { id: 'ef', ratio: 0.4 },
-      { id: 'leg', ratio: 0.3 },
-      { id: 'co2', ratio: 0.4 },
-      { id: 'plyo', ratio: 0.3 }
+      { id: 'seuil', ratio: 0.6, confidence: 'estimé' },
+      { id: 'ef', ratio: 0.4, confidence: 'estimé' },
+      { id: 'leg', ratio: 0.3, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.4, confidence: 'estimé' },
+      { id: 'plyo', ratio: 0.3, confidence: 'estimé' }
     ],
     bike: [
-      { id: 'seuil', ratio: 0.55 },
-      { id: 'ef', ratio: 0.4 },
-      { id: 'leg', ratio: 0.25 },
-      { id: 'co2', ratio: 0.35 }
+      { id: 'seuil', ratio: 0.55, confidence: 'estimé' },
+      { id: 'ef', ratio: 0.4, confidence: 'estimé' },
+      { id: 'leg', ratio: 0.25, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.35, confidence: 'estimé' }
     ]
   },
   seuil: {
     run: [
-      { id: 'vo2max', ratio: 0.3 },
-      { id: 'ef', ratio: 0.4 },
-      { id: 'leg', ratio: 0.3 },
-      { id: 'co2', ratio: 0.3 },
-      { id: 'plyo', ratio: 0.2 }
+      { id: 'vo2max', ratio: 0.3, confidence: 'estimé' },
+      { id: 'ef', ratio: 0.4, confidence: 'estimé' },
+      { id: 'leg', ratio: 0.3, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.3, confidence: 'estimé' },
+      { id: 'plyo', ratio: 0.2, confidence: 'estimé' }
     ],
     bike: [
-      { id: 'ef', ratio: 0.4 },
-      { id: 'vo2max', ratio: 0.25 },
-      { id: 'leg', ratio: 0.25 },
-      { id: 'co2', ratio: 0.25 }
+      { id: 'ef', ratio: 0.4, confidence: 'estimé' },
+      { id: 'vo2max', ratio: 0.25, confidence: 'estimé' },
+      { id: 'leg', ratio: 0.25, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.25, confidence: 'estimé' }
     ]
   },
   ef: {
     run: [
-      { id: 'leg', ratio: 0.2 },
-      { id: 'co2', ratio: 0.2 }
+      { id: 'leg', ratio: 0.2, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.2, confidence: 'estimé' }
     ],
     bike: [
-      { id: 'leg', ratio: 0.15 },
-      { id: 'co2', ratio: 0.15 },
-      { id: 'gut', ratio: 0.15 }
+      { id: 'leg', ratio: 0.15, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.15, confidence: 'estimé' },
+      { id: 'gut', ratio: 0.15, confidence: 'estimé' }
     ]
   },
   sprint: {
     run: [
-      { id: 'leg', ratio: 0.7 },
-      { id: 'plyo', ratio: 0.7 },
-      { id: 'co2', ratio: 0.4 },
-      { id: 'seuil', ratio: 0.2 },
-      { id: 'vo2max', ratio: 0.25 },
-      { id: 'ef', ratio: 0.15 }
+      { id: 'leg', ratio: 0.7, confidence: 'estimé' },
+      { id: 'plyo', ratio: 0.7, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.4, confidence: 'estimé' },
+      { id: 'seuil', ratio: 0.2, confidence: 'estimé' },
+      { id: 'vo2max', ratio: 0.25, confidence: 'estimé' },
+      { id: 'ef', ratio: 0.15, confidence: 'estimé' }
     ],
     bike: [
-      { id: 'leg', ratio: 0.6 },
-      { id: 'co2', ratio: 0.35 },
-      { id: 'seuil', ratio: 0.2 },
-      { id: 'vo2max', ratio: 0.25 }
+      { id: 'leg', ratio: 0.6, confidence: 'estimé' },
+      { id: 'co2', ratio: 0.35, confidence: 'estimé' },
+      { id: 'seuil', ratio: 0.2, confidence: 'estimé' },
+      { id: 'vo2max', ratio: 0.25, confidence: 'estimé' }
     ]
   }
 };
@@ -247,11 +247,17 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
   const readiness = dailyMetrics?.[refDate]?.readiness || 7;
   const numQualities = qualities.length || 1;
 
-  // Analyse des marqueurs de récupération autonome (VFC & FC repos)
+  // Analyse des marqueurs de récupération autonome (VFC & FC repos) et de fatigue perçue
   const vfcAnalysis = computeVfcAnalysis(dailyMetrics || {}, refDate);
   const hrRestAnalysis = computeHrRestAnalysis(dailyMetrics || {}, refDate);
-  const hasSystemicFatigue = (vfcAnalysis.status === 'low') || (hrRestAnalysis.status === 'elevated') || (readiness <= 4);
-  const isReadinessOptimal = (readiness >= 8) && (vfcAnalysis.status === 'optimal' || vfcAnalysis.status === 'high');
+  const perceivedFatigueAnalysis = computePerceivedFatigueAnalysis(events || {}, refDate, 14);
+  const cardioMuscBalance = computeCardioVsMuscularBalance(events || {}, refDate, 7);
+
+  const hasSystemicFatigue = (vfcAnalysis.status === 'low') || 
+                             (hrRestAnalysis.status === 'elevated') || 
+                             (readiness <= 4) || 
+                             (perceivedFatigueAnalysis.status === 'critical');
+  const isReadinessOptimal = (readiness >= 8) && (vfcAnalysis.status === 'optimal' || vfcAnalysis.status === 'high') && (perceivedFatigueAnalysis.status !== 'elevated');
 
   const HARD_QUALITIES = new Set(['vo2max', 'seuil', 'sprint', 'pull', 'push', 'leg', 'plyo', 'descente']);
 
@@ -281,10 +287,10 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
 
     const cellState = computeCellState(q, refDate, events?.[q.id] || {}, readiness, activeBlock ? [activeBlock] : []);
 
-    // Trouver la dernière date de séance
+    // Trouver la dernière date de séance directe (principale)
     const qualityEvents = events?.[q.id] || {};
     const sessionDates = Object.keys(qualityEvents)
-      .filter(d => d <= refDate && qualityEvents[d])
+      .filter(d => d <= refDate && qualityEvents[d] && isPrimary(qualityEvents[d]) && extractSessionLoad(qualityEvents[d]) > 0)
       .sort();
     
     let daysSinceLastSession = null;
@@ -421,6 +427,15 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       reason += ' • [⚡ Excellente disponibilité autonome (VFC & Readiness favorables) : créneau idéal pour séance qualitative]';
     }
 
+    // Prise en compte de la balance de fatigue Cardio vs Musculaire (découplage dual-tau)
+    if (cardioMuscBalance.state === 'MUSCULAR_DOMINANT' && (q.category === 'force' || q.id === 'descente' || q.id === 'plyo') && urgencyScore > 0) {
+      urgencyScore = Math.round(urgencyScore * 0.7);
+      reason += ' • [Fatigue musculaire résiduelle dominante : privilégier régénération ou travail aérobie sans impact]';
+    } else if (cardioMuscBalance.state === 'CARDIO_DOMINANT' && (q.category === 'cardio' && q.id !== 'ef') && urgencyScore > 0) {
+      urgencyScore = Math.round(urgencyScore * 0.75);
+      reason += ' • [Stress cardiorespiratoire aigu élevé : privilégier renforcement ou travail technique]';
+    }
+
     return {
       quality: q,
       rank,
@@ -487,8 +502,10 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     const eventTime = new Date(eventDate).getTime();
     const daysSince = Math.round((targetTime - eventTime) / (1000 * 3600 * 24));
     if (daysSince >= 0) {
-      if (mostRecentSessionDays === null || daysSince < mostRecentSessionDays) {
-        mostRecentSessionDays = daysSince;
+      if (isPrimary(data) && extractSessionLoad(data) > 0) {
+        if (mostRecentSessionDays === null || daysSince < mostRecentSessionDays) {
+          mostRecentSessionDays = daysSince;
+        }
       }
       if (daysSince <= 60 && isPrimary(data)) {
         const l = extractSessionLoad(data);
@@ -596,9 +613,10 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     currentLevelPrescription = Math.max(20, Math.round(50 * Math.exp(-0.035 * Math.max(0, daysOverPresc))));
   }
 
-  // Évaluation de la fatigue aiguë élevée (B8)
-  const dailyAverage28d = sessionCount28d > 0 ? (total28dLoad / 28) : 40;
-  const isAcuteFatigueHigh = recent3DaysLoad > Math.max(500, dailyAverage28d * 3 * 1.8);
+  // Évaluation de la fatigue aiguë élevée relative à la référence de la filière et à la moyenne de l'athlète
+  const dailyAverage28d = sessionCount28d > 0 ? (total28dLoad / 28) : (refLoad_q / 7);
+  const qualityOverloadThreshold = Math.max(refLoad_q * 2.5, dailyAverage28d * 3 * 1.8);
+  const isAcuteFatigueHigh = recent3DaysLoad > qualityOverloadThreshold;
   const isBurnout = isAcuteFatigueHigh;
 
   let blockStateInfo = null;
@@ -613,8 +631,14 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
   let tooltip = mostRecentSessionDays === null 
     ? 'Filière non stimulée (aucune séance enregistrée)' 
     : `Fenêtre dépassée (J+${mostRecentSessionDays}) • Rappel recommandé`;
-  if (bestStatusPrescription === 'green') tooltip = `Effet Actif : Reste ${daysLeftPrescription} jours`;
-  if (bestStatusPrescription === 'orange') tooltip = `Fenêtre de rappel : Reste ${daysLeftPrescription} jours`;
+  if (bestStatusPrescription === 'green') {
+    tooltip = isFocus 
+      ? `Prescription bloc : prochaine séance sous ${daysLeftPrescription}j (maintien acquis : ${daysLeftPhysio}j)`
+      : `Effet d'entraînement actif : reste ${daysLeftPhysio} jours de maintien résiduel`;
+  }
+  if (bestStatusPrescription === 'orange') {
+    tooltip = `Fenêtre de rappel : piqûre recommandée sous ${daysLeftPrescription} jours`;
+  }
   if (blockStateInfo) {
     tooltip += ` • [Bloc ${blockStateInfo.name} : ${blockStateInfo.label}]`;
   }
@@ -629,6 +653,8 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     isBurnout,
     isAcuteFatigueHigh,
     blockStateInfo,
+    mostRecentSessionDays,
+    refLoad_q,
     physio: {
       status: bestStatusPhysio,
       opacity: opacityPhysio,
@@ -658,21 +684,25 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
     const dateStr = getLocalYYYYMMDD(d);
     
     let load = 0;
+    let isPrimarySession = false;
     if (eventsForQuality && eventsForQuality[dateStr]) {
-      load = extractSessionLoad(eventsForQuality[dateStr]);
+      const sess = eventsForQuality[dateStr];
+      load = extractSessionLoad(sess);
+      isPrimarySession = isPrimary(sess) && load > 0;
     }
     rawData.push({
       dateStr,
       day: d.getDate(),
       offset: i,
-      load
+      load,
+      isPrimarySession
     });
   }
 
   const loads = rawData.map(d => d.load);
-  const ema3 = calculateEMA(loads, 3, true);
-  const ema7 = calculateEMA(loads, 7, true);
-  const ema21 = calculateEMA(loads, 21, true);
+  const ema3 = calculateEMA(loads, 3, true, 0);
+  const ema7 = calculateEMA(loads, 7, true, 0);
+  const ema21 = calculateEMA(loads, 21, true, 0);
 
   const series = rawData.map((d, idx) => ({
     ...d,
@@ -718,11 +748,12 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const weekPercent21 = prevWeek && prevWeek.ema21 > 0 ? Math.round((weekDelta21 / prevWeek.ema21) * 1000) / 10 : (weekDelta21 > 0 ? 100 : 0);
 
   // Validation statistique de l'ACWR par filière :
-  // Nécessite au moins 4 séances sur les 28 derniers jours et une EMA 21j significative (> 5 UA)
-  // pour éviter les ratios aberrants (ex: 3.8) après une simple reprise d'une qualité peu fréquente.
+  // Nécessite au moins 4 séances directes/principales sur les 28 derniers jours et une EMA 21j significative (> 5 UA)
+  // pour éviter les ratios aberrants (ex: 3.8) après une simple reprise d'une qualité peu fréquente
+  // ou une qualité qui ne reçoit que des transferts secondaires.
   const recentSessionsCount28d = rawData
     .filter(d => d.offset <= 0 && d.offset >= -28)
-    .filter(d => d.load > 0).length;
+    .filter(d => d.isPrimarySession).length;
 
   const isAcwrValid = recentSessionsCount28d >= 4 && current && current.ema21 > 5;
   const acwr = isAcwrValid 
@@ -839,12 +870,12 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
   let riskColor = 'emerald';
   let advice = 'Excellente alternance entre séances stimulantes et régénération.';
 
-  if (monotony > 2.0 || strain > 4500) {
+  if (monotony > 2.0 || (totalLoad > 1800 && strain > totalLoad * 2.2) || strain > 6000) {
     riskLevel = 'CRITICAL';
     riskBadge = '🚨 Risque Surcharge / Maladie';
     riskColor = 'red';
     advice = 'Monotonie critique (> 2.0). Risque élevé d\'infection respiratoire, d\'effondrement immunitaire et de blessure. Intégrez un jour de repos complet.';
-  } else if (monotony > 1.5 || strain > 3200) {
+  } else if (monotony > 1.5 || (totalLoad > 1500 && strain > totalLoad * 1.8) || strain > 4200) {
     riskLevel = 'HIGH';
     riskBadge = '⚠️ Monotonie Élevée';
     riskColor = 'amber';
@@ -1053,8 +1084,8 @@ export function getTaperingAnalysis(
   const diffMs = compDate.getTime() - today.getTime();
   const daysRemaining = Math.ceil(diffMs / (1000 * 3600 * 24));
 
-  // Modèle Banister sur 30j passés et projection jusqu'à la compétition
-  const projectionDays = Math.max(7, Math.min(30, Math.max(0, daysRemaining) + 3));
+  // Modèle PMC sur 30j passés et projection jusqu'à la compétition (jusqu'à 180 jours)
+  const projectionDays = Math.max(7, Math.min(180, Math.max(0, daysRemaining) + 3));
   const banister = computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness, initialCtl);
 
   const compDayData = banister.series.find(s => s.dateStr === targetCompetition.date) || 
@@ -1212,7 +1243,7 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
           if (item.loadMusc !== undefined) {
             mLoad = Number(item.loadMusc) || 0;
           } else if (dur > 0 && rpeM > 0) {
-            mLoad = Math.round(dur * rpeM * (isEcc ? 1.35 : 1.0));
+            mLoad = Math.round(dur * rpeM * (isEcc ? 1.15 : 1.0));
           } else {
             mLoad = gLoad;
           }
@@ -1247,6 +1278,17 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
     });
   }
 
+  // Calcul de la double constante de temps de fatigue (tau Cardio = 3j vs tau Musculaire = 6j)
+  // Méthodologie : dissipation rapide du stress cardiovasculaire vs réparation lente des micro-lésions myofibrillaires
+  const tauCardio = 3;
+  const tauMusc = 6;
+  const cardioLoadsChronological = dailyBreakdown.map(d => d.cardioLoad);
+  const muscLoadsChronological = dailyBreakdown.map(d => d.muscLoad);
+  const expAtlCardio = calculateExpDecay(cardioLoadsChronological, tauCardio, { decayToZero: true });
+  const expAtlMusc = calculateExpDecay(muscLoadsChronological, tauMusc, { decayToZero: true });
+  const currentAtlCardio = Math.round((expAtlCardio[expAtlCardio.length - 1] || 0) * 10) / 10;
+  const currentAtlMusc = Math.round((expAtlMusc[expAtlMusc.length - 1] || 0) * 10) / 10;
+
   const combined = totalCardioLoad + totalMuscLoad;
   const cardioPercent = combined > 0 ? Math.round((totalCardioLoad / combined) * 100) : 50;
   const muscPercent = 100 - cardioPercent;
@@ -1260,17 +1302,17 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
   let description = 'Charge harmonieusement répartie entre appareil cardiorespiratoire et chaîne musculo-squelettique.';
   let recommendation = 'Toutes les filières peuvent être abordées sans contre-indication de fatigue locale.';
 
-  if (asymmetryScore >= 20) {
+  if (asymmetryScore >= 20 || currentAtlCardio > currentAtlMusc * 1.35) {
     state = 'CARDIO_DOMINANT';
     badge = '🫀 Jambes Fraîches / Cardio Sollicité';
     color = 'sky';
-    description = 'Votre système cardiorespiratoire a absorbé l\'essentiel du stress récent. Vos muscles et articulations restent relativement frais.';
+    description = 'Votre système cardiorespiratoire a absorbé l\'essentiel du stress récent (ATL Cardio: ' + currentAtlCardio + ' UA, tau 3j). Vos muscles et articulations restent relativement frais.';
     recommendation = 'Idéal pour : renforcement musculaire, force max, travail technique, pliométrie légère ou côtes courtes sans montée en zone rouge cardiaque.';
-  } else if (asymmetryScore <= -20) {
+  } else if (asymmetryScore <= -20 || currentAtlMusc > currentAtlCardio * 1.35) {
     state = 'MUSCULAR_DOMINANT';
     badge = '🦵 Cardio Disponible / Jambes Lourdes';
     color = 'red';
-    description = 'Tension mécanique, courbatures et stress tissulaire élevés. Votre cœur et vos poumons sont prêts mais vos fibres musculaires demandent de la régénération.';
+    description = 'Tension mécanique et stress tissulaire résiduel élevés (ATL Musc: ' + currentAtlMusc + ' UA, tau 6j). Votre cœur et vos poumons sont disponibles mais vos fibres musculaires demandent de la régénération.';
     recommendation = 'Idéal pour : séance cardio portée à basse intensité (vélo, home-trainer, natation, marche inclinée) pour favoriser le drainage sans impacts articulaires.';
   }
 
@@ -1284,10 +1326,238 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
     cardioPercent,
     muscPercent,
     asymmetryScore,
+    tauCardio,
+    tauMusc,
+    atlCardio: currentAtlCardio,
+    atlMusc: currentAtlMusc,
     state,
     badge,
     color,
     description,
     recommendation
+  };
+}
+
+/**
+ * Analyse de la distribution d'intensité selon le modèle 3 zones de Stephen Seiler (Polarisation)
+ * - Zone 1 : Basse intensité (sous VT1 / aérobie de base, RPE <= 4)
+ * - Zone 2 : Intensité seuil / tempo (entre VT1 et VT2, RPE 5-6)
+ * - Zone 3 : Haute intensité (au-dessus de VT2 / PMA / lactique / force lourde, RPE >= 7)
+ */
+export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITIES, referenceDateStr = null, windowDays = 28) {
+  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  let z1Minutes = 0;
+  let z2Minutes = 0;
+  let z3Minutes = 0;
+  let z1Load = 0;
+  let z2Load = 0;
+  let z3Load = 0;
+  let totalSessions = 0;
+
+  for (let i = windowDays - 1; i >= 0; i--) {
+    const d = new Date(refDate);
+    d.setDate(refDate.getDate() - i);
+    const dateStr = getLocalYYYYMMDD(d);
+
+    Object.entries(events || {}).forEach(([qId, qDates]) => {
+      if (qDates && qDates[dateStr]) {
+        const item = qDates[dateStr];
+        if (!isPrimary(item)) return;
+
+        const dur = Number(item.duration) || 0;
+        const load = extractSessionLoad(item);
+        if (dur <= 0 && load <= 0) return;
+
+        totalSessions++;
+        const rpeC = Number(item.rpeCardio) || 5;
+        const rpeM = Number(item.rpeMusc || item.rpeMusculaire) || 5;
+        const maxRpe = Math.max(rpeC, rpeM);
+
+        // Classification physiologique tri-zonale Seiler
+        // 1. Détermination de la zone selon qualité et RPE perçu
+        if (['ef', 'co2', 'gut', 'abdos', 'proprio'].includes(qId) && maxRpe <= 5) {
+          z1Minutes += dur;
+          z1Load += load;
+        } else if (qId === 'seuil' || (maxRpe >= 5 && maxRpe <= 6 && !['vo2max', 'sprint', 'plyo', 'descente'].includes(qId))) {
+          z2Minutes += dur;
+          z2Load += load;
+        } else if (maxRpe >= 7 || ['vo2max', 'sprint', 'plyo', 'descente', 'pull', 'push', 'leg'].includes(qId)) {
+          z3Minutes += dur;
+          z3Load += load;
+        } else {
+          // RPE <= 4
+          z1Minutes += dur;
+          z1Load += load;
+        }
+      }
+    });
+  }
+
+  const totalMinutes = z1Minutes + z2Minutes + z3Minutes;
+  const totalLoad = z1Load + z2Load + z3Load;
+
+  const z1TimePct = totalMinutes > 0 ? Math.round((z1Minutes / totalMinutes) * 100) : 0;
+  const z2TimePct = totalMinutes > 0 ? Math.round((z2Minutes / totalMinutes) * 100) : 0;
+  const z3TimePct = totalMinutes > 0 ? Math.round((z3Minutes / totalMinutes) * 100) : 0;
+
+  const z1LoadPct = totalLoad > 0 ? Math.round((z1Load / totalLoad) * 100) : 0;
+  const z2LoadPct = totalLoad > 0 ? Math.round((z2Load / totalLoad) * 100) : 0;
+  const z3LoadPct = totalLoad > 0 ? Math.round((z3Load / totalLoad) * 100) : 0;
+
+  // Profil de distribution Seiler
+  let profile = 'BALANCED';
+  let badge = '⚖️ Mixte';
+  let color = 'sky';
+  let advice = '';
+
+  if (totalMinutes === 0) {
+    profile = 'EMPTY';
+    badge = '⏳ Aucune donnée';
+    color = 'slate';
+    advice = 'Enregistrez vos premières séances pour analyser votre répartition d\'intensité Seiler.';
+  } else if (z1TimePct >= 75 && z2TimePct <= 12 && z3TimePct >= 8) {
+    profile = 'POLARIZED';
+    badge = '🎯 Polarisé Optimal (Seiler 80/20)';
+    color = 'emerald';
+    advice = 'Excellente polarisation. Le gros du volume est validé en basse intensité (Z1) avec des piqûres qualitatives à haute intensité (Z3), évitant le piège de la zone grise (Z2).';
+  } else if (z1TimePct >= 65 && z2TimePct >= z3TimePct) {
+    profile = 'PYRAMIDAL';
+    badge = '📐 Pyramidal Classique';
+    color = 'blue';
+    advice = 'Distribution pyramidale saine : socle aérobie dominant (Z1), part mesurée de seuil (Z2) et travail haute intensité ciblé (Z3).';
+  } else if (z2TimePct >= 25) {
+    profile = 'THRESHOLD_DOMINANT';
+    badge = '⚠️ Surcharge Médiane (Trou Noir Z2)';
+    color = 'amber';
+    advice = 'Proportion de travail au seuil (Z2) trop élevée. L\'entraînement en intensité intermédiaire engendre une fatigue nerveuse disproportionnée par rapport aux gains d\'endurance de fond. Ralentissez vos footings (Z1) pour durcir vos séances clés (Z3).';
+  } else if (z3TimePct >= 30) {
+    profile = 'HIGH_INTENSITY';
+    badge = '⚡ Dominance Haute Intensité (Z3)';
+    color = 'rose';
+    advice = 'Volume à haute intensité très important (> 30%). Risque de saturation neuromusculaire si ce bloc dure plus de 3 semaines.';
+  } else {
+    profile = 'BASE_BUILDING';
+    badge = '🛡️ Développement Foncière (Z1)';
+    color = 'emerald';
+    advice = 'Prédominance de travail à basse intensité, idéal pour la construction mitochondriale et la capillarisation.';
+  }
+
+  return {
+    windowDays,
+    totalSessions,
+    totalMinutes,
+    totalLoad,
+    z1Minutes,
+    z2Minutes,
+    z3Minutes,
+    z1TimePct,
+    z2TimePct,
+    z3TimePct,
+    z1Load,
+    z2Load,
+    z3Load,
+    z1LoadPct,
+    z2LoadPct,
+    z3LoadPct,
+    profile,
+    badge,
+    color,
+    advice
+  };
+}
+
+/**
+ * Analyse de la fatigue perçue et de l'indice de coût interne (Charge / Réponse)
+ * Exploite le champ fatigue (1-10) saisi lors des séances pour détecter le surmenage fonctionnel
+ */
+export function computePerceivedFatigueAnalysis(events, referenceDateStr = null, windowDays = 28) {
+  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  const sessionEntries = [];
+
+  for (let i = windowDays - 1; i >= 0; i--) {
+    const d = new Date(refDate);
+    d.setDate(refDate.getDate() - i);
+    const dateStr = getLocalYYYYMMDD(d);
+
+    Object.entries(events || {}).forEach(([qId, qDates]) => {
+      if (qDates && qDates[dateStr]) {
+        const item = qDates[dateStr];
+        if (!isPrimary(item)) return;
+
+        const fatigueVal = Number(item.fatigue);
+        const load = extractSessionLoad(item);
+        const dur = Number(item.duration) || 0;
+        const rpeM = Number(item.rpeMusc || item.rpeMusculaire) || 5;
+        const rpeC = Number(item.rpeCardio) || 5;
+        const maxRpe = Math.max(rpeM, rpeC);
+
+        if (!isNaN(fatigueVal) && fatigueVal > 0) {
+          // Écart entre la fatigue ressentie (1-10) et la difficulté prévue de la séance (maxRpe)
+          const strainDiscrepancy = fatigueVal - maxRpe;
+          sessionEntries.push({
+            dateStr,
+            qId,
+            load,
+            duration: dur,
+            maxRpe,
+            fatigue: fatigueVal,
+            strainDiscrepancy
+          });
+        }
+      }
+    });
+  }
+
+  const count = sessionEntries.length;
+  if (count === 0) {
+    return {
+      count: 0,
+      meanFatigue: null,
+      meanDiscrepancy: 0,
+      highStrainSessionsCount: 0,
+      status: 'initializing',
+      badge: '⏳ En attente de saisies',
+      color: 'slate',
+      interpretation: 'Renseignez le niveau de fatigue perçue (1-10) lors de vos séances pour calibrer votre tolérance individuelle à la charge.'
+    };
+  }
+
+  const totalFatigue = sessionEntries.reduce((acc, s) => acc + s.fatigue, 0);
+  const meanFatigue = Math.round((totalFatigue / count) * 10) / 10;
+  const totalDiscrepancy = sessionEntries.reduce((acc, s) => acc + s.strainDiscrepancy, 0);
+  const meanDiscrepancy = Math.round((totalDiscrepancy / count) * 10) / 10;
+  const highStrainSessionsCount = sessionEntries.filter(s => s.fatigue >= 7 || s.strainDiscrepancy >= 2).length;
+
+  let status = 'optimal';
+  let badge = '🟢 Excellente Tolérance';
+  let color = 'emerald';
+  let interpretation = 'Vos séances sont bien assimilées. Le niveau de fatigue ressentie est en parfaite adéquation avec la difficulté prescrite.';
+
+  if (meanFatigue >= 7.5 || highStrainSessionsCount >= Math.max(2, Math.round(count * 0.4))) {
+    status = 'critical';
+    badge = '🚨 Surmenage / Fatigue Élevée';
+    color = 'rose';
+    interpretation = `Fatigue perçue moyenne élevée (${meanFatigue}/10) avec ${highStrainSessionsCount} séance(s) en fatigue disproportionnée. Risque d'overreaching non-fonctionnel. Prévoyez une semaine de décharge ou allégez les volumes.`;
+  } else if (meanFatigue >= 6.2 || meanDiscrepancy >= 1.2) {
+    status = 'elevated';
+    badge = '⚠️ Fatigue Marquée';
+    color = 'amber';
+    interpretation = `L'effort coûte plus cher que prévu à l'organisme (écart moyen de +${meanDiscrepancy} pts par rapport au RPE). Surveillez votre sommeil et votre apport glucidique post-séance.`;
+  } else if (meanFatigue <= 4.0) {
+    status = 'optimal';
+    badge = '✨ Fraîcheur & Récupération Rapide';
+    color = 'emerald';
+    interpretation = `Niveau de fatigue perçue très bas (${meanFatigue}/10). L'organisme encaisse remarquablement bien la charge actuelle.`;
+  }
+
+  return {
+    count,
+    meanFatigue,
+    meanDiscrepancy,
+    highStrainSessionsCount,
+    status,
+    badge,
+    color,
+    interpretation
   };
 }

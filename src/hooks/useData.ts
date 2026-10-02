@@ -13,7 +13,9 @@ import {
   computeBanisterPerformance,
   getTaperingAnalysis,
   computeCardioVsMuscularBalance,
-  getQualityImpacts
+  getQualityImpacts,
+  computeIntensityDistribution,
+  computePerceivedFatigueAnalysis
 } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
@@ -452,9 +454,19 @@ export function useData() {
     );
   }, [targetCompetition, effectiveEvents, dailyMetrics, physioSettings]);
 
-  // Balance TRIMP Multi-Facteurs (Cardio vs Musculaire vs Excentrique)
+  // Balance de charge (Cardio vs Musculaire, Dual-Tau, Excentrique)
   const cardioMuscularBalance = useMemo(() => {
     return computeCardioVsMuscularBalance(effectiveEvents);
+  }, [effectiveEvents]);
+
+  // Distribution d'intensité selon Stephen Seiler (Polarisation Z1 / Z2 / Z3)
+  const intensityDistribution = useMemo(() => {
+    return computeIntensityDistribution(effectiveEvents, qualities as any);
+  }, [effectiveEvents, qualities]);
+
+  // Analyse de la fatigue perçue & tolérance à l'effort (Charge / Réponse)
+  const perceivedFatigueAnalysis = useMemo(() => {
+    return computePerceivedFatigueAnalysis(effectiveEvents);
   }, [effectiveEvents]);
 
   // Helper pour récupérer l'historique EMA d'une qualité sur une durée personnalisée
@@ -862,8 +874,10 @@ export function useData() {
     fosterMetrics,
     taperingAnalysis,
     banisterPerformance,
-    // TRIMP Multi-Facteurs (Cardio vs Musculaire)
+    // Modélisation physiologique avancée
     cardioMuscularBalance,
+    intensityDistribution,
+    perceivedFatigueAnalysis,
     // Mode Simulation (What-If)
     isSimulationActive,
     simulatedEvents,

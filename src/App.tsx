@@ -58,8 +58,10 @@ function AppContent() {
     // Constantes physiologiques
     physioSettings,
     savePhysioSettings,
-    // TRIMP Multi-Facteurs (Cardio vs Musculaire)
+    // Modélisation physiologique avancée
     cardioMuscularBalance,
+    intensityDistribution,
+    perceivedFatigueAnalysis,
     // Simulation (What-If)
     isSimulationActive,
     simulatedEvents,
@@ -470,7 +472,7 @@ function AppContent() {
                       <div className="p-2.5 rounded-xl bg-slate-900/60 border border-indigo-500/20">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0"></span>
-                          <span className="text-xs font-bold text-indigo-300">EMA 21j · Condition Durable (CTL)</span>
+                          <span className="text-xs font-bold text-indigo-300">EMA 21j · Charge Chronique Filière</span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
                           Fitness de fond acquis sur le cycle. Résistance structurelle à l'effort.
@@ -484,7 +486,7 @@ function AppContent() {
                           <span className="text-xs font-bold text-emerald-300">Balance de Forme (TSB)</span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
-                          CTL − ATL. Visez +15 à +25 le Jour J pour un affûtage optimal en compétition.
+                          CTL − ATL. Visez +10% à +25% de la CTL le Jour J (+15 à +25 pts selon profil) pour un affûtage optimal en compétition.
                         </p>
                       </div>
                     </div>
@@ -595,8 +597,11 @@ function AppContent() {
               banisterPerformance={banisterPerformance}
               taperingAnalysis={taperingAnalysis}
               cardioMuscularBalance={cardioMuscularBalance}
+              intensityDistribution={intensityDistribution}
+              perceivedFatigueAnalysis={perceivedFatigueAnalysis}
               isSimulationActive={isSimulationActive}
               physioSettings={physioSettings}
+              trainingBlocks={trainingBlocks}
               viewMode="physiology"
               onOpenCompetitionModal={() => setShowCompetitionModal(true)}
               onOpenReportModal={() => setShowReportModal(true)}
@@ -618,8 +623,11 @@ function AppContent() {
               banisterPerformance={banisterPerformance}
               taperingAnalysis={taperingAnalysis}
               cardioMuscularBalance={cardioMuscularBalance}
+              intensityDistribution={intensityDistribution}
+              perceivedFatigueAnalysis={perceivedFatigueAnalysis}
               isSimulationActive={isSimulationActive}
               physioSettings={physioSettings}
+              trainingBlocks={trainingBlocks}
               viewMode="qualities"
               onOpenCompetitionModal={() => setShowCompetitionModal(true)}
               onOpenReportModal={() => setShowReportModal(true)}

@@ -246,8 +246,8 @@ export default function QualityChartModal({ quality, events, onClose }) {
               
               <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.25)" radius={[2, 2, 0, 0]} maxBarSize={18} />
               <Line type="monotone" dataKey="ema3" name="EMA 3j (Court terme)" stroke="#38bdf8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="ema7" name="EMA 7j (Moyen terme / ATL)" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="ema21" name="EMA 21j (Fond durable / CTL)" stroke="#818cf8" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="ema7" name="EMA 7j (Aigu / Fatigue filière)" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="ema21" name="EMA 21j (Fond / Charge chronique filière)" stroke="#818cf8" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

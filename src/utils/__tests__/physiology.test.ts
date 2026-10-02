@@ -61,4 +61,16 @@ describe('Phase 1 Physiology Verifications', () => {
     // Doit être null (données insuffisantes) plutôt qu'un ratio aberrant faussement alarmiste
     expect(emaData.current.acwr).toBeNull();
   });
+
+  it('ACWR guard ignores secondary impacts: 4 secondary transfers do NOT trigger a valid ACWR', () => {
+    // Une qualité (ex: leg) qui a 4 impacts secondaires transférés mais 0 séance directe
+    const secondaryOnlyEvents = {
+      '2026-09-20': { load: 50, isSecondary: true, parentQId: 'sprint' },
+      '2026-09-22': { load: 50, isSecondary: true, parentQId: 'sprint' },
+      '2026-09-25': { load: 50, isSecondary: true, parentQId: 'sprint' },
+      '2026-09-28': { load: 50, isSecondary: true, parentQId: 'sprint' },
+    };
+    const emaData = computeQualityEMAData('leg', secondaryOnlyEvents, 45, 0);
+    expect(emaData.current.acwr).toBeNull();
+  });
 });

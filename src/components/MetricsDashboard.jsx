@@ -12,7 +12,13 @@ import {
 } from 'lucide-react';
 import { calculateEMA, calculateExpDecay } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
-import { computeCardioVsMuscularBalance } from '../utils/physiology';
+import { 
+  computeCardioVsMuscularBalance, 
+  computeCellState, 
+  extractSessionLoad,
+  computeIntensityDistribution,
+  computePerceivedFatigueAnalysis
+} from '../utils/physiology';
 import { getDailyAthleteLoad, isPrimary } from '../utils/loadHelpers';
 import { getTsbZone, calculateTsbPercent } from '../utils/zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from '../utils/vfcHelpers';
@@ -145,8 +151,11 @@ export default function MetricsDashboard({
   banisterPerformance = null,
   taperingAnalysis = null,
   cardioMuscularBalance = null,
+  intensityDistribution = null,
+  perceivedFatigueAnalysis = null,
   isSimulationActive = false,
   physioSettings = null,
+  trainingBlocks = [],
   viewMode = 'all', // 'all' | 'physiology' | 'qualities'
   onOpenCompetitionModal = null,
   onOpenReportModal = null,
@@ -410,7 +419,7 @@ export default function MetricsDashboard({
     return computeHrRestAnalysis(dailyMetrics, currentInspectedDay?.dateStr || null);
   }, [dailyMetrics, currentInspectedDay?.dateStr]);
 
-  // 1b. Calcul du ruban de rémanence immédiat pour toutes les qualités
+  // 1b. Calcul du ruban de rémanence immédiat unifié pour toutes les qualités
   const remanenceStatusList = useMemo(() => {
     const today = new Date();
     const todayStr = getLocalYYYYMMDD(today);
@@ -419,7 +428,7 @@ export default function MetricsDashboard({
       const rank = index + 1;
       const qEvents = events[q.id] || {};
       const dates = Object.keys(qEvents)
-        .filter(d => d <= todayStr && qEvents[d])
+        .filter(d => d <= todayStr && qEvents[d] && isPrimary(qEvents[d]) && extractSessionLoad(qEvents[d]) > 0)
         .sort();
 
       let lastDate = null;
@@ -433,70 +442,48 @@ export default function MetricsDashboard({
         daysSince = Math.max(0, Math.floor(diffMs / (1000 * 3600 * 24)));
       }
 
+      // Modèle unifié avec computeCellState (dose-réponse, charge de référence et rémanence physiologique)
+      const cellState = computeCellState(q, todayStr, qEvents, 7, trainingBlocks || []);
+      const remainingPercent = cellState.physio.currentLevel;
+
       const plateauDays = q.g || 4; // Durée de gain / plateau (jours)
       const declineDays = q.o || 3; // Durée de déclin (jours)
       const totalRemanenceWindow = plateauDays + declineDays;
 
-      // Calcul de la jauge circulaire de rémanence restante (0% à 100%)
-      let remainingPercent = 0;
       let statusKey = 'decondition';
-      let statusLabel = 'Désentraînement';
+      let statusLabel = 'Rappel requis';
       let statusColor = 'text-rose-400';
-      let statusBg = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      let statusBg = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
       let statusIcon = AlertTriangle;
-      let actionAdvice = 'Séance de rappel nécessaire';
+      let actionAdvice = 'Fenêtre dépassée : séance à programmer';
 
       if (daysSince === null) {
-        remainingPercent = 0;
         statusKey = 'uninitialized';
         statusLabel = 'Non initialisée';
         statusColor = 'text-slate-400';
         statusBg = 'bg-white/5 text-slate-400 border-white/10';
         statusIcon = Clock;
         actionAdvice = 'À programmer selon vos objectifs';
-      } else if (daysSince === 0) {
-        remainingPercent = 100;
+      } else if (cellState.physio.status === 'green') {
         statusKey = 'optimal';
-        statusLabel = 'Travaillée aujourd\'hui';
+        statusLabel = daysSince === 0 ? "Travaillée aujourd'hui" : `En plateau (J+${daysSince})`;
         statusColor = 'text-emerald-400';
         statusBg = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
         statusIcon = CheckCircle2;
-        actionAdvice = 'Assimilation en cours (J+0)';
-      } else if (daysSince <= plateauDays) {
-        // En plateau : effet résiduel plein
-        remainingPercent = Math.round(100 - (daysSince / plateauDays) * 20); // 100% -> 80%
-        statusKey = 'optimal';
-        statusLabel = `En plateau (J+${daysSince})`;
-        statusColor = 'text-emerald-400';
-        statusBg = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-        statusIcon = CheckCircle2;
-        const daysToRecall = plateauDays - daysSince;
-        actionAdvice = daysToRecall === 0 
-          ? 'Fin de plateau : rappel demain' 
-          : `Acquis protégés encore ${daysToRecall}j`;
-      } else if (daysSince <= plateauDays + 2) {
-        // Fenêtre de rappel critique
-        remainingPercent = Math.round(75 - ((daysSince - plateauDays) / 2) * 35); // 75% -> 40%
+        const daysToRecall = Math.ceil(cellState.physio.daysLeft);
+        actionAdvice = daysSince === 0 
+          ? 'Assimilation en cours (J+0)' 
+          : (daysToRecall <= 1 ? 'Fin de plateau : rappel demain' : `Acquis protégés encore ${daysToRecall}j`);
+      } else if (cellState.physio.status === 'orange') {
         statusKey = 'recall';
         statusLabel = `Fenêtre de rappel (J+${daysSince})`;
         statusColor = 'text-amber-400';
         statusBg = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
         statusIcon = Zap;
-        actionAdvice = 'Rappel idéal sous 24h-48h';
-      } else if (daysSince <= totalRemanenceWindow) {
-        // Déclin amorcé
-        const elapsedDecline = daysSince - plateauDays;
-        remainingPercent = Math.max(10, Math.round(40 * (1 - elapsedDecline / declineDays)));
-        statusKey = 'decline';
-        statusLabel = `Déclin amorcé (J+${daysSince})`;
-        statusColor = 'text-orange-400';
-        statusBg = 'bg-orange-500/20 text-orange-300 border-orange-500/30';
-        statusIcon = TrendingDown;
-        actionAdvice = 'Dégradation des gains en cours';
+        const daysLeft = Math.ceil(cellState.physio.daysLeft);
+        actionAdvice = `Rappel idéal sous ${daysLeft}j`;
       } else {
-        // Fenêtre de rappel dépassée - Stimulation requise (déclin graduel selon Coyle & Mujika)
-        const daysOver = daysSince - totalRemanenceWindow;
-        remainingPercent = Math.max(30, Math.round(50 * Math.exp(-0.03 * daysOver)));
+        // Red : fenêtre dépassée, déclin progressif Coyle/Mujika
         statusKey = 'decondition';
         statusLabel = `Rappel requis (J+${daysSince})`;
         statusColor = 'text-rose-400';
@@ -528,10 +515,11 @@ export default function MetricsDashboard({
         actionAdvice,
         ema3,
         ema7,
-        ema21
+        ema21,
+        cellState
       };
     });
-  }, [qualities, events, qualitiesEMA]);
+  }, [qualities, events, qualitiesEMA, trainingBlocks]);
 
   const urgentCount = useMemo(() => {
     return remanenceStatusList.filter(item => item.statusKey === 'decondition' || item.statusKey === 'decline').length;
@@ -633,26 +621,65 @@ export default function MetricsDashboard({
       });
     }
 
-    // Tendance VFC basée sur la dernière mesure réelle disponible (non future)
-    const latestVfcDay = [...chartData].reverse().find(d => !d.isFuture && d.vfcEMA3 && d.vfcEMA7);
-    if (latestVfcDay) {
-      if (latestVfcDay.vfcEMA3 < latestVfcDay.vfcEMA7 * 0.9) {
+    // Tendance VFC & FC repos basée sur computeVfcAnalysis et computeHrRestAnalysis
+    if (vfcAnalysis && vfcAnalysis.status !== 'initializing') {
+      if (vfcAnalysis.status === 'low') {
         insights.push({ 
           type: 'danger', 
           icon: <Activity size={18}/>, 
-          text: `Fléchissement du tonus parasympathique. La VFC récente (EMA 3: ${latestVfcDay.vfcEMA3} ms) est inférieure à votre moyenne 7 jours (${latestVfcDay.vfcEMA7} ms).` 
+          text: `Fléchissement parasympathique significatif (VFC 7j : ${vfcAnalysis.baseline7d} ms, sous le corridor SWC de ${vfcAnalysis.corridorLower} ms). Privilégiez la régénération active ou le repos.` 
         });
-      } else if (latestVfcDay.vfcEMA3 > latestVfcDay.vfcEMA7 * 1.05) {
+      } else if (vfcAnalysis.status === 'high') {
         insights.push({ 
           type: 'good', 
           icon: <Activity size={18}/>, 
-          text: `Excellente récupération autonome. Votre VFC récente (${latestVfcDay.vfcEMA3} ms) est supérieure à votre niveau de base (${latestVfcDay.vfcEMA7} ms).` 
+          text: `Excellente assimilation autonome (VFC 7j : ${vfcAnalysis.baseline7d} ms, au-dessus de la ligne de base). Fraîcheur propice aux séances qualitatives.` 
+        });
+      }
+    }
+
+    if (hrRestAnalysis && hrRestAnalysis.status === 'elevated') {
+      insights.push({
+        type: 'danger',
+        icon: <Heart size={18}/>,
+        text: `Élévation de la FC de repos (+${hrRestAnalysis.deltaBpm} bpm par rapport à la médiane 28j de ${hrRestAnalysis.median28d} bpm). Marqueur précoce de fatigue résiduelle ou de début d'infection.`
+      });
+    }
+
+    if (fatigueReport && fatigueReport.count >= 3) {
+      if (fatigueReport.status === 'critical') {
+        insights.push({
+          type: 'danger',
+          icon: <ShieldAlert size={18}/>,
+          text: `Surmenage perçu élevé (${fatigueReport.meanFatigue}/10 en moyenne sur ${fatigueReport.count} séances). ${fatigueReport.highStrainSessionsCount} séance(s) avec fatigue disproportionnée. Réduisez le volume global.`
+        });
+      } else if (fatigueReport.status === 'elevated') {
+        insights.push({
+          type: 'warning',
+          icon: <AlertTriangle size={18}/>,
+          text: `Coût interne élevé : la fatigue perçue dépasse la difficulté attendue (+${fatigueReport.meanDiscrepancy} pts vs RPE). Optimisez votre sommeil et l'apport glucidique.`
+        });
+      }
+    }
+
+    if (intensity && intensity.totalMinutes > 60) {
+      if (intensity.profile === 'THRESHOLD_DOMINANT') {
+        insights.push({
+          type: 'warning',
+          icon: <TrendingUp size={18}/>,
+          text: `Polarisation à rééquilibrer : ${intensity.z2TimePct}% du temps passé en Zone 2 (Seuil). Privilégiez 80% en Zone 1 (Aérobie douce) pour maximiser les adaptations sans épuisement.`
+        });
+      } else if (intensity.profile === 'POLARIZED') {
+        insights.push({
+          type: 'good',
+          icon: <Sparkles size={18}/>,
+          text: `Excellente répartition d'intensité polarisée (${intensity.z1TimePct}% Z1 / ${intensity.z2TimePct}% Z2 / ${intensity.z3TimePct}% Z3), respectant le modèle Seiler 80/20.`
         });
       }
     }
 
     return insights;
-  }, [chartData]);
+  }, [chartData, vfcAnalysis, hrRestAnalysis, fatigueReport, intensity]);
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -922,6 +949,14 @@ export default function MetricsDashboard({
     return cardioMuscularBalance || computeCardioVsMuscularBalance(events);
   }, [cardioMuscularBalance, events]);
 
+  const intensity = useMemo(() => {
+    return intensityDistribution || computeIntensityDistribution(events, qualities);
+  }, [intensityDistribution, events, qualities]);
+
+  const fatigueReport = useMemo(() => {
+    return perceivedFatigueAnalysis || computePerceivedFatigueAnalysis(events);
+  }, [perceivedFatigueAnalysis, events]);
+
   // Données synthétiques Banister du jour (TSB, ATL, CTL, ACWR, Rampe)
   const banisterSummary = useMemo(() => {
     if (chartData.length === 0) return null;
@@ -1062,37 +1097,48 @@ export default function MetricsDashboard({
         formula: `Moyenne Mobile Exponentielle sur ${tauFitness} jours (Condition)`,
         color: '#38bdf8',
         role: "Représente votre condition physique de fond ('Fitness') et votre capacité à encaisser de gros volumes d'entraînement sans vous épuiser. La CTL se construit patiemment sur plusieurs semaines de travail continu.",
-        currentValue: banisterSummary ? `${banisterSummary.ctl} pts (${banisterSummary.ctlRamp >= 0 ? `+${banisterSummary.ctlRamp}` : banisterSummary.ctlRamp} pts/sem)` : '0 pts',
+        currentValue: banisterSummary ? (
+          banisterSummary.ctlRampPercent !== null
+            ? `${banisterSummary.ctl} pts (${banisterSummary.ctlRampPercent >= 0 ? `+${banisterSummary.ctlRampPercent}` : banisterSummary.ctlRampPercent}%/sem)`
+            : `${banisterSummary.ctl} pts (${banisterSummary.ctlRamp >= 0 ? `+${banisterSummary.ctlRamp}` : banisterSummary.ctlRamp} pts/sem)`
+        ) : '0 pts',
         currentInterpretation:
           !banisterSummary ? 'Données en cours de calcul' :
-          banisterSummary.ctlRamp > 8 ? 'Montée trop rapide (> +8 pts/sem)' :
-          banisterSummary.ctlRamp >= 3 ? 'Progression optimale (+3 à +7 pts/sem)' :
-          banisterSummary.ctlRamp >= -2 ? 'Stabilisation / Maintien (Plateau)' :
-          'Désentraînement (Baisse de condition)',
+          (banisterSummary.ctlRampPercent !== null ? (
+            banisterSummary.ctlRampPercent > 12 ? 'Montée trop agressive (> +12%/sem)' :
+            banisterSummary.ctlRampPercent >= 4 ? 'Progression optimale (+4% à +12%/sem)' :
+            banisterSummary.ctlRampPercent >= -4 ? 'Stabilisation / Maintien (Plateau ±4%)' :
+            'Désentraînement (Baisse de charge < -4%/sem)'
+          ) : (
+            banisterSummary.ctlRamp > 8 ? 'Montée rapide (> +8 pts/sem)' :
+            banisterSummary.ctlRamp >= 3 ? 'Progression optimale (+3 à +7 pts/sem)' :
+            banisterSummary.ctlRamp >= -2 ? 'Stabilisation / Maintien (Plateau)' :
+            'Désentraînement (Baisse de condition)'
+          )),
         thresholds: [
           {
-            zone: '+3 à +7 pts/sem',
+            zone: '+4% à +12%/sem',
             title: 'Rampe de Progression Optimale',
-            detail: 'Rythme idéal de montée en charge pour développer la cylindrée aérobie et musculaire de manière saine.',
+            detail: 'Rythme idéal de montée en charge relative pour développer la cylindrée sans saturer l\'organisme.',
             status: 'success',
             tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
           },
           {
-            zone: '> +8 à +10 pts/sem',
+            zone: '> +12%/sem',
             title: 'Rampe Trop Agressive',
-            detail: 'Augmentation trop brutale du volume, conduisant souvent à un effondrement immunitaire ou une blessure.',
+            detail: 'Augmentation trop brutale du volume hebdomadaire, risquant d\'induire une surcharge aiguë ou une blessure.',
             status: 'warning',
             tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
           },
           {
-            zone: 'Plateau stable (±2 pts)',
+            zone: 'Plateau stable (±4%/sem)',
             title: 'Phase de Stabilisation / Palier',
             detail: 'Permet à l\'organisme d\'assimiler un nouveau niveau de travail avant d\'engager un cycle supérieur.',
             status: 'info',
             tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
           },
           {
-            zone: 'Baisse > -4 pts/sem',
+            zone: 'Baisse < -4%/sem',
             title: 'Désentraînement / Perte de Fond',
             detail: 'Perte progressive de condition consécutive à une coupure ou une baisse d\'activité prolongée.',
             status: 'neutral',
@@ -1116,7 +1162,7 @@ export default function MetricsDashboard({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tableau de Bord Physiologique</h4>
-                <p className="text-[11px] text-slate-400">Modèles Banister, Foster Monotony & Affûtage</p>
+                <p className="text-[11px] text-slate-400">Modèle PMC (Charge & Forme), Foster Monotony & Affûtage</p>
               </div>
             </div>
 
@@ -1229,13 +1275,23 @@ export default function MetricsDashboard({
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
                       <span className="text-[10px] text-slate-400 block">TSB Projeté Jour J</span>
                       <span className="text-xs font-bold font-mono text-emerald-400 block mt-0.5">
-                        {taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb}` : taperingAnalysis.projectedTsb}
+                        {taperingAnalysis.projectedTsbPercent !== null
+                          ? (taperingAnalysis.projectedTsbPercent > 0 ? `+${taperingAnalysis.projectedTsbPercent}%` : `${taperingAnalysis.projectedTsbPercent}%`)
+                          : (taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb} pts` : `${taperingAnalysis.projectedTsb} pts`)}
                       </span>
+                      {taperingAnalysis.projectedTsbPercent !== null && (
+                        <span className="text-[9px] text-slate-400 block">
+                          ({taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb}` : taperingAnalysis.projectedTsb} pts)
+                        </span>
+                      )}
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Cible Banister</span>
+                      <span className="text-[10px] text-slate-400 block">Cible d'Affûtage</span>
                       <span className="text-xs font-bold font-mono text-blue-300 block mt-0.5">
-                        +{taperingAnalysis.targetTsb} TSB
+                        +{taperingAnalysis.targetTsb}{taperingAnalysis.targetTsbUnit === 'percent' ? '% CTL' : ' pts'}
+                      </span>
+                      <span className="text-[9px] text-slate-400 block">
+                        {taperingAnalysis.targetTsbUnit === 'percent' ? 'Fraîcheur relative' : 'Score brut'}
                       </span>
                     </div>
                   </div>
@@ -1318,7 +1374,7 @@ export default function MetricsDashboard({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                      TRIMP Cardio vs Musculaire
+                      Charge Cardio vs Musculaire (RPE)
                     </h4>
                     <p className="text-[11px] text-slate-400">Asymétrie de fatigue & stress excentrique</p>
                   </div>
@@ -1432,7 +1488,7 @@ export default function MetricsDashboard({
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                   <Activity size={14} className="text-blue-400" />
-                  Indicateurs de Modélisation Banister (Jour J)
+                  Indicateurs de Modélisation PMC (Jour J)
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
                   (Survolez les indicateurs pour comprendre leur rôle et leurs seuils)
@@ -1792,7 +1848,7 @@ export default function MetricsDashboard({
               <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Activity size={13} className="text-blue-400" />
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Modélisation Banister</span>
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Modélisation PMC (Charge & Forme)</span>
                 </div>
                 
                 {/* Légendes interactives compactes cliquables pour afficher/masquer */}

@@ -252,7 +252,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
           {isEccentric && (
             <span className="text-[10px] font-bold px-2 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 shadow-sm">
-              <Zap size={11} className="text-amber-400" /> Excentrique (+35%)
+              <Zap size={11} className="text-amber-400" /> Excentrique (+15%)
             </span>
           )}
         </div>
@@ -621,7 +621,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   <span>
                     Appliquer impacts secondaires ({activeImpacts.map(i => {
                       const targetName = qualities.find(q => q.id === i.id)?.name || i.id;
-                      return `${targetName} ${Math.round(i.ratio * 100)}%`;
+                      return `${targetName} ${Math.round(i.ratio * 100)}% (${i.confidence || 'estimé'})`;
                     }).join(', ')})
                   </span>
                 </label>
