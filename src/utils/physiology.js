@@ -2,6 +2,7 @@ import { calculateEMA, calculateExpDecay } from './mathHelpers';
 import { getLocalYYYYMMDD } from './dateHelpers';
 import { getDailyAthleteLoad, isPrimary, extractSessionLoad as loadExtract } from './loadHelpers';
 import { getTsbZone, calculateTsbPercent } from './zones';
+import { computeVfcAnalysis, computeHrRestAnalysis } from './vfcHelpers';
 
 export const DEFAULT_QUALITIES = [
   { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio', impacts: [{ id: 'seuil', ratio: 0.6, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }, { id: 'plyo', ratio: 0.3, confidence: 'estimé' }] },
@@ -246,6 +247,12 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
   const readiness = dailyMetrics?.[refDate]?.readiness || 7;
   const numQualities = qualities.length || 1;
 
+  // Analyse des marqueurs de récupération autonome (VFC & FC repos)
+  const vfcAnalysis = computeVfcAnalysis(dailyMetrics || {}, refDate);
+  const hrRestAnalysis = computeHrRestAnalysis(dailyMetrics || {}, refDate);
+  const hasSystemicFatigue = (vfcAnalysis.status === 'low') || (hrRestAnalysis.status === 'elevated') || (readiness <= 4);
+  const isReadinessOptimal = (readiness >= 8) && (vfcAnalysis.status === 'optimal' || vfcAnalysis.status === 'high');
+
   const HARD_QUALITIES = new Set(['vo2max', 'seuil', 'sprint', 'pull', 'push', 'leg', 'plyo', 'descente']);
 
   // Détection de séance intense réalisée la veille (J-1) ou le jour même (J-0) pour alternance physiologique (D3)
@@ -300,7 +307,7 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
     if (cellState.isBurnout || cellState.isAcuteFatigueHigh) {
       urgencyLevel = 'REST';
       urgencyScore = -50;
-      urgencyBadge = '🛑 Surcharge Aiguë (SNC)';
+      urgencyBadge = '🛑 Surcharge Aiguë';
       urgencyColor = 'rose';
       reason = 'Charge accumulée élevée sur 72h. Fatigue neuromusculaire aiguë.';
       actionTip = 'Privilégier le repos complet ou la régénération active très douce.';
@@ -348,7 +355,7 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
         urgencyLevel = 'HIGH';
         urgencyBadge = '⚡ Rappel sous 24h';
         urgencyColor = 'amber';
-        reason = `Fenêtre de rappel critique : expire dans ${daysLeft} j avant bascule en désentraînement.`;
+        reason = `Fenêtre de rappel critique : expire dans ${daysLeft} j avant déclin d'adaptation.`;
         actionTip = 'Séance de rappel recommandée sans tarder.';
       } else {
         urgencyLevel = 'MEDIUM';
@@ -388,6 +395,32 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       urgencyScore = Math.round(urgencyScore * 1.25);
     }
 
+    // Intégration directe des marqueurs physiologiques de récupération (VFC, FC repos, Readiness)
+    if (hasSystemicFatigue) {
+      if (isHardQuality && urgencyScore > 0) {
+        urgencyScore = Math.round(urgencyScore * 0.45);
+        if (urgencyLevel === 'CRITICAL') urgencyLevel = 'MEDIUM';
+        else if (urgencyLevel === 'HIGH') urgencyLevel = 'LOW';
+        urgencyBadge = '⚠️ Récup requise';
+        urgencyColor = 'amber';
+        const fatigueCause = [
+          vfcAnalysis.status === 'low' ? 'VFC basse (< SWC)' : '',
+          hrRestAnalysis.status === 'elevated' ? `FC repos +${hrRestAnalysis.deltaBpm} bpm` : '',
+          readiness <= 4 ? `Readiness ${readiness}/10` : ''
+        ].filter(Boolean).join(' · ');
+        reason += ` • [Fatigue systémique : ${fatigueCause} -> séance intensive déconseillée]`;
+        actionTip = 'Remplacer par une séance d\'Endurance Fondamentale (EF) très souple ou du repos.';
+      } else if (q.id === 'ef' || q.id === 'proprio') {
+        urgencyScore = Math.max(urgencyScore, 70);
+        urgencyBadge = '🍃 Assimilation Active';
+        urgencyColor = 'emerald';
+        reason += ' • [Option privilégiée pour drainer la fatigue sans surcharger le système nerveux]';
+        actionTip = 'Séance d\'assimilation idéale en zone 1/2.';
+      }
+    } else if (isReadinessOptimal && isHardQuality && urgencyScore >= 45) {
+      reason += ' • [⚡ Excellente disponibilité autonome (VFC & Readiness favorables) : créneau idéal pour séance qualitative]';
+    }
+
     return {
       quality: q,
       rank,
@@ -416,7 +449,6 @@ export function extractSessionLoad(data) {
     const duration = Number(data.duration) || 0;
     const rpeM = Number(data.rpeMusculaire ?? data.rpeMusc ?? 5);
     const rpeC = Number(data.rpeCardio ?? 5);
-    // Supprimer le multiplicateur fatMod : la fatigue perçue est un marqueur de réponse, pas de stimulus (C3)
     return Math.round(((rpeM + rpeC) / 2) * duration);
   }
   const parsed = Number(data);
@@ -447,18 +479,26 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
   let total28dLoad = 0;
   let sessionCount28d = 0;
 
-  // Calcul de la charge médiane de cette qualité pour doseScale continue
-  const pastLoads = [];
+  // Calcul de la charge de référence pour doseScale : EXCLUSIVEMENT sur les séances directes (principales)
+  // pour éviter qu'une filière qui n'a que des impacts secondaires ne s'auto-calibre à doseScale=1.0
+  const pastPrimaryLoads = [];
+  let mostRecentSessionDays = null;
   for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
     const eventTime = new Date(eventDate).getTime();
     const daysSince = Math.round((targetTime - eventTime) / (1000 * 3600 * 24));
-    if (daysSince >= 0 && daysSince <= 60) {
-      const l = extractSessionLoad(data);
-      if (l > 0) pastLoads.push(l);
+    if (daysSince >= 0) {
+      if (mostRecentSessionDays === null || daysSince < mostRecentSessionDays) {
+        mostRecentSessionDays = daysSince;
+      }
+      if (daysSince <= 60 && isPrimary(data)) {
+        const l = extractSessionLoad(data);
+        if (l > 0) pastPrimaryLoads.push(l);
+      }
     }
   }
-  pastLoads.sort((a, b) => a - b);
-  const refLoad_q = pastLoads.length > 0 ? pastLoads[Math.floor(pastLoads.length / 2)] : 240;
+  pastPrimaryLoads.sort((a, b) => a - b);
+  const defaultRefLoad = qDef.category === 'force' ? 200 : (qDef.category === 'mixte' ? 180 : 250);
+  const refLoad_q = pastPrimaryLoads.length > 0 ? pastPrimaryLoads[Math.floor(pastPrimaryLoads.length / 2)] : defaultRefLoad;
 
   for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
     const eventTime = new Date(eventDate).getTime();
@@ -466,6 +506,7 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
 
     if (daysSince >= 0) {
       const load = extractSessionLoad(data);
+      const isSec = !isPrimary(data);
 
       if (daysSince <= 3) {
         recent3DaysLoad += load;
@@ -479,7 +520,14 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
       let doseScale = 0;
       if (load >= 15) {
         const ratio = load / refLoad_q;
-        doseScale = Math.max(0.3, Math.min(1.3, 0.45 + 0.55 * Math.sqrt(Math.max(0, ratio))));
+        if (isSec) {
+          // Les impacts secondaires représentent une contrainte mécanique / fatigue périphérique
+          // et non un stimulus direct d'adaptation : doseScale strictement bornée (max 0.35)
+          // pour ne JAMAIS accorder une fenêtre verte complète sans séance directe
+          doseScale = Math.min(0.35, 0.25 * Math.sqrt(Math.max(0, ratio)));
+        } else {
+          doseScale = Math.max(0.3, Math.min(1.3, 0.45 + 0.55 * Math.sqrt(Math.max(0, ratio))));
+        }
       }
 
       if (doseScale > 0) {
@@ -533,6 +581,21 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     }
   }
 
+  // Déclin physiologique progressif (Coyle 1984, Mujika & Padilla 2000) au lieu d'un zéro brutal
+  const gBaseNominal = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
+  const oBaseNominal = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
+  const totalNominal = gBaseNominal + oBaseNominal;
+
+  if (bestStatusPhysio === 'red' && mostRecentSessionDays !== null) {
+    const daysOver = mostRecentSessionDays - totalNominal;
+    currentLevelPhysio = Math.max(30, Math.round(55 * Math.exp(-0.025 * Math.max(0, daysOver))));
+  }
+  if (bestStatusPrescription === 'red' && mostRecentSessionDays !== null) {
+    const totalPrescNominal = Math.round(totalNominal * prescriptionMultiplier);
+    const daysOverPresc = mostRecentSessionDays - totalPrescNominal;
+    currentLevelPrescription = Math.max(20, Math.round(50 * Math.exp(-0.035 * Math.max(0, daysOverPresc))));
+  }
+
   // Évaluation de la fatigue aiguë élevée (B8)
   const dailyAverage28d = sessionCount28d > 0 ? (total28dLoad / 28) : 40;
   const isAcuteFatigueHigh = recent3DaysLoad > Math.max(500, dailyAverage28d * 3 * 1.8);
@@ -547,7 +610,9 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     };
   }
 
-  let tooltip = 'Qualité dégradée (Rouge)';
+  let tooltip = mostRecentSessionDays === null 
+    ? 'Filière non stimulée (aucune séance enregistrée)' 
+    : `Fenêtre dépassée (J+${mostRecentSessionDays}) • Rappel recommandé`;
   if (bestStatusPrescription === 'green') tooltip = `Effet Actif : Reste ${daysLeftPrescription} jours`;
   if (bestStatusPrescription === 'orange') tooltip = `Fenêtre de rappel : Reste ${daysLeftPrescription} jours`;
   if (blockStateInfo) {
@@ -893,14 +958,17 @@ export function computeBanisterPerformance(
     ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true });
   }
 
-  const minWarmupThreshold = Math.max(28, Math.round(tauFitness * 1.0));
-  const isWarmedUp = historyDays >= minWarmupThreshold;
+  const hasInitialCtl = (initialCtl !== null && Number(initialCtl) > 0);
+  const minWarmupThreshold = hasInitialCtl ? 0 : Math.max(35, Math.round(tauFitness * 1.5));
+  const isWarmedUp = hasInitialCtl || (historyDays >= minWarmupThreshold);
 
   const fullSeries = fullRawData.map((d, idx) => {
     const atl = Math.round(atlArray[idx] * 10) / 10;
     const ctl = Math.round(ctlArray[idx] * 10) / 10;
     const tsb = Math.round((ctl - atl) * 10) / 10;
-    const tsbPercent = calculateTsbPercent(ctl, atl);
+    // Si la CTL n'est pas encore convergée mathématiquement, neutraliser le TSB% pour éviter fausses alertes
+    const rawTsbPercent = calculateTsbPercent(ctl, atl);
+    const tsbPercent = isWarmedUp ? rawTsbPercent : null;
 
     // ACWR couplé classique (avec neutralisation si CTL non convergée)
     const acwr = (ctl > 0 && isWarmedUp) ? Math.round((atl / ctl) * 100) / 100 : 1;
@@ -922,7 +990,7 @@ export function computeBanisterPerformance(
       atl, // Fatigue aiguë (tauFatigue j)
       ctl, // Fitness chronique (tauFitness j)
       tsb, // Forme absolue (CTL - ATL)
-      tsbPercent, // Forme relative en % de la CTL
+      tsbPercent, // Forme relative en % de la CTL (null si en cours de convergence)
       acwr,
       acwrUncoupled
     };
@@ -948,8 +1016,8 @@ export function computeBanisterPerformance(
     });
   }
 
-  // Zone centrale TSB selon les pourcentages de CTL
-  const tsbZone = getTsbZone(current.ctl, current.atl, historyDays);
+  // Zone centrale TSB selon les pourcentages de CTL avec seuil de convergence
+  const tsbZone = getTsbZone(current.ctl, current.atl, historyDays, tauFitness, hasInitialCtl);
 
   return {
     tauFatigue,
@@ -994,11 +1062,14 @@ export function getTaperingAnalysis(
                       banister.current;
 
   const targetTsb = targetCompetition.targetTsb ?? 15;
-  const targetTsbUnit = targetCompetition.targetTsbUnit || 'points';
+  const targetTsbUnit = targetCompetition.targetTsbUnit || 'percent';
   const projectedTsb = compDayData?.tsb ?? 0;
   const projectedTsbPercent = calculateTsbPercent(compDayData?.ctl ?? 0, compDayData?.atl ?? 0);
-  const tsbGap = Math.round((projectedTsb - targetTsb) * 10) / 10;
-  const tsbZone = getTsbZone(compDayData?.ctl ?? 0, compDayData?.atl ?? 0, banister.historyDays);
+  const tsbGap = targetTsbUnit === 'percent' && projectedTsbPercent !== null
+    ? Math.round((projectedTsbPercent - targetTsb) * 10) / 10
+    : Math.round((projectedTsb - targetTsb) * 10) / 10;
+  const hasInitCtl = (initialCtl !== null && Number(initialCtl) > 0);
+  const tsbZone = getTsbZone(compDayData?.ctl ?? 0, compDayData?.atl ?? 0, banister.historyDays, tauFitness, hasInitCtl);
 
   // Monotonie sur les 7 derniers jours
   const foster = computeFosterMetrics(events);

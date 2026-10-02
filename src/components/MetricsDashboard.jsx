@@ -494,14 +494,15 @@ export default function MetricsDashboard({
         statusIcon = TrendingDown;
         actionAdvice = 'Dégradation des gains en cours';
       } else {
-        // Désentraînement complet
-        remainingPercent = 0;
+        // Fenêtre de rappel dépassée - Stimulation requise (déclin graduel selon Coyle & Mujika)
+        const daysOver = daysSince - totalRemanenceWindow;
+        remainingPercent = Math.max(30, Math.round(50 * Math.exp(-0.03 * daysOver)));
         statusKey = 'decondition';
-        statusLabel = `Désentraînement (J+${daysSince})`;
+        statusLabel = `Rappel requis (J+${daysSince})`;
         statusColor = 'text-rose-400';
         statusBg = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
         statusIcon = AlertTriangle;
-        actionAdvice = 'Capacité désentraînée';
+        actionAdvice = 'Fenêtre dépassée : séance à programmer';
       }
 
       const qEma = qualitiesEMA[q.id]?.current;
@@ -929,18 +930,22 @@ export default function MetricsDashboard({
     const atl = item?.loadEMA7 ?? 0;
     const ctl = item?.loadEMA21 ?? 0;
     const tsb = item?.tsb ?? (ctl - atl);
-    const tsbPercent = calculateTsbPercent(ctl, atl);
-    const tsbZone = getTsbZone(ctl, atl);
-    const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
+    
+    const historyDays = banisterPerformance?.historyDays ?? 30;
+    const hasInitialCtl = (physioSettings?.initialCtl !== undefined && physioSettings?.initialCtl !== null && Number(physioSettings.initialCtl) > 0);
+    const tsbZone = getTsbZone(ctl, atl, historyDays, tauFitness, hasInitialCtl);
+    const tsbPercent = tsbZone.isReliable ? calculateTsbPercent(ctl, atl) : null;
+    const acwr = (ctl > 0 && tsbZone.isReliable) ? (atl / ctl).toFixed(2) : '1.0';
 
-    // Rampe de progression CTL sur 7 jours
+    // Rampe de progression CTL sur 7 jours (points et pourcentage relatif)
     const targetIdx = todayIndex >= 0 ? todayIndex : chartData.length - 1;
     const sevenDaysAgo = targetIdx >= 7 ? chartData[targetIdx - 7] : chartData[0];
     const ctlPast = sevenDaysAgo?.loadEMA21 ?? ctl;
     const ctlRamp = Math.round((ctl - ctlPast) * 10) / 10;
+    const ctlRampPercent = ctlPast > 10 ? Math.round(((ctl - ctlPast) / ctlPast) * 1000) / 10 : null;
 
-    return { atl, ctl, tsb, tsbPercent, tsbZone, acwr, ctlRamp };
-  }, [chartData]);
+    return { atl, ctl, tsb, tsbPercent, tsbZone, acwr, ctlRamp, ctlRampPercent };
+  }, [chartData, banisterPerformance?.historyDays, physioSettings?.initialCtl, tauFitness]);
 
   // Définitions détaillées, rôles physiologiques et seuils de normalité pour les infobulles (Tooltips)
   const physioTooltips = useMemo(() => {
@@ -1463,38 +1468,56 @@ export default function MetricsDashboard({
 
                 if (isTsb) {
                   const tsbVal = banisterSummary?.tsb ?? 0;
-                  mainNumber = tsbVal > 0 ? `+${tsbVal}` : `${tsbVal}`;
-                  unitLabel = 'TSB';
-                  secondaryDetail = '';
-                  shortFormula = 'CTL − ATL';
+                  const tsbPct = banisterSummary?.tsbPercent;
+                  const isInit = banisterSummary?.tsbZone?.zoneId === 'INITIALIZING';
 
-                  // Échelle TSB : -40 à +30 (delta 70)
-                  gaugePercent = Math.max(4, Math.min(96, ((Math.max(-40, Math.min(30, tsbVal)) + 40) / 70) * 100));
-                  gaugeSubtextLeft = '-40 Surcharge';
-                  gaugeSubtextCenter = 'Optimal +15';
-                  gaugeSubtextRight = '+30 Repos';
-
-                  if (tsbVal >= 10 && tsbVal <= 25) {
-                    cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
-                    valueColor = 'text-emerald-400';
-                    badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-                    statusColor = 'text-emerald-400';
-                  } else if (tsbVal >= 0) {
-                    cardBorder = 'border-sky-500/30 bg-gradient-to-b from-sky-950/20 to-slate-900/80 hover:border-sky-400/50';
-                    valueColor = 'text-sky-300';
-                    badgeClass = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
-                    statusColor = 'text-sky-300';
-                  } else if (tsbVal >= -30) {
-                    cardBorder = 'border-indigo-500/30 bg-gradient-to-b from-indigo-950/20 to-slate-900/80 hover:border-indigo-400/50';
-                    valueColor = 'text-indigo-300';
-                    badgeClass = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
-                    statusColor = 'text-indigo-300';
+                  if (isInit) {
+                    mainNumber = tsbVal > 0 ? `+${tsbVal}` : `${tsbVal}`;
+                    unitLabel = 'pts';
+                    secondaryDetail = '(Étalonnage CTL)';
+                    shortFormula = 'CTL − ATL';
+                    gaugePercent = 50;
+                    gaugeSubtextLeft = 'Calibration';
+                    gaugeSubtextCenter = 'Convergence en cours';
+                    gaugeSubtextRight = '30-45j';
+                    cardBorder = 'border-slate-700/60 bg-gradient-to-b from-slate-900/60 to-slate-950/80';
+                    valueColor = 'text-slate-300';
+                    badgeClass = 'bg-slate-700/60 text-slate-300 border-slate-600';
+                    statusColor = 'text-slate-400';
                   } else {
-                    // Surcharge critique
-                    cardBorder = 'border-red-500/40 bg-gradient-to-b from-red-950/25 to-slate-900/80 hover:border-red-400/60';
-                    valueColor = 'text-red-400';
-                    badgeClass = 'bg-red-500/20 text-red-300 border-red-500/30';
-                    statusColor = 'text-red-400';
+                    mainNumber = tsbPct !== null && tsbPct !== undefined ? (tsbPct > 0 ? `+${tsbPct}%` : `${tsbPct}%`) : (tsbVal > 0 ? `+${tsbVal}` : `${tsbVal}`);
+                    unitLabel = 'CTL';
+                    secondaryDetail = `(${tsbVal > 0 ? `+${tsbVal}` : tsbVal} pts)`;
+                    shortFormula = 'Forme relative';
+
+                    // Échelle TSB% : -50% à +30% (delta 80)
+                    const clampPct = Math.max(-50, Math.min(30, tsbPct ?? tsbVal));
+                    gaugePercent = Math.max(4, Math.min(96, ((clampPct + 50) / 80) * 100));
+                    gaugeSubtextLeft = '-35% Surcharge';
+                    gaugeSubtextCenter = '+5% à +25% Pic';
+                    gaugeSubtextRight = '>+25% Déclin';
+
+                    if (banisterSummary?.tsbZone?.color === 'rose') {
+                      cardBorder = 'border-red-500/40 bg-gradient-to-b from-red-950/25 to-slate-900/80 hover:border-red-400/60';
+                      valueColor = 'text-red-400';
+                      badgeClass = 'bg-red-500/20 text-red-300 border-red-500/30';
+                      statusColor = 'text-red-400';
+                    } else if (banisterSummary?.tsbZone?.color === 'amber') {
+                      cardBorder = 'border-amber-500/35 bg-gradient-to-b from-amber-950/20 to-slate-900/80 hover:border-amber-400/50';
+                      valueColor = 'text-amber-400';
+                      badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                      statusColor = 'text-amber-400';
+                    } else if (banisterSummary?.tsbZone?.color === 'emerald') {
+                      cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
+                      valueColor = 'text-emerald-400';
+                      badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+                      statusColor = 'text-emerald-400';
+                    } else {
+                      cardBorder = 'border-sky-500/30 bg-gradient-to-b from-sky-950/20 to-slate-900/80 hover:border-sky-400/50';
+                      valueColor = 'text-sky-300';
+                      badgeClass = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+                      statusColor = 'text-sky-300';
+                    }
                   }
                 } else if (isAtl) {
                   const atlVal = banisterSummary?.atl ?? 0;
@@ -1510,7 +1533,6 @@ export default function MetricsDashboard({
                   gaugeSubtextCenter = '0.8 - 1.3x Sweet Spot';
                   gaugeSubtextRight = '1.8x Danger';
 
-                  // CORRECTION SÉMANTIQUE : Vert/Bleu dans la zone optimale, Rouge réservé UNIQUEMENT à ACWR > 1.5
                   if (acwrVal > 1.5) {
                     cardBorder = 'border-red-500/50 bg-gradient-to-b from-red-950/30 to-slate-900/80 hover:border-red-400/70 shadow-red-500/10';
                     valueColor = 'text-red-400';
@@ -1522,7 +1544,6 @@ export default function MetricsDashboard({
                     badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
                     statusColor = 'text-amber-400';
                   } else if (acwrVal >= 0.8) {
-                    // Zone optimale / sécuritaire (Sweet Spot) : VERT / ÉMERAUDE
                     cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
                     valueColor = 'text-emerald-400';
                     badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
@@ -1536,23 +1557,27 @@ export default function MetricsDashboard({
                 } else if (isCtl) {
                   const ctlVal = banisterSummary?.ctl ?? 0;
                   const rampVal = banisterSummary?.ctlRamp ?? 0;
+                  const rampPct = banisterSummary?.ctlRampPercent;
                   mainNumber = `${ctlVal}`;
                   unitLabel = 'pts';
-                  secondaryDetail = `(${rampVal >= 0 ? `+${rampVal}` : rampVal} pts/sem)`;
+                  secondaryDetail = rampPct !== null && rampPct !== undefined 
+                    ? `(${rampPct >= 0 ? `+${rampPct}` : rampPct}%/sem)` 
+                    : `(${rampVal >= 0 ? `+${rampVal}` : rampVal} pts/sem)`;
                   shortFormula = `Moyenne ${tauFitness}j`;
 
-                  // Échelle Rampe : -6 à +12 (delta 18)
-                  gaugePercent = Math.max(4, Math.min(96, ((Math.max(-6, Math.min(12, rampVal)) + 6) / 18) * 100));
-                  gaugeSubtextLeft = '-5 Déclin';
-                  gaugeSubtextCenter = '+3 à +7 Idéal';
-                  gaugeSubtextRight = '+12 Brutal';
+                  // Échelle Rampe : -8% à +18%
+                  const effectiveRamp = rampPct !== null && rampPct !== undefined ? rampPct : (rampVal * 1.5);
+                  gaugePercent = Math.max(4, Math.min(96, ((Math.max(-8, Math.min(18, effectiveRamp)) + 8) / 26) * 100));
+                  gaugeSubtextLeft = '-5% Déclin';
+                  gaugeSubtextCenter = '+5% à +10% Idéal';
+                  gaugeSubtextRight = '+15% Brutal';
 
-                  if (rampVal > 8) {
+                  if (effectiveRamp > 12) {
                     cardBorder = 'border-amber-500/35 bg-gradient-to-b from-amber-950/20 to-slate-900/80 hover:border-amber-400/50';
                     valueColor = 'text-amber-400';
                     badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
                     statusColor = 'text-amber-400';
-                  } else if (rampVal >= 3) {
+                  } else if (effectiveRamp >= 4) {
                     cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
                     valueColor = 'text-emerald-400';
                     badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';

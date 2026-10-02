@@ -42,23 +42,30 @@ export function calculateTsbPercent(ctl: number, atl: number): number | null {
  * - ]+5%, +25%] : Zone d'affûtage idéale pour compétition (fraîcheur maximale)
  * - > +25% : Sur-fraîcheur prolongée (début de désentraînement si > 7j)
  */
-export function getTsbZone(ctl: number, atl: number, historyDays: number = 30): TsbZoneInfo {
+export function getTsbZone(
+  ctl: number, 
+  atl: number, 
+  historyDays: number = 30,
+  tauFitness: number = 28,
+  hasInitialCtl: boolean = false
+): TsbZoneInfo {
   const tsb = Math.round((ctl - atl) * 10) / 10;
   const tsbPercent = calculateTsbPercent(ctl, atl);
 
-  // Démarrage à froid ou historique inférieur à 21 jours
-  if (ctl < 10 || historyDays < 21 || tsbPercent === null) {
+  // Démarrage à froid ou historique inférieur au seuil de convergence mathématique (1.5 * tauFitness, soit ~42j pour tau=28)
+  const minRequiredDays = hasInitialCtl ? 0 : Math.max(35, Math.round(tauFitness * 1.5));
+  if ((!hasInitialCtl && historyDays < minRequiredDays) || ctl < 10 || tsbPercent === null) {
     return {
       zoneId: 'INITIALIZING',
       tsb,
       ctl,
       atl,
-      tsbPercent,
-      title: 'CTL en Construction',
-      badge: '⏳ Historique en cours',
+      tsbPercent: null,
+      title: 'CTL en Phase de Convergence',
+      badge: hasInitialCtl ? '⏳ Initialisation' : `⏳ Étalonnage CTL (${historyDays}/${minRequiredDays} j)`,
       color: 'slate',
       status: 'neutral',
-      summary: `Historique de charge en phase d'étalonnage (${Math.round(ctl)} UA). Le modèle Banister nécessite 3 à 4 semaines de données pour stabiliser la condition de fond.`,
+      summary: `Historique de charge en phase de convergence (${historyDays}/${minRequiredDays} jours requis, CTL actuelle: ${Math.round(ctl)} UA). Le modèle PMC nécessite 5 à 6 semaines de régularité pour stabiliser mathématiquement la condition de fond. Les alertes de fatigue aiguë sont neutralisées pendant cette phase pour prévenir tout faux positif.`,
       advice: 'Entraînez-vous selon vos sensations RPE habituelles pendant la phase de calibration.',
       prescription: 'Maintenir une régularité sans chercher à interpréter les ratios de fraîcheur.',
       isReliable: false

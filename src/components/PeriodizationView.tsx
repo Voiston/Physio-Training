@@ -332,21 +332,27 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">TSB Projeté Jour J</span>
                     <div className="my-1">
                       <span className={`text-xl sm:text-2xl font-black font-mono tracking-tight block ${
-                        taperingAnalysis.projectedTsb >= 10 
-                          ? 'text-emerald-400' 
-                          : taperingAnalysis.projectedTsb >= 0 
-                            ? 'text-sky-300' 
-                            : 'text-amber-400'
+                        taperingAnalysis.projectedTsbPercent !== null
+                          ? (taperingAnalysis.projectedTsbPercent >= 5 && taperingAnalysis.projectedTsbPercent <= 25 
+                              ? 'text-emerald-400' 
+                              : taperingAnalysis.projectedTsbPercent > 25 
+                                ? 'text-amber-400' 
+                                : 'text-sky-300')
+                          : (taperingAnalysis.projectedTsb >= 10 ? 'text-emerald-400' : 'text-sky-300')
                       }`}>
-                        {taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb}` : taperingAnalysis.projectedTsb}
+                        {taperingAnalysis.projectedTsbPercent !== null
+                          ? (taperingAnalysis.projectedTsbPercent > 0 ? `+${taperingAnalysis.projectedTsbPercent}%` : `${taperingAnalysis.projectedTsbPercent}%`)
+                          : (taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb} pts` : `${taperingAnalysis.projectedTsb} pts`)}
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {taperingAnalysis.projectedTsb >= 10 && taperingAnalysis.projectedTsb <= 25 
-                        ? '✅ Pic Optimal' 
-                        : taperingAnalysis.projectedTsb > 25 
-                          ? '⚠️ Sur-affûtage' 
-                          : '⚡ En montée'}
+                      {taperingAnalysis.projectedTsbPercent !== null
+                        ? (taperingAnalysis.projectedTsbPercent >= 5 && taperingAnalysis.projectedTsbPercent <= 25
+                            ? '✅ Pic Optimal'
+                            : taperingAnalysis.projectedTsbPercent > 25
+                              ? '⚠️ Sur-affûtage'
+                              : '⚡ En montée')
+                        : (taperingAnalysis.projectedTsb >= 10 && taperingAnalysis.projectedTsb <= 25 ? '✅ Pic Optimal' : '⚡ En montée')}
                     </span>
                   </div>
 
@@ -355,11 +361,11 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Cible Idéale</span>
                     <div className="my-1">
                       <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-blue-300 block">
-                        +{taperingAnalysis.targetTsb}
+                        +{taperingAnalysis.targetTsb}{taperingAnalysis.targetTsbUnit === 'percent' ? '% CTL' : ' pts'}
                       </span>
                     </div>
                     <span className="text-[10px] text-blue-400 font-mono font-semibold">
-                      Balance TSB
+                      {taperingAnalysis.targetTsbUnit === 'percent' ? 'Fraîcheur relative' : 'Balance TSB'}
                     </span>
                   </div>
                 </div>

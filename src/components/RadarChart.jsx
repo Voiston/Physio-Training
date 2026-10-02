@@ -30,10 +30,10 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
     <div className="w-full h-[300px] flex flex-col">
       <div className="flex items-center justify-between mb-2 px-1">
         <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
-          Niveau de Rétention Physiologique
+          Statut de Stimulation & Rappels
         </h3>
         <span className="text-[10px] font-mono text-blue-400 font-semibold">
-          Rétention pure
+          Fenêtre de rappel
         </span>
       </div>
       <div className="flex-1 w-full min-h-[220px]">
@@ -69,7 +69,10 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
                 fontSize: '12px'
               }} 
               itemStyle={{ color: '#60a5fa', fontWeight: 'bold' }}
-              formatter={(value, name, item) => [`${value}% d'effet résiduel`, item.payload.fullName]}
+              formatter={(value, name, item) => [
+                `${value}% (${value >= 75 ? 'Actif' : value >= 55 ? 'Rappel optimal' : 'Rappel recommandé'})`, 
+                item.payload.fullName
+              ]}
             />
           </RechartsRadar>
         </ResponsiveContainer>

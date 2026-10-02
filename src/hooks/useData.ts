@@ -81,8 +81,17 @@ export interface TargetCompetition {
   date: string;
   type: string; // 'marathon' | 'trail' | 'triathlon' | 'force' | 'course' | 'autre'
   targetTsb: number; // e.g. 15 to 25
+  targetTsbUnit?: 'percent' | 'points' | string;
   targetTime?: string;
   notes?: string;
+}
+
+export interface SecondaryContribution {
+  load: number;
+  loadCardio?: number;
+  loadMusc?: number;
+  ratio: number;
+  parentName?: string;
 }
 
 export interface SessionData {
@@ -94,10 +103,11 @@ export interface SessionData {
   load: number;
   loadCardio?: number;
   loadMusc?: number;
-  sport?: 'run' | 'bike' | string;
+  sport?: 'run' | 'bike' | 'muscu' | string;
   isEccentric?: boolean;
   isSecondary?: boolean;
   parentQId?: string;
+  parentContributions?: Record<string, SecondaryContribution>;
   originalLoad?: number;
   isSimulated?: boolean;
 }
@@ -700,73 +710,119 @@ export function useData() {
   };
 
   const saveEventWithImpacts = (qId: string, dateStr: string, sessionData: SessionData | null, applyImpacts: boolean = true) => {
-    // 1. Toujours nettoyer les anciens impacts secondaires générés par cette qualité sur cette date
-    qualities.forEach(q => {
-      if (q.id === qId) return;
-      const key = `${dateStr}_${q.id}`;
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed.isSecondary && parsed.parentQId === qId) {
-            saveEvent(q.id, dateStr, null);
-          }
-        } catch (e) {}
-      }
-    });
-
+    // 1. Sauvegarder ou supprimer la séance directe de l'athlète
     if (!sessionData) {
       saveEvent(qId, dateStr, null);
     } else {
-      // Déterminer le sport adapté : ne pas forcer 'run' sur les filières de musculation
-      const isCardio = ['vo2max', 'seuil', 'ef', 'sprint'].includes(qId);
+      const isCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(qId);
       const normalizedSport = sessionData.sport || (isCardio ? 'run' : 'muscu');
       const normalizedSession: SessionData = {
         ...sessionData,
         sport: normalizedSport,
         isSecondary: false
       };
-
       saveEvent(qId, dateStr, normalizedSession);
+    }
 
-      if (applyImpacts) {
-        const impacts = getQualityImpacts(qId, normalizedSport, qualities as any) as QualityImpact[];
-        if (impacts && impacts.length > 0) {
-          impacts.forEach(imp => {
-            // RÈGLE CRITIQUE D'INTÉGRITÉ : Ne JAMAIS écraser une séance principale existante
-            const existingRaw = localStorage.getItem(`${dateStr}_${imp.id}`);
-            let existingSession: any = null;
-            if (existingRaw) {
-              try { existingSession = JSON.parse(existingRaw); } catch (e) {}
+    if (!applyImpacts) return;
+
+    // 2. Recenser toutes les séances directes/principales de l'athlète sur cette date
+    const primarySessionsOnDate: { qId: string; session: SessionData }[] = [];
+    qualities.forEach(q => {
+      if (q.id === qId) {
+        if (sessionData) {
+          const isCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(qId);
+          primarySessionsOnDate.push({
+            qId: q.id,
+            session: {
+              ...sessionData,
+              sport: sessionData.sport || (isCardio ? 'run' : 'muscu'),
+              isSecondary: false
             }
-            if (existingSession && isPrimary(existingSession)) {
-              // Créneau déjà occupé par une séance directe de l'athlète -> Conserver la séance principale
-              return;
-            }
-
-            const calculatedSecLoad = Math.round(normalizedSession.load * imp.ratio);
-            const secCardio = normalizedSession.loadCardio !== undefined ? Math.round(normalizedSession.loadCardio * imp.ratio) : undefined;
-            const secMusc = normalizedSession.loadMusc !== undefined ? Math.round(normalizedSession.loadMusc * imp.ratio) : undefined;
-            
-            // Si un impact secondaire d'un autre parent existe déjà, cumuler les charges
-            const previousLoad = (existingSession && existingSession.isSecondary) ? (Number(existingSession.load) || 0) : 0;
-            const previousCardio = (existingSession && existingSession.isSecondary) ? (Number(existingSession.loadCardio) || 0) : 0;
-            const previousMusc = (existingSession && existingSession.isSecondary) ? (Number(existingSession.loadMusc) || 0) : 0;
-
-            const secData: SessionData = {
-              ...normalizedSession,
-              load: previousLoad + calculatedSecLoad,
-              loadCardio: secCardio !== undefined ? previousCardio + secCardio : undefined,
-              loadMusc: secMusc !== undefined ? previousMusc + secMusc : undefined,
-              isSecondary: true,
-              parentQId: qId,
-              originalLoad: normalizedSession.load
-            };
-            saveEvent(imp.id, dateStr, secData);
           });
         }
+      } else {
+        const raw = localStorage.getItem(`${dateStr}_${q.id}`);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && isPrimary(parsed)) {
+              primarySessionsOnDate.push({ qId: q.id, session: parsed });
+            }
+          } catch (e) {}
+        }
       }
-    }
+    });
+
+    const primaryQIds = new Set(primarySessionsOnDate.map(p => p.qId));
+
+    // 3. Pour chaque qualité qui n'est PAS occupée par une séance directe :
+    qualities.forEach(targetQ => {
+      // RÈGLE CRITIQUE D'INTÉGRITÉ 1 : Ne JAMAIS écraser une séance principale existante
+      if (primaryQIds.has(targetQ.id)) return;
+
+      // Calculer le cumul multi-parents de tous les impacts ciblant targetQ
+      const contributions: Record<string, SecondaryContribution> = {};
+      let totalSecLoad = 0;
+      let totalSecCardio = 0;
+      let totalSecMusc = 0;
+
+      primarySessionsOnDate.forEach(({ qId: parentId, session: parentSession }) => {
+        const parentSport = parentSession.sport || (['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(parentId) ? 'run' : 'muscu');
+        const parentImpacts = getQualityImpacts(parentId, parentSport, qualities as any) as QualityImpact[];
+        const imp = parentImpacts?.find(i => i.id === targetQ.id);
+
+        if (imp && imp.ratio > 0) {
+          const pLoad = Number(parentSession.load) || 0;
+          const pCardio = parentSession.loadCardio !== undefined ? Number(parentSession.loadCardio) : pLoad;
+          const pMusc = parentSession.loadMusc !== undefined ? Number(parentSession.loadMusc) : pLoad;
+
+          const calculatedSecLoad = Math.round(pLoad * imp.ratio);
+          const calculatedSecCardio = Math.round(pCardio * imp.ratio);
+          const calculatedSecMusc = Math.round(pMusc * imp.ratio);
+
+          if (calculatedSecLoad > 0) {
+            contributions[parentId] = {
+              load: calculatedSecLoad,
+              loadCardio: calculatedSecCardio,
+              loadMusc: calculatedSecMusc,
+              ratio: imp.ratio,
+              parentName: qualities.find(q => q.id === parentId)?.name || parentId
+            };
+            totalSecLoad += calculatedSecLoad;
+            totalSecCardio += calculatedSecCardio;
+            totalSecMusc += calculatedSecMusc;
+          }
+        }
+      });
+
+      const existingRaw = localStorage.getItem(`${dateStr}_${targetQ.id}`);
+      let existingSession: any = null;
+      if (existingRaw) {
+        try { existingSession = JSON.parse(existingRaw); } catch (e) {}
+      }
+
+      if (totalSecLoad > 0) {
+        const isTargetCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(targetQ.id);
+        const secData: SessionData = {
+          load: totalSecLoad,
+          loadCardio: totalSecCardio,
+          loadMusc: totalSecMusc,
+          isSecondary: true,
+          sport: isTargetCardio ? 'run' : 'muscu',
+          duration: 0,
+          rpeMusc: 0,
+          rpeCardio: 0,
+          parentContributions: contributions,
+          parentQId: Object.keys(contributions)[0],
+          originalLoad: totalSecLoad
+        };
+        saveEvent(targetQ.id, dateStr, secData);
+      } else if (existingSession && !isPrimary(existingSession)) {
+        // Plus aucun impact parent et séance secondaire présente : suppression propre
+        saveEvent(targetQ.id, dateStr, null);
+      }
+    });
   };
 
   return { 

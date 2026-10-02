@@ -34,6 +34,7 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
       date,
       type,
       targetTsb: Number(targetTsb),
+      targetTsbUnit: 'percent',
       notes
     });
     onClose();
@@ -182,13 +183,13 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <Gauge size={13} className="text-emerald-400" />
-                Niveau de Forme TSB visé le Jour J (+{targetTsb})
+                Niveau de Forme TSB visé le Jour J (+{targetTsb}% de la CTL)
               </label>
               <div className="flex items-center gap-1">
                 {[
-                  { label: 'Modéré (+12)', val: 12 },
-                  { label: 'Standard (+18)', val: 18 },
-                  { label: 'Max Fraîcheur (+24)', val: 24 }
+                  { label: 'Modéré (+10%)', val: 10 },
+                  { label: 'Standard (+15%)', val: 15 },
+                  { label: 'Max Fraîcheur (+22%)', val: 22 }
                 ].map(p => (
                   <button
                     key={p.val}
@@ -215,7 +216,7 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
               className="w-full accent-emerald-500 h-2 bg-white/10 rounded-lg cursor-pointer"
             />
             <p className="text-[10px] text-slate-400 mt-1">
-              En sciences du sport (modèle de dynamique de charge type Coggan/PMC), un TSB compris entre +5% et +25% de la CTL (ou environ +10 à +20 pts) vise un équilibre optimal entre fraîcheur (ATL basse) et maintien de la condition (CTL).
+              En sciences du sport (modèle PMC), un TSB compris entre +5% et +25% de la CTL vise un équilibre optimal entre fraîcheur (ATL basse) et maintien de la cylindrée de fond (CTL).
             </p>
           </div>
 

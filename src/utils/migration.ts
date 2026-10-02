@@ -100,12 +100,18 @@ export function migrateData(rawData: any): AppExportData {
               // Recalculer le stimulus pur selon la filière sans le modificateur de fatigue
               if (dur > 0) {
                 const { load, loadCardio, loadMusc } = calculateCleanSessionLoad(qId, dur, rM, rC, isEcc);
-                // Si la séance n'est pas un impact secondaire calculé
+                // Si la séance est principale (non secondaire)
                 if (!session.isSecondary) {
                   session.load = load;
+                  session.loadCardio = loadCardio;
+                  session.loadMusc = loadMusc;
+                } else {
+                  // Pour une séance secondaire, recalculer les composantes proportionnellement à son ratio réel
+                  const parentLoad = Number(session.originalLoad) || load || 1;
+                  const secRatio = Math.min(1.0, (Number(session.load) || 0) / parentLoad);
+                  session.loadCardio = Math.round(loadCardio * secRatio);
+                  session.loadMusc = Math.round(loadMusc * secRatio);
                 }
-                session.loadCardio = loadCardio;
-                session.loadMusc = loadMusc;
               }
             }
           });
@@ -166,12 +172,19 @@ export function migrateLocalStorage(): void {
                 const rM = session.rpeMusculaire ?? session.rpeMusc ?? 5;
                 const rC = session.rpeCardio ?? 5;
                 const isEcc = !!session.isEccentric;
-                if (dur > 0 && !session.isSecondary) {
+                if (dur > 0) {
                   const { load, loadCardio, loadMusc } = calculateCleanSessionLoad(qualityId, dur, rM, rC, isEcc);
-                  session.load = load;
-                  session.loadCardio = loadCardio;
-                  session.loadMusc = loadMusc;
-                  session.isSecondary = false;
+                  if (!session.isSecondary) {
+                    session.load = load;
+                    session.loadCardio = loadCardio;
+                    session.loadMusc = loadMusc;
+                    session.isSecondary = false;
+                  } else {
+                    const parentLoad = Number(session.originalLoad) || load || 1;
+                    const secRatio = Math.min(1.0, (Number(session.load) || 0) / parentLoad);
+                    session.loadCardio = Math.round(loadCardio * secRatio);
+                    session.loadMusc = Math.round(loadMusc * secRatio);
+                  }
                   localStorage.setItem(key, JSON.stringify(session));
                 }
               }

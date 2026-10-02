@@ -50,9 +50,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   };
 
   const currentSessionData = getSessionForDate(selectedDate);
-  const existing = currentSessionData || { rpeMusc: '', rpeCardio: '', fatigue: '', duration: '', isEccentric: false, sport: 'run' };
+  const defaultSportForQuality = ['vo2max', 'seuil', 'ef', 'sprint'].includes(info.qId) ? 'run' : 'muscu';
+  const existing = currentSessionData || { rpeMusc: '', rpeCardio: '', fatigue: '', duration: '', isEccentric: false, sport: defaultSportForQuality };
 
-  const [sport, setSport] = useState(existing.sport || 'run');
+  const [sport, setSport] = useState(existing.sport || defaultSportForQuality);
   const [rpeMusc, setRpeMusc] = useState(existing.rpeMusc || (typeof existing === 'number' ? existing : ''));
   const [rpeCardio, setRpeCardio] = useState(existing.rpeCardio || '');
   const [fatigue, setFatigue] = useState(existing.fatigue || '');
@@ -70,7 +71,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     const session = getSessionForDate(newDateStr);
     if (session) {
       if (typeof session === 'object') {
-        setSport(session.sport || 'run');
+        setSport(session.sport || defaultSportForQuality);
         setRpeMusc(session.rpeMusc ?? session.rpeMusculaire ?? '');
         setRpeCardio(session.rpeCardio ?? '');
         setFatigue(session.fatigue ?? '');
@@ -217,7 +218,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         load,
         loadCardio,
         loadMusc,
-        sport: isMultiSport ? sport : (existing?.sport || 'run'),
+        sport: isMultiSport ? sport : (existing?.sport || defaultSportForQuality),
         isEccentric: Boolean(isEccentric)
       }, applyImpacts, selectedDate);
     } else {

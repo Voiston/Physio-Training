@@ -26,39 +26,39 @@ export interface PresetProfile {
 
 export const PRESET_PROFILES: PresetProfile[] = [
   {
+    id: 'pmc_coggan',
+    name: 'Référence PMC Coggan (Classique)',
+    tauFatigue: 7,
+    tauFitness: 42,
+    description: 'Norme de référence du Performance Management Chart (Coggan & Allen). Fatigue aiguë sur 7j (ATL) et condition chronique sur 6 semaines (CTL = 42j).',
+    badge: 'PMC Coggan (42j)',
+    color: 'emerald'
+  },
+  {
     id: 'standard',
-    name: 'Standard / Athlète Intermédiaire',
+    name: 'Standard Méso-cycles (4 semaines)',
     tauFatigue: 7,
     tauFitness: 28,
-    description: 'Calibrage de référence Banister/Coggan. Demi-vie de fatigue à 7j et assimilation chronique sur 4 semaines.',
-    badge: 'Standard',
+    description: 'Calibrage adapté aux blocs de 4 semaines (3 semaines de charge + 1 semaine d\'assimilation). Demi-vie de fatigue à 7j et CTL sur 28j.',
+    badge: 'Cycle 4 sem (28j)',
     color: 'blue'
   },
   {
     id: 'master',
-    name: 'Master (+40 ans) / Récupération Lente',
+    name: 'Profil Empirique Récupération Lente',
     tauFatigue: 10,
     tauFitness: 35,
-    description: 'La fatigue résiduelle persiste plus longtemps (10j) avant retour au calme, et la condition physique nécessite une consolidation plus graduelle.',
-    badge: 'Master / Récup Lente',
+    description: 'Modèle indicatif : dissipation plus lente de la fatigue neuromusculaire (10j) et consolidation sur 5 semaines.',
+    badge: 'Récup Lente',
     color: 'amber'
   },
   {
     id: 'elite',
-    name: 'Élite / Haute Capacité d\'Assimilation',
+    name: 'Profil Empirique Haute Assimilation',
     tauFatigue: 5,
     tauFitness: 42,
-    description: 'Évacuation ultra-rapide du stress d\'entraînement (5j) et inertie physiologique très forte sur cycle de 6 semaines.',
-    badge: 'Élite',
-    color: 'emerald'
-  },
-  {
-    id: 'reprise',
-    name: 'Débutant / Reprise Progressive',
-    tauFatigue: 9,
-    tauFitness: 21,
-    description: 'Fatigue nerveuse et courbatures prolongées (9j), avec une mémoire musculaire/cardio encore courte (3 semaines).',
-    badge: 'Reprise',
+    description: 'Modèle indicatif pour athlètes aguerris : évacuation rapide du stress aigu (5j) et socle aérobie durable sur 6 semaines.',
+    badge: 'Haute Assimilation',
     color: 'purple'
   }
 ];
@@ -275,6 +275,14 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
             <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
               Permet d'initialiser votre niveau de condition préalable afin d'éviter un démarrage à froid artificiel à 0 UA.
             </p>
+          </div>
+
+          {/* Note méthodologique de transparence */}
+          <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-[10px] text-slate-400 flex items-start gap-2">
+            <Info size={14} className="text-blue-400 shrink-0 mt-0.5" />
+            <span>
+              <strong>Note méthodologique :</strong> Ce module s'appuie sur la dynamique de charge de type <em>Performance Management Chart</em> (PMC Coggan / formalisme Banister simplifié : TSB = CTL − ATL). Les profils ci-dessus sont des repères empiriques indicatifs, personnalisables selon votre tolérance et vos temps de récupération observés.
+            </span>
           </div>
 
         </div>
