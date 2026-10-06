@@ -486,7 +486,7 @@ function AppContent() {
                           <span className="text-xs font-bold text-emerald-300">Balance de Forme (TSB)</span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed m-0 pl-4">
-                          CTL − ATL. Visez +10% à +25% de la CTL le Jour J (+15 à +25 pts selon profil) pour un affûtage optimal en compétition.
+                          CTL − ATL. Visez +5% à +25% de la CTL le Jour J (+10 à +25 pts selon profil) pour un affûtage optimal en compétition.
                         </p>
                       </div>
                     </div>

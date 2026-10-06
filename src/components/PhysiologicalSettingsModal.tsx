@@ -197,7 +197,7 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                 <Zap size={14} className="text-red-400" />
-                Constante de Fatigue Aiguë &tau;₁ (ATL) : <strong className="text-red-400 font-mono text-sm">{tauFatigue} jours</strong>
+                Constante de Fatigue Aiguë &tau;<sub>fatigue</sub> (ATL) : <strong className="text-red-400 font-mono text-sm">{tauFatigue} jours</strong>
               </label>
               <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
                 Plage : 5 à 12 jours (défaut : 7j)
@@ -216,7 +216,7 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
               className="w-full accent-red-500 h-2 bg-white/10 rounded-lg cursor-pointer"
             />
             <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-              <strong>Interprétation :</strong> Détermine la vitesse à laquelle votre organisme évacue l'acidose, le stress nerveux et la fatigue musculaire. Une valeur basse (ex: 5j) modélise une régénération rapide ; une valeur haute (ex: 10j) convient aux profils sensibles ou masters.
+              <strong>Interprétation :</strong> Détermine la vitesse à laquelle votre organisme dissipe la fatigue aiguë (réparation des micro-lésions musculaires, reconstitution du glycogène et récupération neuromusculaire). Une valeur basse (ex: 5j) modélise une régénération rapide ; une valeur haute (ex: 10j) convient aux profils sensibles ou masters.
             </p>
           </div>
 
@@ -225,7 +225,7 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                 <HeartPulse size={14} className="text-sky-400" />
-                Constante de Condition Physique &tau;₂ (CTL) : <strong className="text-sky-400 font-mono text-sm">{tauFitness} jours</strong>
+                Constante de Condition Physique &tau;<sub>fitness</sub> (CTL) : <strong className="text-sky-400 font-mono text-sm">{tauFitness} jours</strong>
               </label>
               <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
                 Plage : 21 à 45 jours (défaut : 28j)

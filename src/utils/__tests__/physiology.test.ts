@@ -3,7 +3,8 @@ import {
   computeFosterMetrics, 
   computeBanisterPerformance, 
   computeCardioVsMuscularBalance,
-  computeQualityEMAData
+  computeQualityEMAData,
+  computeCellState
 } from '../physiology';
 import { getDailyAthleteLoad } from '../loadHelpers';
 
@@ -72,5 +73,49 @@ describe('Phase 1 Physiology Verifications', () => {
     };
     const emaData = computeQualityEMAData('leg', secondaryOnlyEvents, 45, 0);
     expect(emaData.current.acwr).toBeNull();
+  });
+
+  it('Monotonicity Criterion: computeCellState currentLevel decreases strictly monotonically with days', () => {
+    const qVo2 = { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio' };
+
+    // Simulate single session on day 0, and evaluate state on subsequent days
+    const baseDate = new Date('2026-10-01');
+    const evts = {
+      '2026-10-01': { load: 100, duration: 40, rpeCardio: 8, isSecondary: false }
+    };
+
+    let prevLevel = 101;
+    // Test across green, orange and expired (red) windows
+    for (let dayOffset = 0; dayOffset <= 25; dayOffset++) {
+      const evalDate = new Date(baseDate);
+      evalDate.setDate(baseDate.getDate() + dayOffset);
+      const evalStr = evalDate.toISOString().split('T')[0];
+
+      const state = computeCellState(qVo2, evts, evalStr);
+      // Niveau doit être strictement décroissant ou égal (pas de bond de 20% à 55% !)
+      expect(state.currentLevel).toBeLessThanOrEqual(prevLevel);
+      prevLevel = state.currentLevel;
+    }
+  });
+
+  it('Warmup Invariance: computeQualityEMAData produces identical converged current EMA regardless of daysHistory', () => {
+    // Generate 30 days of consistent training
+    const historyEvents: Record<string, any> = {};
+    const ref = new Date();
+    for (let i = 1; i <= 30; i++) {
+      const d = new Date(ref);
+      d.setDate(ref.getDate() - i);
+      const str = d.toISOString().split('T')[0];
+      historyEvents[str] = { load: 100, isSecondary: false, isPrimary: true };
+    }
+
+    // Call with 14 days vs 45 days
+    const res14 = computeQualityEMAData('vo2max', historyEvents, 14, 0);
+    const res45 = computeQualityEMAData('vo2max', historyEvents, 45, 0);
+
+    // Both must yield the exact same converged current EMA21
+    expect(res14.current.ema21).toBe(res45.current.ema21);
+    expect(res14.current.ema7).toBe(res45.current.ema7);
+    expect(res14.current.acwr).toBe(res45.current.acwr);
   });
 });

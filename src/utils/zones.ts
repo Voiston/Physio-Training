@@ -52,8 +52,10 @@ export function getTsbZone(
   const tsb = Math.round((ctl - atl) * 10) / 10;
   const tsbPercent = calculateTsbPercent(ctl, atl);
 
-  // Démarrage à froid ou historique inférieur au seuil de convergence mathématique (1.5 * tauFitness, soit ~42j pour tau=28)
-  const minRequiredDays = hasInitialCtl ? 0 : Math.max(35, Math.round(tauFitness * 1.5));
+  // Convergence mathématique du filtre CTL : requiert 3 * tauFitness (ex: 84j pour tau=28, 126j pour tau=42)
+  // pour garantir > 95% de convergence et éliminer tout biais d'accélération artificielle.
+  // Si un CTL initial a été calibré par l'athlète, la neutralisation est levée immédiatement.
+  const minRequiredDays = hasInitialCtl ? 0 : Math.round(tauFitness * 3);
   if ((!hasInitialCtl && historyDays < minRequiredDays) || ctl < 10 || tsbPercent === null) {
     return {
       zoneId: 'INITIALIZING',
@@ -65,7 +67,7 @@ export function getTsbZone(
       badge: hasInitialCtl ? '⏳ Initialisation' : `⏳ Étalonnage CTL (${historyDays}/${minRequiredDays} j)`,
       color: 'slate',
       status: 'neutral',
-      summary: `Historique de charge en phase de convergence (${historyDays}/${minRequiredDays} jours requis, CTL actuelle: ${Math.round(ctl)} UA). Le modèle PMC nécessite 5 à 6 semaines de régularité pour stabiliser mathématiquement la condition de fond. Les alertes de fatigue aiguë sont neutralisées pendant cette phase pour prévenir tout faux positif.`,
+      summary: `Historique de charge en phase de convergence (${historyDays}/${minRequiredDays} jours requis, CTL actuelle: ${Math.round(ctl)} UA). Le modèle PMC requiert 3 constantes de temps (3τ = ${minRequiredDays} j) pour stabiliser mathématiquement la condition de fond sans biais de démarrage à froid. Les ratios relatifs sont neutralisés pendant cette phase pour prévenir tout faux positif.`,
       advice: 'Entraînez-vous selon vos sensations RPE habituelles pendant la phase de calibration.',
       prescription: 'Maintenir une régularité sans chercher à interpréter les ratios de fraîcheur.',
       isReliable: false
@@ -85,7 +87,7 @@ export function getTsbZone(
       color: 'rose',
       status: 'danger',
       summary: `Déficit de fraîcheur marqué (TSB : ${tsb > 0 ? `+${tsb}` : tsb}, soit ${tsbPercent}% de votre CTL). La fatigue aiguë (${atl} UA) dépasse très largement votre capacité de charge chronique (${ctl} UA).`,
-      advice: 'Risque accru de surmenage ou de lésion musculaire si ce niveau persiste. Privilégiez 24 à 48h de régénération active ou repos.',
+      advice: 'Fatigue aiguë importante par rapport à votre condition de fond. Privilégiez 24 à 48h de régénération active ou repos pour assimiler ce bloc.',
       prescription: 'Séance d\'endurance fondamentale légère (RPE 3-4) ou récupération complète.',
       isReliable: true
     };

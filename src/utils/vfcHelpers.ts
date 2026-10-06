@@ -6,10 +6,13 @@
 
 export interface VfcAnalysisResult {
   currentValue: number | null;
+  dayStatus: 'optimal' | 'low' | 'high' | null;
   baseline7d: number | null;
   baseline60d: number | null;
   sd60d: number | null;
   swc: number | null; // Smallest Worthwhile Change = 0.5 * SD sur ln(rMSSD)
+  cv7d: number | null; // Coefficient de variation 7j sur ln(rMSSD) (%)
+  acuteCount7d: number;
   lnCurrent: number | null;
   lnBaseline7d: number | null;
   lnBaseline60d: number | null;
@@ -18,7 +21,7 @@ export interface VfcAnalysisResult {
   corridorUpper: number | null;
   status: 'optimal' | 'low' | 'high' | 'initializing';
   badge: string;
-  color: 'emerald' | 'rose' | 'sky' | 'slate';
+  color: 'emerald' | 'rose' | 'sky' | 'slate' | 'amber';
   interpretation: string;
   dataPointsCount: number;
 }
@@ -88,10 +91,13 @@ export function computeVfcAnalysis(
   if (n < 7) {
     return {
       currentValue,
+      dayStatus: null,
       baseline7d: acute7dValues.length > 0 ? Math.round(acute7dValues.reduce((a, b) => a + b, 0) / acute7dValues.length) : currentValue,
       baseline60d: null,
       sd60d: null,
       swc: null,
+      cv7d: null,
+      acuteCount7d: acute7dValues.length,
       lnCurrent: currentValue ? Math.round(Math.log(currentValue) * 100) / 100 : null,
       lnBaseline7d: null,
       lnBaseline60d: null,
@@ -101,7 +107,7 @@ export function computeVfcAnalysis(
       status: 'initializing',
       badge: '⏳ Étalonnage VFC',
       color: 'slate',
-      interpretation: `Historique VFC en cours de constitution (${n}/7 mesures minimales requises). La bande de normalité personnalisée sera active dès 7 mesures.`,
+      interpretation: `Historique VFC en cours de constitution (${n}/7 mesures minimales requises, 14-20 pour étalonnage complet). La bande de normalité personnalisée sera active dès 7 mesures.`,
       dataPointsCount: n
     };
   }
@@ -136,14 +142,30 @@ export function computeVfcAnalysis(
   const sd60d = Math.round((corridorUpper - corridorLower) / 2 * 10) / 10;
   const swc = Math.round((corridorUpper - baseline60d) * 10) / 10;
 
+  // Coefficient de variation aigu sur 7 jours (ln(rMSSD))
+  let cv7d: number | null = null;
+  if (acute7dLnValues.length >= 2 && meanAcuteLn > 0) {
+    const acuteVarianceLn = acute7dLnValues.reduce((acc, v) => acc + Math.pow(v - meanAcuteLn, 2), 0) / (acute7dLnValues.length - 1);
+    const acuteSdLn = Math.sqrt(acuteVarianceLn);
+    cv7d = Math.round((acuteSdLn / meanAcuteLn) * 1000) / 10;
+  }
+
+  // Statut de la valeur du jour par rapport au couloir individuel
+  const dayStatus: 'optimal' | 'low' | 'high' | null = currentValue !== null
+    ? (currentValue < corridorLower ? 'low' : currentValue > corridorUpper ? 'high' : 'optimal')
+    : null;
+
   // Évaluation du statut autonome
   if (baseline7d < corridorLower) {
     return {
       currentValue,
+      dayStatus,
       baseline7d,
       baseline60d,
       sd60d,
       swc,
+      cv7d,
+      acuteCount7d: acute7dValues.length,
       lnCurrent: currentValue ? Math.round(Math.log(currentValue) * 100) / 100 : null,
       lnBaseline7d: Math.round(meanAcuteLn * 100) / 100,
       lnBaseline60d: Math.round(meanLn * 100) / 100,
@@ -159,12 +181,16 @@ export function computeVfcAnalysis(
   }
 
   if (baseline7d > corridorUpper) {
+    const isParasympatheticSaturation = cv7d !== null && cv7d < 3.0;
     return {
       currentValue,
+      dayStatus,
       baseline7d,
       baseline60d,
       sd60d,
       swc,
+      cv7d,
+      acuteCount7d: acute7dValues.length,
       lnCurrent: currentValue ? Math.round(Math.log(currentValue) * 100) / 100 : null,
       lnBaseline7d: Math.round(meanAcuteLn * 100) / 100,
       lnBaseline60d: Math.round(meanLn * 100) / 100,
@@ -172,19 +198,24 @@ export function computeVfcAnalysis(
       corridorLower,
       corridorUpper,
       status: 'high',
-      badge: '⚡ VFC Élevée (> SWC)',
-      color: 'sky',
-      interpretation: `Hyperactivité parasympathique (${baseline7d} ms vs seuil haut ${corridorUpper} ms). Excellente fraîcheur ou surcompensation consécutive à un cycle de charge bien absorbé.`,
+      badge: isParasympatheticSaturation ? '⚠️ VFC Figée (Saturation)' : '⚡ VFC Élevée (> SWC)',
+      color: isParasympatheticSaturation ? 'amber' : 'sky',
+      interpretation: isParasympatheticSaturation
+        ? `Hyperactivité parasympathique (${baseline7d} ms vs seuil haut ${corridorUpper} ms) avec variabilité très figée (CV: ${cv7d}% < 3%). Signal potentiel de saturation parasympathique consécutive à une fatigue accumulée. À corréler à vos sensations d'énergie.`
+        : `Hyperactivité parasympathique (${baseline7d} ms vs seuil haut ${corridorUpper} ms). Excellente fraîcheur ou surcompensation consécutive à un cycle de charge bien absorbé.`,
       dataPointsCount: n
     };
   }
 
   return {
     currentValue,
+    dayStatus,
     baseline7d,
     baseline60d,
     sd60d,
     swc,
+    cv7d,
+    acuteCount7d: acute7dValues.length,
     lnCurrent: currentValue ? Math.round(Math.log(currentValue) * 100) / 100 : null,
     lnBaseline7d: Math.round(meanAcuteLn * 100) / 100,
     lnBaseline60d: Math.round(meanLn * 100) / 100,
@@ -230,7 +261,7 @@ export function computeHrRestAnalysis(
 
   const n = values28d.length;
 
-  if (n < 7 || currentValue === null) {
+  if (n < 7) {
     return {
       currentValue,
       median28d: null,
@@ -249,6 +280,20 @@ export function computeHrRestAnalysis(
   const median28d = values28d.length % 2 !== 0 
     ? values28d[mid] 
     : Math.round((values28d[mid - 1] + values28d[mid]) / 2);
+
+  // Si la mesure du jour n'a pas été saisie, renvoyer la baseline existante plutôt qu'un faux état d'étalonnage
+  if (currentValue === null) {
+    return {
+      currentValue: null,
+      median28d,
+      deltaBpm: null,
+      status: 'optimal',
+      badge: `Médiane : ${median28d} bpm`,
+      color: 'slate',
+      interpretation: `FC de repos non saisie ce matin. Votre médiane de référence sur 28 jours est de ${median28d} bpm (${n} mesures disponibles).`,
+      dataPointsCount: n
+    };
+  }
 
   const deltaBpm = currentValue - median28d;
 

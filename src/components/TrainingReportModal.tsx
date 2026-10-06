@@ -243,19 +243,19 @@ export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
               {(banisterPerformance?.current?.acwr ?? 1) > 1.5 ? (
                 <span className="text-red-400 print:text-red-700 font-bold"> (Zone critique de surmenage, veillez à alléger la fin de cycle).</span>
               ) : (banisterPerformance?.current?.acwr ?? 1) >= 0.8 ? (
-                <span className="text-emerald-400 print:text-emerald-700 font-bold"> (Parfaitement dans la zone optimale 0.8 - 1.3 de sweet-spot).</span>
+                <span className="text-emerald-400 print:text-emerald-700 font-bold"> (Zone de stimulus et développement optimal).</span>
               ) : (
                 <span className="text-blue-400 print:text-blue-700 font-bold"> (Zone de récupération / affûtage).</span>
               )}
             </p>
           </div>
 
-          {/* TRIMP Multi-Facteurs : Balance Cardio vs Musculaire & Excentrique */}
+          {/* Balance Cardio vs Musculaire & Excentrique (RPE Différentiel) */}
           {cardioMuscularBalance && (
             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 print:border-gray-300 print:bg-white text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold uppercase tracking-wider text-slate-300 print:text-black flex items-center gap-2">
-                  <Heart size={14} className="text-sky-400" /> TRIMP Multi-Facteurs (Cardio vs Musculaire)
+                  <Heart size={14} className="text-sky-400" /> RPE Différentiel & Balance Charge (Cardio vs Musculaire)
                 </h3>
                 <span className="font-bold font-mono text-[11px] text-sky-400 print:text-sky-800">
                   {cardioMuscularBalance.badge}

@@ -103,16 +103,16 @@ function formatFullInspectionDate(dateStr) {
 }
 
 /**
- * Interprétation dynamique en langage clair du bilan Banister
+ * Interprétation dynamique en langage clair du bilan Banister / Coggan PMC
  */
-function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28, historyDays = 30) {
+function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28, historyDays = 30, hasInitialCtl = false) {
   if (!dayData) return null;
   const { tsb = 0, loadEMA7 = 0, loadEMA21 = 0 } = dayData;
   const atl = loadEMA7;
   const ctl = loadEMA21;
   const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
 
-  const zone = getTsbZone(ctl, atl, historyDays);
+  const zone = getTsbZone(ctl, atl, historyDays, tauFitness, hasInitialCtl);
   const tsbPercent = calculateTsbPercent(ctl, atl);
 
   let zoneColor = 'text-slate-200';
@@ -402,13 +402,18 @@ export default function MetricsDashboard({
 
   // Interprétation dynamique Banister pour le jour inspecté (avec garde CTL en construction)
   const banisterInterpretation = useMemo(() => {
+    const dayOffset = currentInspectedDay?.offset ?? 0;
+    const baseHistory = banisterPerformance?.historyDays ?? 30;
+    const effectiveHistoryDays = Math.max(0, baseHistory + (dayOffset < 0 ? dayOffset : 0));
+    const hasInitialCtl = Boolean(physioSettings?.initialCtl && Number(physioSettings.initialCtl) > 0);
     return getDynamicBanisterInterpretation(
       currentInspectedDay, 
       tauFatigue, 
       tauFitness, 
-      banisterPerformance?.historyDays ?? 30
+      effectiveHistoryDays,
+      hasInitialCtl
     );
-  }, [currentInspectedDay, tauFatigue, tauFitness, banisterPerformance?.historyDays]);
+  }, [currentInspectedDay, tauFatigue, tauFitness, banisterPerformance?.historyDays, physioSettings?.initialCtl]);
 
   // Analyses personnalisées de VFC et FC Repos par rapport à la baseline individuelle
   const vfcAnalysis = useMemo(() => {
@@ -1577,38 +1582,43 @@ export default function MetricsDashboard({
                   }
                 } else if (isAtl) {
                   const atlVal = banisterSummary?.atl ?? 0;
-                  const acwrVal = Number(banisterSummary?.acwr ?? 1);
+                  const ctlVal = banisterSummary?.ctl ?? 0;
+                  const isInit = banisterSummary?.tsbZone?.zoneId === 'INITIALIZING';
+                  const acwrVal = (ctlVal > 0 && !isInit) ? (atlVal / ctlVal).toFixed(2) : null;
                   mainNumber = `${atlVal}`;
                   unitLabel = 'pts';
-                  secondaryDetail = `(ACWR : ${acwrVal}x)`;
-                  shortFormula = `Moyenne ${tauFatigue}j`;
+                  secondaryDetail = acwrVal !== null ? `(Ratio ATL/CTL : ${acwrVal}x)` : '(En étalonnage)';
+                  shortFormula = `Fatigue Moyenne ${tauFatigue}j`;
 
-                  // Échelle ACWR : 0.4 à 1.8 (delta 1.4)
-                  gaugePercent = Math.max(4, Math.min(96, ((Math.max(0.4, Math.min(1.8, acwrVal)) - 0.4) / 1.4) * 100));
-                  gaugeSubtextLeft = '0.5x Bas';
-                  gaugeSubtextCenter = '0.8 - 1.3x Sweet Spot';
-                  gaugeSubtextRight = '1.8x Danger';
+                  // Échelle de ratio ATL/CTL harmonisée avec la grille TSB% :
+                  // 1.0x = Équilibre (TSB 0), >1.35x = Surcharge aiguë (TSB% < -35%), <0.95x = Fraîcheur
+                  const acwrNum = acwrVal !== null ? Number(acwrVal) : 1.0;
+                  gaugePercent = Math.max(4, Math.min(96, ((Math.max(0.6, Math.min(1.6, acwrNum)) - 0.6) / 1.0) * 100));
+                  gaugeSubtextLeft = '<0.95x Frais';
+                  gaugeSubtextCenter = '1.0x - 1.35x Stimulus';
+                  gaugeSubtextRight = '>1.35x Surcharge';
 
-                  if (acwrVal > 1.5) {
+                  // Alignement strict avec la couleur et le diagnostic de la zone TSB pour éliminer toute contradiction
+                  if (banisterSummary?.tsbZone?.color === 'rose' || acwrNum > 1.35) {
                     cardBorder = 'border-red-500/50 bg-gradient-to-b from-red-950/30 to-slate-900/80 hover:border-red-400/70 shadow-red-500/10';
                     valueColor = 'text-red-400';
                     badgeClass = 'bg-red-500/20 text-red-300 border-red-500/40';
                     statusColor = 'text-red-400';
-                  } else if (acwrVal >= 1.3) {
-                    cardBorder = 'border-amber-500/35 bg-gradient-to-b from-amber-950/20 to-slate-900/80 hover:border-amber-400/50';
-                    valueColor = 'text-amber-400';
-                    badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-                    statusColor = 'text-amber-400';
-                  } else if (acwrVal >= 0.8) {
+                  } else if (banisterSummary?.tsbZone?.color === 'emerald' || (acwrNum >= 1.10 && acwrNum <= 1.35)) {
                     cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
                     valueColor = 'text-emerald-400';
                     badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
                     statusColor = 'text-emerald-400';
-                  } else {
+                  } else if (acwrNum < 0.95) {
                     cardBorder = 'border-sky-500/30 bg-gradient-to-b from-sky-950/20 to-slate-900/80 hover:border-sky-400/50';
                     valueColor = 'text-sky-300';
                     badgeClass = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
                     statusColor = 'text-sky-300';
+                  } else {
+                    cardBorder = 'border-slate-700/60 bg-gradient-to-b from-slate-900/60 to-slate-950/80';
+                    valueColor = 'text-slate-300';
+                    badgeClass = 'bg-slate-700/60 text-slate-300 border-slate-600';
+                    statusColor = 'text-slate-400';
                   }
                 } else if (isCtl) {
                   const ctlVal = banisterSummary?.ctl ?? 0;
@@ -2991,6 +3001,20 @@ export default function MetricsDashboard({
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* CADRE MÉTHODOLOGIQUE & AIDE À LA DÉCISION */}
+          <div className="p-4 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-400 text-xs flex items-start gap-3 mt-6">
+            <Info size={18} className="text-sky-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-slate-200 block text-xs">
+                Cadre méthodologique & Indicateurs d'aide à la décision
+              </span>
+              <p className="text-[11px] leading-relaxed text-slate-400 m-0">
+                Les métriques intégrées (Modèle PMC de Coggan avec filtres continus, Monotonie de Foster, RPE Différentiel, VFC en ln(rMSSD) selon Plews &amp; Buchheit, et Répartition Seiler) constituent des <strong>indicateurs d'aide à la décision d'entraînement</strong>. 
+                Elles fournissent un repère quantifié pour piloter les cycles de charge et la fraîcheur. Elles ne constituent ni une prédiction médicale de blessure ni un avis médical. Fiez-vous toujours à vos sensations et consultez un professionnel de santé en cas de douleur persistante ou d'anomalie.
+              </p>
             </div>
           </div>
 

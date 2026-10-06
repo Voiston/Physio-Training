@@ -4,6 +4,13 @@ import { getDailyAthleteLoad, isPrimary, extractSessionLoad as loadExtract } fro
 import { getTsbZone, calculateTsbPercent } from './zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from './vfcHelpers';
 
+/**
+ * Qualités physiques et filières d'entraînement par défaut.
+ * - retentionDays : durée résiduelle globale de maintien après un bloc de développement concentré (modèle d'Issurin 2008, 2010).
+ * - g (vert) : fenêtre d'assimilation active et de consolidation post-séance.
+ * - o (orange) : fenêtre de rappel optimal avant désentraînement progressif (Mujika & Padilla 2000, 2001; Bosquet et al. 2013).
+ * - rouge : fenêtre de rappel dépassée (indique qu'un rappel est conseillé, non que la qualité est totalement perdue).
+ */
 export const DEFAULT_QUALITIES = [
   { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio', impacts: [{ id: 'seuil', ratio: 0.6, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }, { id: 'plyo', ratio: 0.3, confidence: 'estimé' }] },
   { id: 'seuil', name: 'Seuil', g: 8, o: 5, retentionDays: 18, category: 'cardio', impacts: [{ id: 'vo2max', ratio: 0.3, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.3, confidence: 'estimé' }, { id: 'plyo', ratio: 0.2, confidence: 'estimé' }] },
@@ -560,16 +567,17 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
           if (bestStatusPhysio !== 'green' || dLeft > daysLeftPhysio) {
             bestStatusPhysio = 'green';
             daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            opacityPhysio = 1 - (daysSince / gPhysio) * 0.5;
-            currentLevelPhysio = 100 - (daysSince / gPhysio) * 20;
+            opacityPhysio = 1 - (daysSince / gPhysio) * 0.4;
+            currentLevelPhysio = Math.round(100 - (daysSince / gPhysio) * 30); // 100% -> 70%
           }
         } else if (daysSince < (gPhysio + oPhysio) && bestStatusPhysio !== 'green') {
           const dLeft = (gPhysio + oPhysio) - daysSince;
           if (bestStatusPhysio !== 'orange' || dLeft > daysLeftPhysio) {
             bestStatusPhysio = 'orange';
             daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            opacityPhysio = 1 - ((daysSince - gPhysio) / oPhysio) * 0.5;
-            currentLevelPhysio = Math.max(0, 60 - ((daysSince - gPhysio) / oPhysio) * 40);
+            const progressOrange = (daysSince - gPhysio) / oPhysio;
+            opacityPhysio = 0.6 - progressOrange * 0.3;
+            currentLevelPhysio = Math.max(35, Math.round(70 - progressOrange * 35)); // 70% -> 35%
           }
         }
 
@@ -582,35 +590,38 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
           if (bestStatusPrescription !== 'green' || dLeft > daysLeftPrescription) {
             bestStatusPrescription = 'green';
             daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            opacityPrescription = 1 - (daysSince / gPrescription) * 0.5;
-            currentLevelPrescription = 100 - (daysSince / gPrescription) * 20;
+            opacityPrescription = 1 - (daysSince / gPrescription) * 0.4;
+            currentLevelPrescription = Math.round(100 - (daysSince / gPrescription) * 30); // 100% -> 70%
           }
         } else if (daysSince < (gPrescription + oPrescription) && bestStatusPrescription !== 'green') {
           const dLeft = (gPrescription + oPrescription) - daysSince;
           if (bestStatusPrescription !== 'orange' || dLeft > daysLeftPrescription) {
             bestStatusPrescription = 'orange';
             daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            opacityPrescription = 1 - ((daysSince - gPrescription) / oPrescription) * 0.5;
-            currentLevelPrescription = Math.max(0, 60 - ((daysSince - gPrescription) / oPrescription) * 40);
+            const progressOrangePresc = (daysSince - gPrescription) / oPrescription;
+            opacityPrescription = 0.6 - progressOrangePresc * 0.3;
+            currentLevelPrescription = Math.max(30, Math.round(70 - progressOrangePresc * 40)); // 70% -> 30%
           }
         }
       }
     }
   }
 
-  // Déclin physiologique progressif (Coyle 1984, Mujika & Padilla 2000) au lieu d'un zéro brutal
+  // Décroissance continue monotone au-delà de la fenêtre de rappel (statut rouge)
+  // Raccordement continu au seuil d'expiration (35% pour physio, 30% pour prescription)
+  // sans discontinuité ni ressaut artificiel (Mujika & Padilla 2000, 2001)
   const gBaseNominal = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
   const oBaseNominal = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
   const totalNominal = gBaseNominal + oBaseNominal;
 
   if (bestStatusPhysio === 'red' && mostRecentSessionDays !== null) {
-    const daysOver = mostRecentSessionDays - totalNominal;
-    currentLevelPhysio = Math.max(30, Math.round(55 * Math.exp(-0.025 * Math.max(0, daysOver))));
+    const daysOver = Math.max(0, mostRecentSessionDays - totalNominal);
+    currentLevelPhysio = Math.max(0, Math.round(35 * Math.exp(-0.04 * daysOver)));
   }
   if (bestStatusPrescription === 'red' && mostRecentSessionDays !== null) {
     const totalPrescNominal = Math.round(totalNominal * prescriptionMultiplier);
-    const daysOverPresc = mostRecentSessionDays - totalPrescNominal;
-    currentLevelPrescription = Math.max(20, Math.round(50 * Math.exp(-0.035 * Math.max(0, daysOverPresc))));
+    const daysOverPresc = Math.max(0, mostRecentSessionDays - totalPrescNominal);
+    currentLevelPrescription = Math.max(0, Math.round(30 * Math.exp(-0.05 * daysOverPresc)));
   }
 
   // Évaluation de la fatigue aiguë élevée relative à la référence de la filière et à la moyenne de l'athlète
@@ -673,12 +684,16 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
 /**
  * Calcule l'historique de charge et les courbes EMA (3, 7, 21 jours)
  * pour une qualité donnée sur une fenêtre temporelle passée et présente.
+ * Intègre un échauffement systématique d'au moins 90 jours (>= 3 * tau21 = 63j)
+ * pour garantir que les EMA et l'ACWR soient totalement convergés indépendamment
+ * de la plage d'affichage sélectionnée (ex: 14j vs 45j vs 90j).
  */
 export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory = 45, daysFuture = 0) {
   const today = new Date();
-  const rawData = [];
+  const warmupDays = Math.max(90, daysHistory + 63);
+  const fullRawData = [];
 
-  for (let i = -daysHistory; i <= daysFuture; i++) {
+  for (let i = -warmupDays; i <= daysFuture; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     const dateStr = getLocalYYYYMMDD(d);
@@ -690,7 +705,7 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
       load = extractSessionLoad(sess);
       isPrimarySession = isPrimary(sess) && load > 0;
     }
-    rawData.push({
+    fullRawData.push({
       dateStr,
       day: d.getDate(),
       offset: i,
@@ -699,21 +714,21 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
     });
   }
 
-  const loads = rawData.map(d => d.load);
+  const loads = fullRawData.map(d => d.load);
   const ema3 = calculateEMA(loads, 3, true, 0);
   const ema7 = calculateEMA(loads, 7, true, 0);
   const ema21 = calculateEMA(loads, 21, true, 0);
 
-  const series = rawData.map((d, idx) => ({
+  const fullSeries = fullRawData.map((d, idx) => ({
     ...d,
     ema3: Math.round(ema3[idx] * 10) / 10,
     ema7: Math.round(ema7[idx] * 10) / 10,
     ema21: Math.round(ema21[idx] * 10) / 10,
   }));
 
-  const todayIndex = series.findIndex(s => s.offset === 0);
-  const current = todayIndex >= 0 ? series[todayIndex] : series[series.length - 1];
-  const prev = todayIndex > 0 ? series[todayIndex - 1] : null;
+  const todayIndex = fullSeries.findIndex(s => s.offset === 0);
+  const current = todayIndex >= 0 ? fullSeries[todayIndex] : fullSeries[fullSeries.length - 1];
+  const prev = todayIndex > 0 ? fullSeries[todayIndex - 1] : null;
 
   // Comparaisons par rapport au jour précédent (J-1)
   const deltaEma3 = prev ? Math.round((current.ema3 - prev.ema3) * 10) / 10 : 0;
@@ -721,16 +736,16 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const deltaEma21 = prev ? Math.round((current.ema21 - prev.ema21) * 10) / 10 : 0;
 
   // Comparaisons par rapport à la période caractéristique de chaque EMA (J-3, J-7, J-21)
-  const prevPeriod3 = todayIndex >= 3 ? series[todayIndex - 3] : prev;
-  const prevPeriod7 = todayIndex >= 7 ? series[todayIndex - 7] : prev;
-  const prevPeriod21 = todayIndex >= 21 ? series[todayIndex - 21] : prev;
+  const prevPeriod3 = todayIndex >= 3 ? fullSeries[todayIndex - 3] : prev;
+  const prevPeriod7 = todayIndex >= 7 ? fullSeries[todayIndex - 7] : prev;
+  const prevPeriod21 = todayIndex >= 21 ? fullSeries[todayIndex - 21] : prev;
 
   const periodDelta3 = prevPeriod3 ? Math.round((current.ema3 - prevPeriod3.ema3) * 10) / 10 : deltaEma3;
   const periodDelta7 = prevPeriod7 ? Math.round((current.ema7 - prevPeriod7.ema7) * 10) / 10 : deltaEma7;
   const periodDelta21 = prevPeriod21 ? Math.round((current.ema21 - prevPeriod21.ema21) * 10) / 10 : deltaEma21;
 
   // Comparaisons par rapport à la semaine précédente (J-7)
-  const prevWeek = todayIndex >= 7 ? series[todayIndex - 7] : prev;
+  const prevWeek = todayIndex >= 7 ? fullSeries[todayIndex - 7] : prev;
   const weekDelta3 = prevWeek ? Math.round((current.ema3 - prevWeek.ema3) * 10) / 10 : deltaEma3;
   const weekDelta7 = prevWeek ? Math.round((current.ema7 - prevWeek.ema7) * 10) / 10 : deltaEma7;
   const weekDelta21 = prevWeek ? Math.round((current.ema21 - prevWeek.ema21) * 10) / 10 : deltaEma21;
@@ -751,7 +766,7 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   // Nécessite au moins 4 séances directes/principales sur les 28 derniers jours et une EMA 21j significative (> 5 UA)
   // pour éviter les ratios aberrants (ex: 3.8) après une simple reprise d'une qualité peu fréquente
   // ou une qualité qui ne reçoit que des transferts secondaires.
-  const recentSessionsCount28d = rawData
+  const recentSessionsCount28d = fullRawData
     .filter(d => d.offset <= 0 && d.offset >= -28)
     .filter(d => d.isPrimarySession).length;
 
@@ -768,9 +783,14 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const trend7 = deltaEma7 > 0.1 ? 'up' : deltaEma7 < -0.1 ? 'down' : 'flat';
   const trend21 = deltaEma21 > 0.1 ? 'up' : deltaEma21 < -0.1 ? 'down' : 'flat';
 
+  // Troncature pour l'affichage selon daysHistory demandé
+  const series = fullSeries.filter(s => s.offset >= -daysHistory);
+  const seriesTodayIndex = series.findIndex(s => s.offset === 0);
+
   // Sparkline : 14 derniers jours jusqu'à aujourd'hui inclus
-  const sparklineStart = Math.max(0, todayIndex - 13);
-  const sparkline = series.slice(sparklineStart, todayIndex + 1);
+  const sparklineStart = Math.max(0, seriesTodayIndex >= 0 ? seriesTodayIndex - 13 : series.length - 14);
+  const sparklineEnd = seriesTodayIndex >= 0 ? seriesTodayIndex + 1 : series.length;
+  const sparkline = series.slice(sparklineStart, sparklineEnd);
 
   return {
     qualityId,
@@ -835,9 +855,17 @@ export function computeAllQualitiesEMA(qualities, events, daysHistory = 45, days
  */
 export function computeFosterMetrics(events, referenceDateStr = null, windowDays = 7) {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  const todayStr = getLocalYYYYMMDD(new Date());
+  const isEvaluatingToday = !referenceDateStr || referenceDateStr === todayStr;
+
+  // Si l'évaluation porte sur aujourd'hui et qu'aucune séance n'est encore enregistrée aujourd'hui,
+  // on utilise les 7 jours complets écoulés (J-7 à J-1) pour ne pas fausser artificiellement la variance
+  const todayLoad = getDailyAthleteLoad(events, todayStr);
+  const offsetStart = (isEvaluatingToday && todayLoad === 0) ? 1 : 0;
+
   const dailyLoads = [];
 
-  for (let i = windowDays - 1; i >= 0; i--) {
+  for (let i = windowDays - 1 + offsetStart; i >= offsetStart; i--) {
     const d = new Date(refDate);
     d.setDate(refDate.getDate() - i);
     const dateStr = getLocalYYYYMMDD(d);
@@ -860,7 +888,7 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
   if (stdDev > 0) {
     monotony = Math.round((exactMeanLoad / stdDev) * 100) / 100;
   } else if (exactMeanLoad > 0) {
-    monotony = 3.5; // Monotonie maximale
+    monotony = 2.5; // Monotonie maximale harmonisée
   }
 
   const strain = Math.round(totalLoad * monotony);
@@ -872,19 +900,19 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
 
   if (monotony > 2.0 || (totalLoad > 1800 && strain > totalLoad * 2.2) || strain > 6000) {
     riskLevel = 'CRITICAL';
-    riskBadge = '🚨 Risque Surcharge / Maladie';
+    riskBadge = '⚠️ Monotonie Critique (> 2.0)';
     riskColor = 'red';
-    advice = 'Monotonie critique (> 2.0). Risque élevé d\'infection respiratoire, d\'effondrement immunitaire et de blessure. Intégrez un jour de repos complet.';
+    advice = 'Monotonie critique (> 2.0). Répétition quotidienne de charges similaires sans alternance de régénération, signalant un risque accru de surmenage. Intégrez un jour de repos complet ou une décharge active.';
   } else if (monotony > 1.5 || (totalLoad > 1500 && strain > totalLoad * 1.8) || strain > 4200) {
     riskLevel = 'HIGH';
     riskBadge = '⚠️ Monotonie Élevée';
     riskColor = 'amber';
-    advice = 'Les charges journalières se ressemblent trop. Variez les intensités (jours légers vs jours durs) pour stimuler la surcompensation.';
+    advice = 'Les charges journalières se ressemblent trop. Variez les intensités (jours légers vs jours qualitatifs) pour stimuler la surcompensation.';
   } else if (monotony < 1.0 && totalLoad > 0) {
     riskLevel = 'OPTIMAL';
-    riskBadge = '🎯 Forte Variabilité Journalière';
-    riskColor = 'emerald';
-    advice = 'Forte variabilité des charges (alternance de jours très légers et de séances clés) : propice à une excellente assimilation.';
+    riskBadge = '📊 Forte Dispersion (Séances Espacées)';
+    riskColor = 'sky';
+    advice = 'Forte variance des charges quotidiennes (séances espacées ou stimulus isolé). Veillez à une régularité suffisante pour ancrer les adaptations.';
   }
 
   return {
@@ -1194,8 +1222,11 @@ export function getTaperingAnalysis(
 }
 
 /**
- * Calcul TRIMP Multi-Facteurs : Balance Cardiovasculaire vs Musculo-Squelettique
- * Détermine si la fatigue actuelle est principalement respiratoire/cardiaque ou tissulaire/musculaire
+ * Calcul de la balance Charge Cardiovasculaire vs Musculo-Squelettique (RPE Différentiel).
+ * Évalue si la fatigue actuelle est principalement respiratoire/cardiaque ou tissulaire/musculaire
+ * selon deux constantes de temps physiologiques distinctes (tau Cardio = 3j vs tau Musculaire = 6j).
+ * Utilise un historique continu de 56 jours (8 semaines) initialisé à 0 pour assurer la convergence
+ * complète du filtre exponentiel et éviter tout biais de troncature sur la fenêtre d'observation.
  */
 export function computeCardioVsMuscularBalance(events, referenceDateStr = null, windowDays = 7) {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
@@ -1205,7 +1236,12 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
   let totalGlobalLoad = 0;
   let totalEccentricSessions = 0;
 
-  for (let i = windowDays - 1; i >= 0; i--) {
+  // Historique étendu d'échauffement mathématique (56 jours = 8 semaines >= 9 * tauMusc)
+  const filterHistoryDays = 56;
+  const allCardioLoadsChronological = [];
+  const allMuscLoadsChronological = [];
+
+  for (let i = filterHistoryDays - 1; i >= 0; i--) {
     const d = new Date(refDate);
     d.setDate(refDate.getDate() - i);
     const dateStr = getLocalYYYYMMDD(d);
@@ -1263,29 +1299,33 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
       }
     });
 
-    if (dayHasEccentric) totalEccentricSessions++;
-    totalCardioLoad += dayCardio;
-    totalMuscLoad += dayMusc;
-    totalGlobalLoad += dayGlobal;
+    allCardioLoadsChronological.push(dayCardio);
+    allMuscLoadsChronological.push(dayMusc);
 
-    dailyBreakdown.push({
-      dateStr,
-      day: d.getDate(),
-      cardioLoad: dayCardio,
-      muscLoad: dayMusc,
-      globalLoad: dayGlobal,
-      hasEccentric: dayHasEccentric
-    });
+    // Fenêtre d'observation demandée (par défaut 7 jours)
+    if (i < windowDays) {
+      if (dayHasEccentric) totalEccentricSessions++;
+      totalCardioLoad += dayCardio;
+      totalMuscLoad += dayMusc;
+      totalGlobalLoad += dayGlobal;
+
+      dailyBreakdown.push({
+        dateStr,
+        day: d.getDate(),
+        cardioLoad: dayCardio,
+        muscLoad: dayMusc,
+        globalLoad: dayGlobal,
+        hasEccentric: dayHasEccentric
+      });
+    }
   }
 
   // Calcul de la double constante de temps de fatigue (tau Cardio = 3j vs tau Musculaire = 6j)
-  // Méthodologie : dissipation rapide du stress cardiovasculaire vs réparation lente des micro-lésions myofibrillaires
+  // Initialisation à 0 sur 56 jours pour éliminer tout biais d'initialisation sur le premier jour
   const tauCardio = 3;
   const tauMusc = 6;
-  const cardioLoadsChronological = dailyBreakdown.map(d => d.cardioLoad);
-  const muscLoadsChronological = dailyBreakdown.map(d => d.muscLoad);
-  const expAtlCardio = calculateExpDecay(cardioLoadsChronological, tauCardio, { decayToZero: true });
-  const expAtlMusc = calculateExpDecay(muscLoadsChronological, tauMusc, { decayToZero: true });
+  const expAtlCardio = calculateExpDecay(allCardioLoadsChronological, tauCardio, { decayToZero: true, initialValue: 0 });
+  const expAtlMusc = calculateExpDecay(allMuscLoadsChronological, tauMusc, { decayToZero: true, initialValue: 0 });
   const currentAtlCardio = Math.round((expAtlCardio[expAtlCardio.length - 1] || 0) * 10) / 10;
   const currentAtlMusc = Math.round((expAtlMusc[expAtlMusc.length - 1] || 0) * 10) / 10;
 
@@ -1339,10 +1379,13 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
 }
 
 /**
- * Analyse de la distribution d'intensité selon le modèle 3 zones de Stephen Seiler (Polarisation)
- * - Zone 1 : Basse intensité (sous VT1 / aérobie de base, RPE <= 4)
- * - Zone 2 : Intensité seuil / tempo (entre VT1 et VT2, RPE 5-6)
- * - Zone 3 : Haute intensité (au-dessus de VT2 / PMA / lactique / force lourde, RPE >= 7)
+ * Analyse de la distribution d'intensité selon le modèle 3 zones de Stephen Seiler (Polarisation).
+ * Conforme au modèle physiologique de Seiler (2006, 2010) basé sur les seuils ventilatoires et lactiques :
+ * - Analyse ciblée sur les filières et séances d'endurance cardiovasculaire (EF, Seuil, VO2max, etc.).
+ * - Les séances de renforcement / musculation sont exclues de ce modèle métabolique (analysées dans la balance mécanique).
+ * - Zone 1 : Basse intensité (sous VT1 / aérobie de base, RPE Cardio <= 4 ou EF)
+ * - Zone 2 : Intensité seuil / tempo (entre VT1 et VT2, RPE Cardio 5-6 ou Seuil)
+ * - Zone 3 : Haute intensité (au-dessus de VT2 / PMA / VO2max, RPE Cardio >= 7 ou VO2max)
  */
 export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITIES, referenceDateStr = null, windowDays = 28) {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
@@ -1353,6 +1396,9 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
   let z2Load = 0;
   let z3Load = 0;
   let totalSessions = 0;
+  let strengthSessionsCount = 0;
+
+  const CARDIO_ENDURANCE_QUALITIES = new Set(['ef', 'seuil', 'vo2max', 'co2', 'gut']);
 
   for (let i = windowDays - 1; i >= 0; i--) {
     const d = new Date(refDate);
@@ -1368,24 +1414,25 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
         const load = extractSessionLoad(item);
         if (dur <= 0 && load <= 0) return;
 
-        totalSessions++;
-        const rpeC = Number(item.rpeCardio) || 5;
-        const rpeM = Number(item.rpeMusc || item.rpeMusculaire) || 5;
-        const maxRpe = Math.max(rpeC, rpeM);
+        // Si la séance appartient à une filière de force pure (musculation, plyo),
+        // elle ne relève pas du modèle métabolique tri-zonal de Seiler
+        if (!CARDIO_ENDURANCE_QUALITIES.has(qId)) {
+          strengthSessionsCount++;
+          return;
+        }
 
-        // Classification physiologique tri-zonale Seiler
-        // 1. Détermination de la zone selon qualité et RPE perçu
-        if (['ef', 'co2', 'gut', 'abdos', 'proprio'].includes(qId) && maxRpe <= 5) {
-          z1Minutes += dur;
-          z1Load += load;
-        } else if (qId === 'seuil' || (maxRpe >= 5 && maxRpe <= 6 && !['vo2max', 'sprint', 'plyo', 'descente'].includes(qId))) {
-          z2Minutes += dur;
-          z2Load += load;
-        } else if (maxRpe >= 7 || ['vo2max', 'sprint', 'plyo', 'descente', 'pull', 'push', 'leg'].includes(qId)) {
+        totalSessions++;
+        const rpeC = Number(item.rpeCardio) || (Number(item.rpe) || 5);
+
+        // Classification physiologique monotone fondée strictement sur l'intensité cardiorespiratoire
+        if (rpeC >= 7 || qId === 'vo2max') {
           z3Minutes += dur;
           z3Load += load;
+        } else if (qId === 'seuil' || (rpeC >= 5 && rpeC <= 6)) {
+          z2Minutes += dur;
+          z2Load += load;
         } else {
-          // RPE <= 4
+          // rpeC <= 4 ou EF
           z1Minutes += dur;
           z1Load += load;
         }
@@ -1459,6 +1506,7 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
     z1LoadPct,
     z2LoadPct,
     z3LoadPct,
+    strengthSessionsCount,
     profile,
     badge,
     color,
@@ -1535,9 +1583,9 @@ export function computePerceivedFatigueAnalysis(events, referenceDateStr = null,
 
   if (meanFatigue >= 7.5 || highStrainSessionsCount >= Math.max(2, Math.round(count * 0.4))) {
     status = 'critical';
-    badge = '🚨 Surmenage / Fatigue Élevée';
+    badge = '🚨 Fatigue Aiguë Élevée';
     color = 'rose';
-    interpretation = `Fatigue perçue moyenne élevée (${meanFatigue}/10) avec ${highStrainSessionsCount} séance(s) en fatigue disproportionnée. Risque d'overreaching non-fonctionnel. Prévoyez une semaine de décharge ou allégez les volumes.`;
+    interpretation = `Fatigue perçue moyenne élevée (${meanFatigue}/10) avec ${highStrainSessionsCount} séance(s) en fatigue disproportionnée. Signal d'accumulation de fatigue résiduelle. Prévoyez une phase de décharge active ou réduisez temporairement les volumes.`;
   } else if (meanFatigue >= 6.2 || meanDiscrepancy >= 1.2) {
     status = 'elevated';
     badge = '⚠️ Fatigue Marquée';

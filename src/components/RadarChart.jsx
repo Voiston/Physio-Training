@@ -52,7 +52,7 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
             <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
             
             <Radar 
-              name="Effet résiduel" 
+              name="Fraîcheur du stimulus" 
               dataKey="niveau" 
               stroke="#3b82f6" 
               strokeWidth={2}

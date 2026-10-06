@@ -433,12 +433,14 @@ export default function Grid({
                   let cellTitle = 'VFC non renseignée';
 
                   if (vfc !== '-') {
-                    cellTitle = vfcAnalysis.interpretation;
-                    if (vfcAnalysis.status === 'low') {
+                    const statusToUse = vfcAnalysis.dayStatus || vfcAnalysis.status;
+                    cellTitle = `VFC du jour : ${vfc} ms (${statusToUse === 'optimal' ? 'dans votre couloir' : statusToUse === 'low' ? 'sous votre couloir' : 'au-dessus du couloir'}${vfcAnalysis.corridorLower ? ` [${vfcAnalysis.corridorLower}-${vfcAnalysis.corridorUpper} ms]` : ''})\n• Moyenne 7j : ${vfcAnalysis.baseline7d ?? '—'} ms\n• ${vfcAnalysis.interpretation}`;
+                    
+                    if (statusToUse === 'low') {
                       badgeClass = 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold';
-                    } else if (vfcAnalysis.status === 'optimal') {
+                    } else if (statusToUse === 'optimal') {
                       badgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold';
-                    } else if (vfcAnalysis.status === 'high') {
+                    } else if (statusToUse === 'high') {
                       badgeClass = 'bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold';
                     } else {
                       badgeClass = 'bg-white/10 text-slate-300 border border-white/10 font-bold';
