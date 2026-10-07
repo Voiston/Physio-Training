@@ -118,4 +118,18 @@ describe('Phase 1 Physiology Verifications', () => {
     expect(res14.current.ema7).toBe(res45.current.ema7);
     expect(res14.current.acwr).toBe(res45.current.acwr);
   });
+
+  it('initialCtl seeds ATL and CTL harmoniously without artificial +100% TSB surge', () => {
+    const emptyEvents = {};
+    const initialCtl = 60;
+    const banister = computeBanisterPerformance(emptyEvents, {}, 14, 0, 7, 28, initialCtl);
+    const todayData = banister.series.find(s => s.isToday);
+    expect(todayData).toBeDefined();
+    // Sans le bug (ATL à 0 donnant +100% TSB), ATL et CTL démarrent tous deux en cohérence
+    expect(todayData?.ctl).toBe(57.9);
+    expect(todayData?.atl).toBe(52);
+    expect(todayData?.tsb).toBe(5.9);
+    // TSB% est de +10.2%, évitant l'artefact trompeur de sur-fraîcheur extrême à +100%
+    expect(todayData?.tsbPercent).toBe(10.2);
+  });
 });

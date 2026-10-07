@@ -516,16 +516,27 @@ export function computeAllWeeksStats(
     }
 
     // ACWR (Acute:Chronic Workload Ratio)
-    // Aiguë = charge de la semaine en cours (proratisée si semaine partielle)
+    // Aiguë = charge de la semaine en cours (proratisée avec garde de stabilité)
     // Chronique = moyenne des 3 à 4 semaines précédentes
     const chronicWeeks = computedList.slice(Math.max(0, i - 4), i);
     if (chronicWeeks.length > 0) {
       const chronicAvg = chronicWeeks.reduce((acc, w) => acc + w.totalLoad, 0) / chronicWeeks.length;
       if (chronicAvg > 0) {
-        const acuteLoad = (cur.isCurrentWeek && cur.isPartial && cur.elapsedDays > 0 && cur.elapsedDays < 7)
-          ? (cur.totalLoad / cur.elapsedDays) * 7
-          : cur.totalLoad;
-        cur.acwr = Math.round((acuteLoad / chronicAvg) * 100) / 100;
+        // En semaine en cours partielle :
+        // Une extrapolation brute (total / elapsedDays * 7) sur les 1 à 3 premiers jours (lundi-mercredi)
+        // produit des artefacts aberrants (ex: 1 séance lundi donne un ACWR > 3.0).
+        // On n'extrapole prudemment qu'à partir de 4 jours écoulés (mi-semaine),
+        // sinon on laisse le ratio en cours d'accumulation (null) pour éviter toute fausse alerte.
+        if (cur.isCurrentWeek && cur.isPartial) {
+          if (cur.elapsedDays >= 4) {
+            const acuteLoad = (cur.totalLoad / cur.elapsedDays) * 7;
+            cur.acwr = Math.round((acuteLoad / chronicAvg) * 100) / 100;
+          } else {
+            cur.acwr = null; // Semaine en cours d'accumulation
+          }
+        } else {
+          cur.acwr = Math.round((cur.totalLoad / chronicAvg) * 100) / 100;
+        }
       }
     }
   }

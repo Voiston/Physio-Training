@@ -596,6 +596,18 @@ export default function MetricsDashboard({
     };
   }, [activeQualityData.series]);
 
+  const balance = useMemo(() => {
+    return cardioMuscularBalance || computeCardioVsMuscularBalance(events);
+  }, [cardioMuscularBalance, events]);
+
+  const intensity = useMemo(() => {
+    return intensityDistribution || computeIntensityDistribution(events, qualities);
+  }, [intensityDistribution, events, qualities]);
+
+  const fatigueReport = useMemo(() => {
+    return perceivedFatigueAnalysis || computePerceivedFatigueAnalysis(events);
+  }, [perceivedFatigueAnalysis, events]);
+
   // 2. Le Coach Virtuel (Analyse algorithmique des tendances)
   const coachInsights = useMemo(() => {
     if (chartData.length === 0) return [];
@@ -949,18 +961,6 @@ export default function MetricsDashboard({
   const periodLabel3 = trendBasis === 'daily' ? 'veille (J-1)' : trendBasis === 'week' ? 'J-7' : 'J-3';
   const periodLabel7 = trendBasis === 'daily' ? 'veille (J-1)' : trendBasis === 'week' ? 'J-7' : 'J-7';
   const periodLabel21 = trendBasis === 'daily' ? 'veille (J-1)' : trendBasis === 'week' ? 'J-7' : 'J-21';
-
-  const balance = useMemo(() => {
-    return cardioMuscularBalance || computeCardioVsMuscularBalance(events);
-  }, [cardioMuscularBalance, events]);
-
-  const intensity = useMemo(() => {
-    return intensityDistribution || computeIntensityDistribution(events, qualities);
-  }, [intensityDistribution, events, qualities]);
-
-  const fatigueReport = useMemo(() => {
-    return perceivedFatigueAnalysis || computePerceivedFatigueAnalysis(events);
-  }, [perceivedFatigueAnalysis, events]);
 
   // Données synthétiques Banister du jour (TSB, ATL, CTL, ACWR, Rampe)
   const banisterSummary = useMemo(() => {
@@ -1711,19 +1711,19 @@ export default function MetricsDashboard({
                       <div className="relative w-full h-2.5 rounded-full overflow-hidden flex bg-white/10 shadow-inner">
                         {isTsb && (
                           <>
-                            <div className="h-full bg-red-500/70" style={{ width: '20%' }} title="Surcharge (< -30)" />
-                            <div className="h-full bg-indigo-500/70" style={{ width: '25%' }} title="Entraînement productif (-30 à 0)" />
-                            <div className="h-full bg-sky-500/70" style={{ width: '15%' }} title="Neutre (0 à +10)" />
-                            <div className="h-full bg-emerald-500" style={{ width: '25%' }} title="Pic de Forme (+10 à +25)" />
-                            <div className="h-full bg-amber-500/70" style={{ width: '15%' }} title="Sur-affûtage (> +25)" />
+                            <div className="h-full bg-red-500/70" style={{ width: '18.75%' }} title="Surcharge critique (< -35% CTL)" />
+                            <div className="h-full bg-indigo-500/70" style={{ width: '31.25%' }} title="Surcharge stimulante (-35% à -10% CTL)" />
+                            <div className="h-full bg-sky-500/70" style={{ width: '18.75%' }} title="Neutre / Équilibre (-10% à +5% CTL)" />
+                            <div className="h-full bg-emerald-500" style={{ width: '25%' }} title="Zone d'affûtage / Pic (+5% à +25% CTL)" />
+                            <div className="h-full bg-amber-500/70" style={{ width: '6.25%' }} title="Sur-fraîcheur (> +25% CTL)" />
                           </>
                         )}
                         {isAtl && (
                           <>
-                            <div className="h-full bg-sky-500/70" style={{ width: '25%' }} title="Sous-charge (< 0.8x)" />
-                            <div className="h-full bg-emerald-500" style={{ width: '45%' }} title="Sweet Spot (0.8 à 1.3x)" />
-                            <div className="h-full bg-amber-500" style={{ width: '15%' }} title="Avertissement (1.3 à 1.5x)" />
-                            <div className="h-full bg-red-500" style={{ width: '15%' }} title="Danger (> 1.5x)" />
+                            <div className="h-full bg-sky-500/70" style={{ width: '35%' }} title="Frais / Récupération (< 0.95x)" />
+                            <div className="h-full bg-slate-500/70" style={{ width: '15%' }} title="Maintien / Équilibre (0.95x à 1.10x)" />
+                            <div className="h-full bg-emerald-500" style={{ width: '25%' }} title="Stimulus optimal (1.10x à 1.35x)" />
+                            <div className="h-full bg-red-500" style={{ width: '25%' }} title="Surcharge aiguë (> 1.35x)" />
                           </>
                         )}
                         {isCtl && (

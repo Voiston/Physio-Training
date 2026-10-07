@@ -679,12 +679,16 @@ export default function Grid({
                       let cellHeatmapStyle = 'bg-slate-900/30 border-white/[0.03] text-slate-600 hover:bg-white/[0.04] hover:border-white/10';
                       
                       if (sessionData) {
-                        const loadVal = Number(sessionData.load) || 5;
+                        const loadVal = Number(sessionData.load) || (typeof sessionData === 'number' ? sessionData * 45 : 0);
+                        const rM = Number(sessionData.rpeMusc ?? sessionData.rpeMusculaire ?? sessionData);
+                        const rC = Number(sessionData.rpeCardio ?? sessionData);
+                        const maxRpe = Math.max(isNaN(rM) ? 0 : rM, isNaN(rC) ? 0 : rC);
+
                         if (sessionData.isSimulated) {
                           cellHeatmapStyle = 'bg-purple-600/75 border-purple-400 text-purple-100 shadow-[0_0_8px_rgba(168,85,247,0.35)] font-bold';
-                        } else if (loadVal >= 8) {
+                        } else if (loadVal >= 280 || maxRpe >= 7.5) {
                           cellHeatmapStyle = 'bg-blue-600 border-blue-300 text-white font-black shadow-md shadow-blue-600/30';
-                        } else if (loadVal >= 5) {
+                        } else if (loadVal >= 140 || maxRpe >= 5) {
                           cellHeatmapStyle = 'bg-blue-600/60 border-blue-400/60 text-white font-bold';
                         } else {
                           cellHeatmapStyle = 'bg-sky-600/35 border-sky-400/40 text-sky-100 font-semibold';

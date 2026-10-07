@@ -18,7 +18,9 @@ export function isPrimary(session: any): boolean {
  */
 export function extractSessionLoad(data: any): number {
   if (data === null || data === undefined) return 0;
-  if (typeof data === 'number') return data * 5;
+  // Donnée historique au format RPE brut seul : durée forfaitaire de référence 45 min (45 * RPE)
+  // identique au comportement de ScoreModal pour éliminer tout facteur d'échelle parasite
+  if (typeof data === 'number') return Math.round(data * 45);
   if (typeof data === 'object') {
     if (typeof data.load === 'number') return data.load;
     const duration = Number(data.duration) || 0;

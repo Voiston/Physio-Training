@@ -86,7 +86,22 @@ export function migrateData(rawData: any): AppExportData {
         if (dates && typeof dates === 'object') {
           Object.keys(dates).forEach(dateStr => {
             const session = dates[dateStr];
-            if (session && typeof session === 'object') {
+            if (typeof session === 'number') {
+              const dur = 45;
+              const rpe = session;
+              const { load, loadCardio, loadMusc } = calculateCleanSessionLoad(qId, dur, rpe, rpe, false);
+              dates[dateStr] = {
+                duration: dur,
+                rpeMusc: rpe,
+                rpeCardio: rpe,
+                fatigue: rpe,
+                load,
+                loadCardio,
+                loadMusc,
+                sport: CARDIO_QUALITIES.has(qId) ? 'run' : 'muscu',
+                isSecondary: false
+              };
+            } else if (session && typeof session === 'object') {
               const dur = session.duration ?? 0;
               const rM = session.rpeMusculaire ?? session.rpeMusc ?? 5;
               const rC = session.rpeCardio ?? 5;

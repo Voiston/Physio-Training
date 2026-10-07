@@ -293,7 +293,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             </div>
             <div className="flex items-baseline gap-2">
               <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">
-                {activeWeek.acwr !== null ? activeWeek.acwr : '1.00'}
+                {activeWeek.acwr !== null ? activeWeek.acwr : '—'}
               </div>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
                 activeWeek.acwr === null ? 'bg-slate-500/20 text-slate-400 border-slate-500/30'
@@ -303,7 +303,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                 : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
               }`}>
-                {activeWeek.acwr === null ? 'Neutre'
+                {activeWeek.acwr === null ? 'En cours (J1-J3)'
                 : activeWeek.acwr >= 0.8 && activeWeek.acwr <= 1.3 ? 'Sweet Spot'
                 : activeWeek.acwr > 1.5 ? 'Risque Surcharge' : 'Vigilance'}
               </span>

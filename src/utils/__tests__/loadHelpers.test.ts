@@ -18,7 +18,7 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
   it('extracts session load accurately', () => {
     expect(extractSessionLoad(null)).toBe(0);
     expect(extractSessionLoad(undefined)).toBe(0);
-    expect(extractSessionLoad(10)).toBe(50); // legacy format 10 * 5
+    expect(extractSessionLoad(10)).toBe(450); // legacy format 10 * 45 min
     expect(extractSessionLoad({ load: 250 })).toBe(250);
     expect(extractSessionLoad({ duration: 60, rpeMusc: 8, rpeCardio: 6 })).toBe(420);
   });

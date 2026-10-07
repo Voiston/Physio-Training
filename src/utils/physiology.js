@@ -465,7 +465,8 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
 
 export function extractSessionLoad(data) {
   if (data === null || data === undefined) return 0;
-  if (typeof data === 'number') return data * 5;
+  // Donnée historique au format RPE brut seul : durée forfaitaire de référence 45 min (45 * RPE)
+  if (typeof data === 'number') return Math.round(data * 45);
   if (typeof data === 'object') {
     if (typeof data.load === 'number') return data.load;
     const duration = Number(data.duration) || 0;
@@ -998,27 +999,35 @@ export function computeBanisterPerformance(
   }
 
   const loads = fullRawData.map(d => d.load);
-  const atlArray = calculateExpDecay(loads, tauFatigue, { decayToZero: true });
   
   // Injection propre de initialCtl : semée au jour de la première séance réelle de l'athlète
+  // En condition de base stable (steady-state initial), la fatigue aiguë (ATL0) est alignée
+  // sur la condition chronique initiale (CTL0) pour éviter un artefact de sur-fraîcheur artificielle (+100%)
+  let atlArray;
   let ctlArray;
   if (initialCtl !== null && Number(initialCtl) > 0) {
+    const initCtlNum = Number(initialCtl);
     const firstSessionIdx = fullRawData.findIndex(d => d.offset === -historyDays);
     if (firstSessionIdx > 0 && firstSessionIdx < fullRawData.length) {
       const preLoads = loads.slice(0, firstSessionIdx);
+      const preAtl = calculateExpDecay(preLoads, tauFatigue, { decayToZero: true });
       const preCtl = calculateExpDecay(preLoads, tauFitness, { decayToZero: true });
       const postLoads = loads.slice(firstSessionIdx);
-      const postCtl = calculateExpDecay(postLoads, tauFitness, { decayToZero: true, initialValue: Number(initialCtl) });
+      const postAtl = calculateExpDecay(postLoads, tauFatigue, { decayToZero: true, initialValue: initCtlNum });
+      const postCtl = calculateExpDecay(postLoads, tauFitness, { decayToZero: true, initialValue: initCtlNum });
+      atlArray = [...preAtl, ...postAtl];
       ctlArray = [...preCtl, ...postCtl];
     } else {
-      ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true, initialValue: Number(initialCtl) });
+      atlArray = calculateExpDecay(loads, tauFatigue, { decayToZero: true, initialValue: initCtlNum });
+      ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true, initialValue: initCtlNum });
     }
   } else {
+    atlArray = calculateExpDecay(loads, tauFatigue, { decayToZero: true });
     ctlArray = calculateExpDecay(loads, tauFitness, { decayToZero: true });
   }
 
   const hasInitialCtl = (initialCtl !== null && Number(initialCtl) > 0);
-  const minWarmupThreshold = hasInitialCtl ? 0 : Math.max(35, Math.round(tauFitness * 1.5));
+  const minWarmupThreshold = hasInitialCtl ? 0 : Math.max(84, Math.round(tauFitness * 3));
   const isWarmedUp = hasInitialCtl || (historyDays >= minWarmupThreshold);
 
   const fullSeries = fullRawData.map((d, idx) => {
@@ -1288,7 +1297,7 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
             dayHasEccentric = true;
           }
         } else if (typeof item === 'number') {
-          gLoad = item * 5;
+          gLoad = Math.round(item * 45);
           cLoad = gLoad;
           mLoad = gLoad;
         }
