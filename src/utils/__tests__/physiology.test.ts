@@ -43,8 +43,8 @@ describe('Phase 1 Physiology Verifications', () => {
     const foster = computeFosterMetrics(eventsWithSecondaries, testDate, 7);
     expect(foster.totalLoad).toBe(100);
 
-    // 3. computeBanisterPerformance load on testDate
-    const banister = computeBanisterPerformance(eventsWithSecondaries, {}, 7, 0, 7, 28);
+    // 3. computeBanisterPerformance load on testDate (fenêtre de 14 jours pour couvrir testDate)
+    const banister = computeBanisterPerformance(eventsWithSecondaries, {}, 14, 0, 7, 28);
     const dayData = banister.series.find(s => s.dateStr === testDate);
     expect(dayData).toBeDefined();
     expect(dayData?.load).toBe(100);

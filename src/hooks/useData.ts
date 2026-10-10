@@ -21,6 +21,7 @@ import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
 import { isPrimary } from '../utils/loadHelpers';
+import { SessionExercise } from '../utils/muscleHelpers';
 
 export interface QualityImpact {
   id: string;
@@ -108,6 +109,7 @@ export interface SessionData {
   sport?: 'run' | 'bike' | 'muscu' | string;
   isEccentric?: boolean;
   isSecondary?: boolean;
+  exercises?: SessionExercise[];
   parentQId?: string;
   parentContributions?: Record<string, SecondaryContribution>;
   originalLoad?: number;

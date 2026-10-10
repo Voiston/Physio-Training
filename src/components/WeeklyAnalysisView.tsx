@@ -15,6 +15,10 @@ import {
   ArrowDownRight, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, Filter, 
   ArrowUpDown, Scale, Copy, Check, Info, Bike, Footprints, Dumbbell, Layers, ChevronRight, RefreshCw
 } from 'lucide-react';
+import { 
+  computeWeeklyMuscularSummary, 
+  MUSCLE_GROUPS 
+} from '../utils/muscleHelpers';
 
 interface WeeklyAnalysisViewProps {
   events: Record<string, Record<string, SessionData>>;
@@ -63,6 +67,12 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   const [sortDescending, setSortDescending] = useState<boolean>(true);
   const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>('all');
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
+  const [breakdownTab, setBreakdownTab] = useState<'qualities' | 'muscles'>('qualities');
+
+  // Synthèse musculaire de la semaine sélectionnée
+  const weeklyMuscularSummary = useMemo(() => {
+    return computeWeeklyMuscularSummary(events, activeWeek.startDate, activeWeek.endDate);
+  }, [events, activeWeek.startDate, activeWeek.endDate]);
 
   // Qualités triées et filtrées pour la semaine active
   const filteredAndSortedQualities = useMemo(() => {
@@ -654,170 +664,424 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
         </div>
       </div>
 
-      {/* SECTION DU BAS : VENTILATION DÉTAILLÉE PAR QUALITÉ PHYSIQUE AVEC TRI & FILTRES */}
+      {/* SECTION DU BAS : VENTILATION DÉTAILLÉE PAR QUALITÉ PHYSIQUE OU PAR GROUPE MUSCULAIRE (OPTION A) */}
       <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-md">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Layers size={18} className="text-blue-400" />
-              <h3 className="text-base font-bold text-white">
-                Ventilation par Qualité Physique : {activeWeek.label}
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Classement et détails pour chaque filière d'entraînement sur la semaine sélectionnée.
-            </p>
-          </div>
+        
+        {/* ONGLET DE BASCULE QUALITÉS GLOBALES vs GROUPES MUSCULAIRES */}
+        <div className="flex items-center gap-2 mb-4 border-b border-white/10 pb-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setBreakdownTab('qualities')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              breakdownTab === 'qualities'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-white/5'
+            }`}
+          >
+            <Layers size={14} />
+            <span>Filières & Qualités Physiques</span>
+            <span className="px-1.5 py-0.2 rounded font-mono text-[10px] bg-white/20 text-white">
+              {qualities.length}
+            </span>
+          </button>
 
-          {/* BARRE D'OUTILS DE TRI ET DE FILTRE (DEMANDE UTILISATEUR) */}
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {/* Filtre qualité */}
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
-              <Filter size={13} className="text-slate-400" />
-              <select
-                value={selectedQualityFilter}
-                onChange={(e) => setSelectedQualityFilter(e.target.value)}
-                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="all" className="bg-slate-900 text-white">Toutes les qualités ({qualities.length})</option>
-                {qualities.map(q => (
-                  <option key={q.id} value={q.id} className="bg-slate-900 text-white">
-                    {q.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tri par critère */}
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
-              <ArrowUpDown size={13} className="text-slate-400" />
-              <span className="text-slate-400">Trier par :</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as QualitySortField)}
-                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
-              >
-                <option value="load" className="bg-slate-900 text-white">⚡ Charge décroissante</option>
-                <option value="duration" className="bg-slate-900 text-white">⏱️ Temps d'entraînement</option>
-                <option value="sessions" className="bg-slate-900 text-white">🔢 Nombre de séances</option>
-                <option value="name" className="bg-slate-900 text-white">🔤 Nom alphabétique</option>
-                <option value="default" className="bg-slate-900 text-white">📋 Ordre de la grille</option>
-              </select>
-            </div>
-
-            {/* Inverser ordre ascendant / descendant */}
-            <button
-              onClick={() => setSortDescending(prev => !prev)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
-              title={sortDescending ? "Tri décroissant (du plus grand au plus petit)" : "Tri croissant (du plus petit au plus grand)"}
-            >
-              {sortDescending ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setBreakdownTab('muscles')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              breakdownTab === 'muscles'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400'
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-white/5'
+            }`}
+          >
+            <Dumbbell size={14} />
+            <span>Charge par Groupe Musculaire</span>
+            {weeklyMuscularSummary.totalSets > 0 ? (
+              <span className="px-1.5 py-0.5 rounded-full font-mono text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {weeklyMuscularSummary.totalSets} séries
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.2 rounded font-mono text-[10px] bg-white/10 text-slate-400">
+                Séries effectives
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* TABLEAU DES QUALITÉS AVEC JAUGE DE CHARGE HEBDOMADAIRE */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-white/5 border-y border-white/10 text-[10px] uppercase text-slate-400 font-mono tracking-wider">
-                <th className="p-3">Qualité Physique</th>
-                <th className="p-3 text-right">Charge Hebdo</th>
-                <th className="p-3 w-48 hidden sm:table-cell">% de la Charge Semaine</th>
-                <th className="p-3 text-right">Temps Passé</th>
-                <th className="p-3 text-center">Séances</th>
-                <th className="p-3 text-right">Évolution vs S-1</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredAndSortedQualities.map((item) => {
-                const isZero = item.totalLoad === 0;
+        {breakdownTab === 'qualities' ? (
+          <>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Layers size={18} className="text-blue-400" />
+                  <h3 className="text-base font-bold text-white">
+                    Ventilation par Qualité Physique : {activeWeek.label}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Classement et détails pour chaque filière d'entraînement sur la semaine sélectionnée.
+                </p>
+              </div>
 
-                return (
-                  <tr 
-                    key={item.qualityId}
-                    className={`hover:bg-white/[0.03] transition-colors ${
-                      isZero ? 'opacity-40 hover:opacity-100' : ''
-                    }`}
+              {/* BARRE D'OUTILS DE TRI ET DE FILTRE (DEMANDE UTILISATEUR) */}
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                {/* Filtre qualité */}
+                <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
+                  <Filter size={13} className="text-slate-400" />
+                  <select
+                    value={selectedQualityFilter}
+                    onChange={(e) => setSelectedQualityFilter(e.target.value)}
+                    className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
                   >
-                    {/* Nom de la qualité */}
-                    <td className="p-3">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-white text-xs sm:text-sm">
-                          {item.qualityName}
-                        </span>
-                        {item.secondaryLoad > 0 && (
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Direct: {item.directLoad} UA • Impact indirect: {item.secondaryLoad} UA
+                    <option value="all" className="bg-slate-900 text-white">Toutes les qualités ({qualities.length})</option>
+                    {qualities.map(q => (
+                      <option key={q.id} value={q.id} className="bg-slate-900 text-white">
+                        {q.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tri par critère */}
+                <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
+                  <ArrowUpDown size={13} className="text-slate-400" />
+                  <span className="text-slate-400">Trier par :</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as QualitySortField)}
+                    className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                  >
+                    <option value="load" className="bg-slate-900 text-white">⚡ Charge décroissante</option>
+                    <option value="duration" className="bg-slate-900 text-white">⏱️ Temps d'entraînement</option>
+                    <option value="sessions" className="bg-slate-900 text-white">🔢 Nombre de séances</option>
+                    <option value="name" className="bg-slate-900 text-white">🔤 Nom alphabétique</option>
+                    <option value="default" className="bg-slate-900 text-white">📋 Ordre de la grille</option>
+                  </select>
+                </div>
+
+                {/* Inverser ordre ascendant / descendant */}
+                <button
+                  onClick={() => setSortDescending(prev => !prev)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
+                  title={sortDescending ? "Tri décroissant (du plus grand au plus petit)" : "Tri croissant (du plus petit au plus grand)"}
+                >
+                  {sortDescending ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                </button>
+              </div>
+            </div>
+
+            {/* TABLEAU DES QUALITÉS AVEC JAUGE DE CHARGE HEBDOMADAIRE */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-white/5 border-y border-white/10 text-[10px] uppercase text-slate-400 font-mono tracking-wider">
+                    <th className="p-3">Qualité Physique</th>
+                    <th className="p-3 text-right">Charge Hebdo</th>
+                    <th className="p-3 w-48 hidden sm:table-cell">% de la Charge Semaine</th>
+                    <th className="p-3 text-right">Temps Passé</th>
+                    <th className="p-3 text-center">Séances</th>
+                    <th className="p-3 text-right">Évolution vs S-1</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredAndSortedQualities.map((item) => {
+                    const isZero = item.totalLoad === 0;
+
+                    return (
+                      <tr 
+                        key={item.qualityId}
+                        className={`hover:bg-white/[0.03] transition-colors ${
+                          isZero ? 'opacity-40 hover:opacity-100' : ''
+                        }`}
+                      >
+                        {/* Nom de la qualité */}
+                        <td className="p-3">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-white text-xs sm:text-sm">
+                              {item.qualityName}
+                            </span>
+                            {item.secondaryLoad > 0 && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                Direct: {item.directLoad} UA • Impact indirect: {item.secondaryLoad} UA
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Charge totale */}
+                        <td className="p-3 text-right font-mono font-bold text-xs sm:text-sm">
+                          <span className={item.totalLoad > 0 ? 'text-amber-300' : 'text-slate-500'}>
+                            {item.totalLoad} <span className="text-[10px] font-normal text-slate-400">UA</span>
                           </span>
-                        )}
+                        </td>
+
+                        {/* Barre de répartition */}
+                        <td className="p-3 hidden sm:table-cell">
+                          <div className="flex items-center gap-2">
+                            <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                              <div 
+                                className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all"
+                                style={{ width: `${Math.min(100, item.percentOfTotalLoad)}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-[10px] text-slate-400 w-10 text-right">
+                              {item.percentOfTotalLoad}%
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Temps */}
+                        <td className="p-3 text-right font-mono text-slate-300">
+                          {formatMinutes(item.durationMinutes)}
+                        </td>
+
+                        {/* Séances */}
+                        <td className="p-3 text-center font-mono">
+                          <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                            item.sessionCount > 0 
+                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
+                              : 'text-slate-600'
+                          }`}>
+                            {item.sessionCount}
+                          </span>
+                        </td>
+
+                        {/* Évolution vs S-1 */}
+                        <td className="p-3 text-right font-mono font-bold">
+                          {item.percentChangeVsPrevWeek !== null ? (
+                            <span className={`inline-flex items-center gap-1 ${
+                              item.percentChangeVsPrevWeek > 0 ? 'text-emerald-400'
+                              : item.percentChangeVsPrevWeek < 0 ? 'text-sky-400'
+                              : 'text-slate-400'
+                            }`}>
+                              {item.percentChangeVsPrevWeek > 0 ? <ArrowUpRight size={13} /> : item.percentChangeVsPrevWeek < 0 ? <ArrowDownRight size={13} /> : null}
+                              {item.percentChangeVsPrevWeek >= 0 ? `+${item.percentChangeVsPrevWeek}%` : `${item.percentChangeVsPrevWeek}%`}
+                              <span className="text-[10px] text-slate-500 font-normal">
+                                ({item.deltaLoadVsPrevWeek >= 0 ? `+${item.deltaLoadVsPrevWeek}` : item.deltaLoadVsPrevWeek} UA)
+                              </span>
+                            </span>
+                          ) : item.totalLoad > 0 ? (
+                            <span className="text-emerald-400 text-[11px]">+ Nouveau</span>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          /* VUE PAR GROUPE MUSCULAIRE (OPTION A) */
+          <div className="space-y-5 animate-fadeIn">
+            <div>
+              <div className="flex items-center gap-2">
+                <Dumbbell size={18} className="text-red-400" />
+                <h3 className="text-base font-bold text-white">
+                  Volume Hebdomadaire par Groupe Musculaire : {activeWeek.label}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Comptabilisation des séries effectives (Hard Sets) et équilibre fonctionnel selon les standards en sciences du sport.
+              </p>
+            </div>
+
+            {/* 4 KPI MUSCULAIRES & ÉQUILIBRES */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Séries Effectives
+                </span>
+                <div className="text-xl font-mono font-extrabold text-white">
+                  {weeklyMuscularSummary.totalSets} <span className="text-xs font-normal text-slate-400">séries</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  {weeklyMuscularSummary.totalSessionsWithExercises} séance{weeklyMuscularSummary.totalSessionsWithExercises > 1 ? 's' : ''} détaillée{weeklyMuscularSummary.totalSessionsWithExercises > 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                  Répétitions Totales
+                </span>
+                <div className="text-xl font-mono font-extrabold text-white">
+                  {weeklyMuscularSummary.totalReps} <span className="text-xs font-normal text-slate-400">reps</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Volume-stimulus cumulé
+                </span>
+              </div>
+
+              {/* Ratio H:Q (Ischios / Quadriceps) */}
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    Ratio Ischios / Quad (H:Q)
+                  </span>
+                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/10 text-slate-300">
+                    Visée ≥ 0.60
+                  </span>
+                </div>
+                <div className="text-xl font-mono font-extrabold text-white">
+                  {weeklyMuscularSummary.hqRatio !== null ? weeklyMuscularSummary.hqRatio : '—'}
+                </div>
+                <span className={`text-[10px] font-semibold mt-0.5 block ${
+                  weeklyMuscularSummary.hqRatio === null
+                    ? 'text-slate-500'
+                    : weeklyMuscularSummary.hqRatio >= 0.60
+                    ? 'text-emerald-400'
+                    : 'text-amber-400'
+                }`}>
+                  {weeklyMuscularSummary.hqRatio === null
+                    ? 'Données insuffisantes'
+                    : weeklyMuscularSummary.hqRatio >= 0.60
+                    ? '✓ Équilibré (santé genou)'
+                    : '⚠️ Dominance Quadriceps'}
+                </span>
+              </div>
+
+              {/* Ratio Pull / Push */}
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">
+                    Ratio Tirage / Poussée
+                  </span>
+                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/10 text-slate-300">
+                    Visée ≥ 1.00
+                  </span>
+                </div>
+                <div className="text-xl font-mono font-extrabold text-white">
+                  {weeklyMuscularSummary.pushPullRatio !== null ? weeklyMuscularSummary.pushPullRatio : '—'}
+                </div>
+                <span className={`text-[10px] font-semibold mt-0.5 block ${
+                  weeklyMuscularSummary.pushPullRatio === null
+                    ? 'text-slate-500'
+                    : weeklyMuscularSummary.pushPullRatio >= 1.0
+                    ? 'text-emerald-400'
+                    : 'text-amber-400'
+                }`}>
+                  {weeklyMuscularSummary.pushPullRatio === null
+                    ? 'Données insuffisantes'
+                    : weeklyMuscularSummary.pushPullRatio >= 1.0
+                    ? '✓ Équilibré (santé épaule)'
+                    : '⚠️ Dominance Poussée'}
+                </span>
+              </div>
+            </div>
+
+            {/* REPÈRES SCIENTIFIQUES DE VOLUME (ISRAETEL & SCHOENFELD) */}
+            <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                <Info size={13} className="text-blue-400" />
+                Repères scientifiques de séries par semaine :
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-slate-800 text-slate-300 border-slate-700">
+                  MV &lt; 6 : Maintien
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-blue-500/20 text-blue-300 border-blue-500/30">
+                  MEV 6-10 : Stimulus Minimal
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold">
+                  MAV 10-20 : Optimal Progression
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-amber-500/20 text-amber-300 border-amber-500/30">
+                  MRV &gt; 20 : Plafond Récupérable
+                </span>
+              </div>
+            </div>
+
+            {/* GRILLE DÉTAILLÉE PAR GROUPE MUSCULAIRE */}
+            {weeklyMuscularSummary.sortedMuscles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {weeklyMuscularSummary.sortedMuscles.map(m => {
+                  const targetMav = 20;
+                  const percentOfMav = Math.min(100, Math.round((m.effectiveSets / targetMav) * 100));
+
+                  return (
+                    <div
+                      key={m.muscleId}
+                      className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 space-y-2.5 transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                            <h4 className="text-sm font-bold text-white m-0">{m.name}</h4>
+                            <span className="text-[10px] font-medium text-slate-400 bg-white/5 px-1.5 py-0.2 rounded">
+                              {m.categoryLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-base font-mono font-extrabold text-white">
+                            {m.effectiveSets} <span className="text-xs font-normal text-slate-400">séries</span>
+                          </span>
+                        </div>
                       </div>
-                    </td>
 
-                    {/* Charge totale */}
-                    <td className="p-3 text-right font-mono font-bold text-xs sm:text-sm">
-                      <span className={item.totalLoad > 0 ? 'text-amber-300' : 'text-slate-500'}>
-                        {item.totalLoad} <span className="text-[10px] font-normal text-slate-400">UA</span>
-                      </span>
-                    </td>
+                      {/* Barre de jauge du volume */}
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                          <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${m.statusBadgeColor}`}>
+                            {m.statusLabel}
+                          </span>
+                          <span className="font-mono text-slate-400">
+                            {m.repsTotal} reps totales
+                          </span>
+                        </div>
 
-                    {/* Barre de répartition */}
-                    <td className="p-3 hidden sm:table-cell">
-                      <div className="flex items-center gap-2">
-                        <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                          <div 
-                            className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all"
-                            style={{ width: `${Math.min(100, item.percentOfTotalLoad)}%` }}
+                        <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              backgroundColor: m.color,
+                              width: `${percentOfMav}%`
+                            }}
                           />
                         </div>
-                        <span className="font-mono text-[10px] text-slate-400 w-10 text-right">
-                          {item.percentOfTotalLoad}%
-                        </span>
                       </div>
-                    </td>
 
-                    {/* Temps */}
-                    <td className="p-3 text-right font-mono text-slate-300">
-                      {formatMinutes(item.durationMinutes)}
-                    </td>
-
-                    {/* Séances */}
-                    <td className="p-3 text-center font-mono">
-                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                        item.sessionCount > 0 
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
-                          : 'text-slate-600'
-                      }`}>
-                        {item.sessionCount}
-                      </span>
-                    </td>
-
-                    {/* Évolution vs S-1 */}
-                    <td className="p-3 text-right font-mono font-bold">
-                      {item.percentChangeVsPrevWeek !== null ? (
-                        <span className={`inline-flex items-center gap-1 ${
-                          item.percentChangeVsPrevWeek > 0 ? 'text-emerald-400'
-                          : item.percentChangeVsPrevWeek < 0 ? 'text-sky-400'
-                          : 'text-slate-400'
-                        }`}>
-                          {item.percentChangeVsPrevWeek > 0 ? <ArrowUpRight size={13} /> : item.percentChangeVsPrevWeek < 0 ? <ArrowDownRight size={13} /> : null}
-                          {item.percentChangeVsPrevWeek >= 0 ? `+${item.percentChangeVsPrevWeek}%` : `${item.percentChangeVsPrevWeek}%`}
-                          <span className="text-[10px] text-slate-500 font-normal">
-                            ({item.deltaLoadVsPrevWeek >= 0 ? `+${item.deltaLoadVsPrevWeek}` : item.deltaLoadVsPrevWeek} UA)
-                          </span>
-                        </span>
-                      ) : item.totalLoad > 0 ? (
-                        <span className="text-emerald-400 text-[11px]">+ Nouveau</span>
-                      ) : (
-                        <span className="text-slate-600">—</span>
+                      {/* Exercices ayant contribué à ce muscle */}
+                      {m.exercises.length > 0 && (
+                        <div className="pt-1.5 border-t border-white/5 flex flex-wrap gap-1 items-center">
+                          <span className="text-[10px] text-slate-500 font-medium mr-1">Exercices :</span>
+                          {Array.from(new Set(m.exercises.map(e => `${e.name} (${e.sets}s)`))).map((exStr, idx) => (
+                            <span
+                              key={idx}
+                              className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-[10px] font-mono text-slate-300"
+                            >
+                              {exStr}
+                            </span>
+                          ))}
+                        </div>
                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto text-slate-400">
+                  <Dumbbell size={24} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white mb-1">
+                    Aucun exercice de musculation renseigné sur cette semaine
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto m-0 leading-relaxed">
+                    Pour activer la ventilation automatique par muscle, ouvrez une séance de musculation 
+                    (<em>Push, Pull, Leg, Abdos...</em>) dans la grille et complétez la section 
+                    <strong>« Détail Musculation & Exercices »</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
