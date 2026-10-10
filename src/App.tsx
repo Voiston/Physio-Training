@@ -15,9 +15,11 @@ import { WeeklyAnalysisView } from './components/WeeklyAnalysisView';
 import { CompetitionModal } from './components/CompetitionModal';
 import { TrainingReportModal } from './components/TrainingReportModal';
 import { PhysiologicalSettingsModal } from './components/PhysiologicalSettingsModal';
+import { LiveGymModal } from './components/LiveGymModal';
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { CloudSyncModal } from './components/CloudSyncModal';
 import { ToastProvider, useToast } from './components/Toast';
 import { computeAllWeeksStats } from './utils/weekHelpers';
 import { 
@@ -28,7 +30,7 @@ import {
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
   Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
-  PanelLeftClose, PanelLeftOpen, BarChart3
+  PanelLeftClose, PanelLeftOpen, BarChart3, Dumbbell, Cloud
 } from 'lucide-react';
 
 function AppContent() {
@@ -74,7 +76,9 @@ function AppContent() {
     addSimulatedEvent,
     applySimulationScenario,
     clearSimulation,
-    commitSimulation
+    commitSimulation,
+    // Synchronisation Cloud Smartphone ↔ PC
+    cloudSync
   } = useData();
 
   const { showToast } = useToast();
@@ -88,6 +92,16 @@ function AppContent() {
   const [showCompetitionModal, setShowCompetitionModal] = useState<boolean>(false);
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [showPhysioSettingsModal, setShowPhysioSettingsModal] = useState<boolean>(false);
+  const [showLiveGymModal, setShowLiveGymModal] = useState<boolean>(false);
+  const [showCloudSyncModal, setShowCloudSyncModal] = useState<boolean>(false);
+  const [hasGymDraft, setHasGymDraft] = useState<boolean>(() => {
+    try {
+      return Boolean(localStorage.getItem('training_live_session_draft_v1'));
+    } catch {
+      return false;
+    }
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const todayStr = useMemo(() => getLocalYYYYMMDD(new Date()), []);
@@ -147,6 +161,39 @@ function AppContent() {
           <div className="flex flex-wrap items-center gap-2">
             {/* Bouton PWA Install */}
             <PWAInstallButton />
+
+            {/* Bouton Synchronisation Cloud Smartphone ↔ PC */}
+            <button
+              onClick={() => setShowCloudSyncModal(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
+                cloudSync.syncStatus === 'synced'
+                  ? 'bg-blue-500/15 hover:bg-blue-500/25 border-blue-500/40 text-blue-300'
+                  : cloudSync.syncStatus === 'syncing'
+                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-300'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+              }`}
+              title="Synchronisation automatique temps réel entre votre smartphone et votre PC"
+            >
+              <Cloud size={15} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} />
+              <span className="hidden sm:inline">Synchro Cloud</span>
+              <span className="sm:hidden">Sync</span>
+              {cloudSync.syncStatus === 'synced' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+              )}
+            </button>
+
+            {/* Bouton Mode Salle / Live Gym Tracker */}
+            <button
+              onClick={() => setShowLiveGymModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10 group"
+              title="Lancer le Mode Salle : suivi tactile en direct, minuteur de repos et charge adaptative"
+            >
+              <Dumbbell size={15} className="text-emerald-400 group-hover:rotate-12 transition-transform" />
+              <span>Mode Salle ⏱️</span>
+              {hasGymDraft && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping ml-0.5" title="Séance en cours" />
+              )}
+            </button>
 
             {/* Bouton Mode Simulation (What-If) */}
             <button
@@ -682,6 +729,10 @@ function AppContent() {
           qualities={qualities}
           events={events}
           onClose={() => setModalInfo(null)}
+          onOpenLiveGym={() => {
+            setModalInfo(null);
+            setShowLiveGymModal(true);
+          }}
           onSave={(sessionData: any, applyImpacts: boolean, targetDateStr?: string) => {
             const finalDate = targetDateStr || modalInfo.dateStr;
             saveEventWithImpacts(modalInfo.qId, finalDate, sessionData, applyImpacts);
@@ -813,6 +864,67 @@ function AppContent() {
           onClose={() => setShowPhysioSettingsModal(false)}
         />
       )}
+
+      {showLiveGymModal && (
+        <LiveGymModal
+          isOpen={showLiveGymModal}
+          onClose={() => {
+            setShowLiveGymModal(false);
+            try {
+              setHasGymDraft(Boolean(localStorage.getItem('training_live_session_draft_v1')));
+            } catch {
+              // Ignore
+            }
+          }}
+          qualities={qualities}
+          events={events}
+          initialDateStr={todayStr}
+          onSaveSession={(qualityId, dateStr, sessionData, applyImpacts) => {
+            saveEventWithImpacts(qualityId, dateStr, sessionData, applyImpacts);
+            const qObj = qualities.find(q => q.id === qualityId);
+            const qName = qObj ? qObj.name : qualityId;
+            showToast({
+              type: 'success',
+              title: 'Séance en direct enregistrée ! 🏋️',
+              message: `${qName} · ${sessionData.duration} min · Tonnage : ${(sessionData.tonnageKg || 0).toLocaleString()} kg · Charge : ${sessionData.load} pts`
+            });
+            setShowLiveGymModal(false);
+            setHasGymDraft(false);
+          }}
+        />
+      )}
+
+      {/* Modal Synchronisation Cloud Smartphone ↔ PC */}
+      <CloudSyncModal
+        isOpen={showCloudSyncModal}
+        onClose={() => setShowCloudSyncModal(false)}
+        syncKey={cloudSync.syncKey}
+        userAccount={cloudSync.userAccount}
+        syncStatus={cloudSync.syncStatus}
+        lastSyncedAt={cloudSync.lastSyncedAt}
+        activeDevicesCount={cloudSync.activeDevicesCount}
+        pairingUrl={cloudSync.pairingUrl}
+        qrCodeUrl={cloudSync.qrCodeUrl}
+        onUpdateSyncKey={cloudSync.updateSyncKey}
+        onLoginWithGoogle={cloudSync.loginWithGoogle}
+        onLogout={cloudSync.logout}
+        onPushToCloud={() => {
+          cloudSync.pushToCloud();
+          showToast({
+            type: 'info',
+            title: 'Synchronisation Cloud',
+            message: 'Données locales envoyées vers le serveur Cloud.'
+          });
+        }}
+        onPullFromCloud={() => {
+          cloudSync.pullFromCloud();
+          showToast({
+            type: 'info',
+            title: 'Synchronisation Cloud',
+            message: 'Données rechargées depuis le serveur Cloud.'
+          });
+        }}
+      />
     </div>
   );
 }

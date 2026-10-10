@@ -58,8 +58,8 @@ th.is-today, td.is-today {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   padding: 24px;
   border-radius: 16px;
-  width: 400px;
-  max-width: 90%;
+  width: 500px;
+  max-width: 95vw;
   box-sizing: border-box;
 }
 .input-group {

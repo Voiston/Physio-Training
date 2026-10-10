@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, ChangeEvent } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent } from 'react';
+import { useCloudSync } from './useCloudSync';
 import { 
   DEFAULT_QUALITIES, 
   computeAllQualitiesEMA, 
@@ -262,6 +263,7 @@ export function useData() {
     } else {
       localStorage.setItem('physio_target_competition', JSON.stringify(comp));
     }
+    triggerSyncPush();
   };
 
   // Constantes physiologiques individuelles (tauFatigue, tauFitness)
@@ -276,6 +278,7 @@ export function useData() {
   const savePhysioSettings = (newSettings: PhysiologicalSettings) => {
     setPhysioSettingsState(newSettings);
     localStorage.setItem('physio_settings', JSON.stringify(newSettings));
+    triggerSyncPush();
   };
 
   // Mode Simulation Prédictive ("What-If")
@@ -408,6 +411,81 @@ export function useData() {
     setDailyMetrics(loadedMetrics);
   }, [qualities]);
 
+  // Cloud Synchronization for Smartphone ↔ PC Real-Time Sync
+  const cloudSyncRef = useRef<any>(null);
+  const triggerSyncPush = useCallback(() => {
+    cloudSyncRef.current?.triggerDebouncedPush();
+  }, []);
+
+  const onRemoteDataReceived = useCallback((remoteData: any) => {
+    if (!remoteData) return;
+    try {
+      const imported = migrateData(remoteData);
+      if (imported.events) {
+        setEvents(imported.events);
+        Object.entries(imported.events as Record<string, Record<string, SessionData>>).forEach(([qId, dates]) => {
+          Object.entries(dates).forEach(([date, data]) => {
+            localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));
+          });
+        });
+      }
+      if (imported.dailyMetrics) {
+        setDailyMetrics(imported.dailyMetrics);
+        Object.entries(imported.dailyMetrics as Record<string, Record<string, number>>).forEach(([dateStr, metrics]) => {
+          Object.entries(metrics).forEach(([type, value]) => {
+            localStorage.setItem(`${dateStr}_${type}`, String(value));
+          });
+        });
+      }
+      if (imported.trainingBlocks) {
+        setTrainingBlocks(imported.trainingBlocks);
+        localStorage.setItem('physio_training_blocks', JSON.stringify(imported.trainingBlocks));
+      }
+      if (imported.qualities) {
+        setQualitiesState(imported.qualities);
+        localStorage.setItem('physio_qualities', JSON.stringify(imported.qualities));
+      }
+      if (imported.blockTemplates) {
+        setBlockTemplates(imported.blockTemplates);
+        localStorage.setItem('physio_block_templates', JSON.stringify(imported.blockTemplates));
+      }
+      if (imported.targetCompetition !== undefined) {
+        setTargetCompetitionState(imported.targetCompetition);
+        if (imported.targetCompetition) {
+          localStorage.setItem('physio_target_competition', JSON.stringify(imported.targetCompetition));
+        } else {
+          localStorage.removeItem('physio_target_competition');
+        }
+      }
+      if (imported.physioSettings) {
+        setPhysioSettingsState(imported.physioSettings);
+        localStorage.setItem('physio_settings', JSON.stringify(imported.physioSettings));
+      }
+    } catch (e) {
+      console.error('Error applying remote data:', e);
+    }
+  }, []);
+
+  const getExportableData = useCallback(() => {
+    return {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      events,
+      dailyMetrics,
+      trainingBlocks,
+      qualities,
+      blockTemplates,
+      targetCompetition,
+      physioSettings,
+      updatedAt: new Date().toISOString(),
+    };
+  }, [events, dailyMetrics, trainingBlocks, qualities, blockTemplates, targetCompetition, physioSettings]);
+
+  const cloudSync = useCloudSync({
+    onRemoteDataReceived,
+    getExportableData,
+  });
+  cloudSyncRef.current = cloudSync;
+
   // Événements effectifs (réels ou fusionnés avec la simulation si active)
   const effectiveEvents = useMemo(() => {
     if (!isSimulationActive) return events;
@@ -492,6 +570,7 @@ export function useData() {
         [qId]: { ...prev[qId], [dateStr]: sessionData }
       }));
     }
+    triggerSyncPush();
   };
 
   const saveDailyMetric = (dateStr: string, type: 'readiness' | 'vfc' | string, score: string | number | null) => {
@@ -511,6 +590,7 @@ export function useData() {
         [dateStr]: { ...prev[dateStr], [type]: numVal } 
       }));
     }
+    triggerSyncPush();
   };
 
   const saveTrainingBlock = (block: TrainingBlock) => {
@@ -526,6 +606,7 @@ export function useData() {
       localStorage.setItem('physio_training_blocks', JSON.stringify(updated));
       return updated;
     });
+    triggerSyncPush();
   };
 
   const deleteTrainingBlock = (blockId: string) => {
@@ -534,6 +615,7 @@ export function useData() {
       localStorage.setItem('physio_training_blocks', JSON.stringify(updated));
       return updated;
     });
+    triggerSyncPush();
   };
 
   const activeBlockToday = useMemo(() => {
@@ -888,6 +970,8 @@ export function useData() {
     removeSimulatedEvent,
     applySimulationScenario,
     clearSimulation,
-    commitSimulation
+    commitSimulation,
+    // Synchronisation Cloud Smartphone ↔ PC
+    cloudSync
   };
 }

@@ -119,6 +119,14 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     defaultReps: 15,
     muscleRatios: { mollets: 1.0 }
   },
+  {
+    id: 'mollets_maison',
+    name: 'Mollets debout unilatéral (Poids du corps / Maison)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { mollets: 1.0 }
+  },
 
   // --- HAUT DU CORPS - POUSSÉE (UPPER PUSH) ---
   {
@@ -177,6 +185,22 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     defaultReps: 12,
     muscleRatios: { triceps: 1.0 }
   },
+  {
+    id: 'triceps_overhead',
+    name: 'Extension triceps nuque (Haltère / Câble)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { triceps: 1.0 }
+  },
+  {
+    id: 'triceps_kickback',
+    name: 'Kickback triceps (Haltère)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { triceps: 1.0 }
+  },
 
   // --- HAUT DU CORPS - TIRAGE (UPPER PULL) ---
   {
@@ -227,6 +251,30 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     defaultReps: 10,
     muscleRatios: { biceps: 1.0 }
   },
+  {
+    id: 'curl_incline',
+    name: 'Curl incliné banc (Haltères)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 10,
+    muscleRatios: { biceps: 1.0 }
+  },
+  {
+    id: 'curl_marteau',
+    name: 'Curl marteau (Haltères / Câble)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 10,
+    muscleRatios: { biceps: 1.0 }
+  },
+  {
+    id: 'curl_concentre',
+    name: 'Curl concentré / Pupitre',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 10,
+    muscleRatios: { biceps: 1.0 }
+  },
 
   // --- TRONC & CORE ---
   {
@@ -259,8 +307,9 @@ export interface SessionExercise {
   id: string;
   name: string;
   sets: number;
-  reps: number;
-  rpe: number;
+  reps?: number;
+  rpe?: number;
+  rir?: number; // Reps In Reserve (0 à 4+)
   weightKg?: number;
   customRatios?: Record<string, number>;
 }
@@ -293,7 +342,8 @@ export interface SessionMuscularAnalysis {
  */
 export function computeSessionMuscularBreakdown(
   exercises: SessionExercise[] = [],
-  customCatalog: ExerciseDefinition[] = []
+  customCatalog: ExerciseDefinition[] = [],
+  isMicroSession: boolean = false
 ): SessionMuscularAnalysis {
   const muscleMap: Record<string, MuscleBreakdownItem> = {};
   const mergedCatalog = customCatalog.length > 0 ? [...customCatalog, ...EXERCISE_CATALOG] : EXERCISE_CATALOG;
@@ -320,18 +370,27 @@ export function computeSessionMuscularBreakdown(
 
   exercises.forEach(ex => {
     const sets = Math.max(0, Number(ex.sets) || 0);
-    const reps = Math.max(0, Number(ex.reps) || 0);
-    const rpe = Math.min(10, Math.max(1, Number(ex.rpe) || 7));
-    const weight = Number(ex.weightKg) || 0;
-
     if (sets <= 0) return;
-
-    totalSets += sets;
-    totalReps += sets * reps;
-    weightedRpeSum += sets * rpe;
 
     // Retrouver la matrice d'activation
     const catalogItem = mergedCatalog.find(c => c.id === ex.id);
+
+    // Détermination des répétitions (valeur explicite ou defaultReps pour estimer le volume)
+    const reps = ex.reps !== undefined && ex.reps !== null && Number(ex.reps) > 0
+      ? Number(ex.reps)
+      : (catalogItem?.defaultReps || 8);
+
+    // Intensité effective (RIR converti en RPE : RPE = 10 - RIR)
+    const effectiveRpe = ex.rpe !== undefined && ex.rpe !== null && Number(ex.rpe) > 0
+      ? Math.min(10, Math.max(1, Number(ex.rpe)))
+      : (ex.rir !== undefined && ex.rir !== null ? Math.min(10, Math.max(1, 10 - Number(ex.rir))) : 8);
+
+    const weight = Number(ex.weightKg) || 0;
+
+    totalSets += sets;
+    totalReps += sets * reps;
+    weightedRpeSum += sets * effectiveRpe;
+
     const ratios = ex.customRatios || catalogItem?.muscleRatios || {
       // Si exercice inconnu, essayer d'assigner selon son nom
       quadriceps: 0.5,
@@ -357,7 +416,7 @@ export function computeSessionMuscularBreakdown(
       const m = muscleMap[muscleId];
       const effSets = Number((sets * ratio).toFixed(1));
       const effReps = Math.round(sets * reps * ratio);
-      const estLoad = Math.round(sets * reps * (rpe / 10) * ratio);
+      const estLoad = Math.round(sets * reps * (effectiveRpe / 10) * ratio);
 
       m.effectiveSets = Number((m.effectiveSets + effSets).toFixed(1));
       m.repsTotal += effReps;
@@ -377,9 +436,12 @@ export function computeSessionMuscularBreakdown(
 
   const weightedAvgRpe = totalSets > 0 ? Number((weightedRpeSum / totalSets).toFixed(1)) : 7;
   
-  // Durée estimée : environ 3 à 4 min par série effective (temps d'exécution + 2 à 3 min de récupération inter-séries)
-  // min 15 minutes, max 150 minutes
-  const suggestedDuration = totalSets > 0 ? Math.min(150, Math.max(15, Math.round(totalSets * 3.5))) : 45;
+  // Durée estimée : environ 3.5 min par série (séance classique) ou 2 min (micro-séance ciblée)
+  // min 5 minutes pour micro-séance (au lieu de 15), max 150 minutes
+  const setMultiplier = isMicroSession ? 2 : 3.5;
+  const minDuration = isMicroSession ? 5 : 15;
+  const defaultDuration = isMicroSession ? 10 : 45;
+  const suggestedDuration = totalSets > 0 ? Math.min(150, Math.max(minDuration, Math.round(totalSets * setMultiplier))) : defaultDuration;
   const suggestedRpeMusc = Math.min(10, Math.max(1, Math.round(weightedAvgRpe)));
 
   // Liste triée par nombre de séries effectives décroissantes
@@ -747,4 +809,263 @@ export function computeMuscularAlerts(summary: WeeklyMuscularSummary): MuscularA
   }
 
   return alerts;
+}
+
+// ==========================================
+// SUGGESTION AUTOMATIQUE DE CHARGE ADAPTATIVE
+// (RIR & FATIGUE ACCUMULÉE)
+// ==========================================
+
+export interface LastExercisePerformance {
+  date: string;
+  qualityId: string;
+  exercise: SessionExercise;
+  sessionFatigue?: number;
+}
+
+export interface ExerciseProgressionSuggestion {
+  hasHistory: boolean;
+  lastDate?: string;
+  lastQualityId?: string;
+  lastSets?: number;
+  lastReps?: number;
+  lastWeightKg?: number;
+  lastRir?: number;
+  lastRpe?: number;
+  lastSessionFatigue?: number;
+  suggestedWeightKg?: number;
+  suggestedReps?: number;
+  suggestedRir: number;
+  suggestedSets?: number;
+  percentageDelta: number;
+  weightDeltaKg: number;
+  status: 'increase' | 'maintain' | 'decrease' | 'new';
+  reason: string;
+}
+
+/**
+ * Recherche la dernière performance d'un exercice donné à travers tout l'historique des séances (toutes filières confondues).
+ */
+export function findLastExercisePerformance(
+  events: Record<string, Record<string, any>> | undefined | null,
+  exerciseId: string,
+  beforeDateStr?: string
+): LastExercisePerformance | null {
+  if (!events || !exerciseId) return null;
+
+  const matches: LastExercisePerformance[] = [];
+
+  for (const [qId, dateMap] of Object.entries(events)) {
+    if (!dateMap || typeof dateMap !== 'object') continue;
+
+    for (const [dateStr, session] of Object.entries(dateMap)) {
+      if (!session || typeof session !== 'object') continue;
+      if (!Array.isArray(session.exercises)) continue;
+
+      // Filtrer par date antérieure si une date de référence est fournie
+      if (beforeDateStr && dateStr >= beforeDateStr) continue;
+
+      const foundEx = session.exercises.find(
+        (ex: any) => ex && (ex.id === exerciseId || (ex.name && ex.name.toLowerCase() === exerciseId.toLowerCase()))
+      );
+
+      if (foundEx) {
+        matches.push({
+          date: dateStr,
+          qualityId: qId,
+          exercise: foundEx,
+          sessionFatigue: session.fatigue !== undefined ? Number(session.fatigue) : undefined
+        });
+      }
+    }
+  }
+
+  // Si aucune séance strictement antérieure n'est trouvée, chercher sur une autre date
+  if (matches.length === 0 && beforeDateStr) {
+    for (const [qId, dateMap] of Object.entries(events)) {
+      if (!dateMap || typeof dateMap !== 'object') continue;
+
+      for (const [dateStr, session] of Object.entries(dateMap)) {
+        if (!session || typeof session !== 'object') continue;
+        if (!Array.isArray(session.exercises)) continue;
+        if (dateStr === beforeDateStr) continue;
+
+        const foundEx = session.exercises.find(
+          (ex: any) => ex && (ex.id === exerciseId || (ex.name && ex.name.toLowerCase() === exerciseId.toLowerCase()))
+        );
+
+        if (foundEx) {
+          matches.push({
+            date: dateStr,
+            qualityId: qId,
+            exercise: foundEx,
+            sessionFatigue: session.fatigue !== undefined ? Number(session.fatigue) : undefined
+          });
+        }
+      }
+    }
+  }
+
+  if (matches.length === 0) return null;
+
+  // Tri décroissant par date chronologique (la plus récente d'abord)
+  matches.sort((a, b) => {
+    const cmp = b.date.localeCompare(a.date);
+    if (cmp !== 0) return cmp;
+    const aW = (a.exercise.weightKg && a.exercise.weightKg > 0) ? 1 : 0;
+    const bW = (b.exercise.weightKg && b.exercise.weightKg > 0) ? 1 : 0;
+    return bW - aW;
+  });
+
+  return matches[0];
+}
+
+/**
+ * Calcule la suggestion adaptative de charge selon le RIR de la séance précédente
+ * et la fatigue globale accumulée, avec arrondi aux pas de matériel réalistes (0.5 kg).
+ */
+export function computeAdaptiveProgression(
+  lastPerformance: LastExercisePerformance | null,
+  currentFatigue?: number | string
+): ExerciseProgressionSuggestion {
+  if (!lastPerformance || !lastPerformance.exercise) {
+    return {
+      hasHistory: false,
+      suggestedRir: 2,
+      percentageDelta: 0,
+      weightDeltaKg: 0,
+      status: 'new',
+      reason: 'Premier enregistrement pour cet exercice · Définissez votre charge de référence.'
+    };
+  }
+
+  const ex = lastPerformance.exercise;
+  const weight = ex.weightKg !== undefined && Number(ex.weightKg) > 0 ? Number(ex.weightKg) : 0;
+  const reps = ex.reps !== undefined && Number(ex.reps) > 0 ? Number(ex.reps) : undefined;
+  const sets = ex.sets !== undefined && Number(ex.sets) > 0 ? Number(ex.sets) : 4;
+  
+  const rir = ex.rir !== undefined && !isNaN(Number(ex.rir))
+    ? Number(ex.rir)
+    : (ex.rpe !== undefined ? Math.max(0, 10 - Number(ex.rpe)) : 2);
+
+  const effectiveFatigue = currentFatigue !== undefined && currentFatigue !== '' && !isNaN(Number(currentFatigue)) && Number(currentFatigue) > 0
+    ? Number(currentFatigue)
+    : (lastPerformance.sessionFatigue !== undefined ? Number(lastPerformance.sessionFatigue) : 5);
+
+  // 1. Delta de base selon le RIR
+  let basePercent = 0;
+  if (rir >= 4) {
+    basePercent = 5.0; // Facile / Sous-maximal -> forte progression
+  } else if (rir === 3) {
+    basePercent = 3.5; // Modéré -> progression solide
+  } else if (rir === 2) {
+    basePercent = 2.0; // Optimal MAV -> progression continue
+  } else if (rir === 1) {
+    basePercent = 0.5; // Proche échec -> consolidation légère
+  } else {
+    basePercent = -2.5; // 0 RIR (échec absolu) -> décharge préventive
+  }
+
+  // 2. Modulation par la fatigue globale accumulée
+  let fatigueDelta = 0;
+  if (effectiveFatigue <= 3) {
+    fatigueDelta = 1.0; // Très frais -> assimilation maximale
+  } else if (effectiveFatigue === 4) {
+    fatigueDelta = 0.5; // Bonne fraîcheur
+  } else if (effectiveFatigue <= 6) {
+    fatigueDelta = 0.0; // Fatigue normale
+  } else if (effectiveFatigue <= 8) {
+    fatigueDelta = -2.5; // Fatigue élevée -> régulation
+  } else {
+    fatigueDelta = -5.0; // Fatigue critique -> décharge marquée
+  }
+
+  const totalPercent = basePercent + fatigueDelta;
+
+  let suggestedWeightKg: number | undefined = undefined;
+  let suggestedReps: number | undefined = reps;
+  let weightDeltaKg = 0;
+  let percentageDelta = 0;
+  let status: 'increase' | 'maintain' | 'decrease' = 'maintain';
+  let reason = '';
+
+  // Cas avec charge en kilos
+  if (weight > 0) {
+    const rawNewWeight = weight * (1 + totalPercent / 100);
+    // Arrondi au pas standard d'équipement (0.5 kg)
+    let newWeight = Math.round(rawNewWeight * 2) / 2;
+    newWeight = Math.max(0.5, newWeight);
+
+    // Ajustement de bordure si l'arrondi absorbe le delta
+    if (totalPercent > 0 && newWeight === weight) {
+      if (effectiveFatigue <= 4 || rir >= 3) {
+        newWeight = weight + 0.5;
+      } else if (reps) {
+        suggestedReps = reps + 1;
+      }
+    } else if (totalPercent < 0 && newWeight === weight) {
+      if (effectiveFatigue >= 7 || rir === 0) {
+        newWeight = Math.max(0.5, weight - 0.5);
+      }
+    }
+
+    suggestedWeightKg = Number(newWeight.toFixed(1));
+    weightDeltaKg = Number((suggestedWeightKg - weight).toFixed(1));
+    percentageDelta = Number(((weightDeltaKg / weight) * 100).toFixed(1));
+
+    if (weightDeltaKg > 0 || (suggestedReps && reps && suggestedReps > reps)) {
+      status = 'increase';
+      const detailDelta = weightDeltaKg > 0 ? `+${weightDeltaKg} kg (${percentageDelta > 0 ? `+${percentageDelta}%` : ''})` : `+1 rep`;
+      reason = `${detailDelta} · ${rir} RIR & ${effectiveFatigue <= 4 ? 'pleine fraîcheur' : 'bonne tolérance'}`;
+    } else if (weightDeltaKg < 0 || (suggestedReps && reps && suggestedReps < reps)) {
+      status = 'decrease';
+      reason = `${weightDeltaKg} kg (${percentageDelta}%) · ${rir === 0 ? 'RIR 0 (échec)' : 'Régulation'} & fatigue ${effectiveFatigue}/10`;
+    } else {
+      status = 'maintain';
+      reason = `Maintien (${weight} kg) · Consolidation technique (${rir} RIR · Fatigue ${effectiveFatigue}/10)`;
+    }
+  } else {
+    // Cas sans charge externe (poids du corps : tractions, dips, pompes, abdos)
+    if (reps) {
+      if (totalPercent >= 2.0) {
+        suggestedReps = reps + (rir >= 4 ? 2 : 1);
+        status = 'increase';
+        reason = `+${suggestedReps - reps} rep(s) · ${rir} RIR précédent & bonne fraîcheur`;
+      } else if (totalPercent <= -2.0) {
+        suggestedReps = Math.max(1, reps - 1);
+        status = 'decrease';
+        reason = `-1 rep · Régulation fatigue ${effectiveFatigue}/10 (RIR ${rir})`;
+      } else {
+        suggestedReps = reps;
+        status = 'maintain';
+        reason = `Maintien (${reps} reps) · RIR ${rir} & Fatigue ${effectiveFatigue}/10`;
+      }
+    } else {
+      status = 'maintain';
+      reason = `Maintien du format · RIR ${rir} & Fatigue ${effectiveFatigue}/10`;
+    }
+  }
+
+  // RIR cible recommandé (2 = zone optimale d'hypertrophie / MAV)
+  const suggestedRir = (rir === 0 && effectiveFatigue >= 8) ? 3 : 2;
+
+  return {
+    hasHistory: true,
+    lastDate: lastPerformance.date,
+    lastQualityId: lastPerformance.qualityId,
+    lastSets: sets,
+    lastReps: reps,
+    lastWeightKg: weight > 0 ? weight : undefined,
+    lastRir: rir,
+    lastRpe: ex.rpe || (10 - rir),
+    lastSessionFatigue: lastPerformance.sessionFatigue,
+    suggestedWeightKg,
+    suggestedReps,
+    suggestedRir,
+    suggestedSets: sets,
+    percentageDelta,
+    weightDeltaKg,
+    status,
+    reason
+  };
 }

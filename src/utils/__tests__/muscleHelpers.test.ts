@@ -4,7 +4,9 @@ import {
   computeWeeklyMuscularSummary,
   getVolumeLandmark,
   EXERCISE_CATALOG,
-  MUSCLE_GROUPS 
+  MUSCLE_GROUPS,
+  findLastExercisePerformance,
+  computeAdaptiveProgression
 } from '../muscleHelpers';
 
 describe('Muscle Helpers & Physiological Modeling', () => {
@@ -121,5 +123,153 @@ describe('Muscle Helpers & Physiological Modeling', () => {
     // Push sets: Pectoraux (5), Triceps (5 * 0.65 = 3.3), Deltoïdes ant (5 * 0.5 = 2.5)
     // Pull sets: Dorsaux (5), Biceps (5 * 0.7 = 3.5), Trapèzes (5 * 0.5 = 2.5)
     expect(summary.pushPullRatio).toBeDefined();
+  });
+
+  it('handles micro-sessions: 5 sets of biceps curl with short duration & targeted stimulus', () => {
+    const exercises = [
+      { id: 'biceps_curl', name: 'Curl Biceps', sets: 5, reps: 10, rir: 2, rpe: 8 }
+    ];
+
+    const result = computeSessionMuscularBreakdown(exercises, [], true);
+    expect(result.totalSets).toBe(5);
+    // Micro-session duration: Math.max(5, Math.round(5 * 2)) = 10 min
+    expect(result.suggestedDuration).toBe(10);
+    expect(result.suggestedRpeMusc).toBe(8);
+
+    // Biceps has 5 direct sets, Dorsaux has 0 sets
+    expect(result.muscleLoads.biceps.effectiveSets).toBe(5);
+    expect(result.muscleLoads.biceps.directSets).toBe(5);
+    expect(result.muscleLoads.dorsaux.effectiveSets).toBe(0);
+  });
+
+  it('aggregates micro-session logged under isolation quality without touching pull back window', () => {
+    const events: Record<string, any> = {
+      isolation: {
+        '2026-10-09': {
+          duration: 10,
+          load: 80,
+          isSecondary: false,
+          exercises: [
+            { id: 'biceps_curl', name: 'Curl Biceps', sets: 5, reps: 10, rir: 2, rpe: 8 }
+          ]
+        }
+      }
+    };
+
+    const summary = computeWeeklyMuscularSummary(events, '2026-10-05', '2026-10-11');
+    expect(summary.totalSessionsWithExercises).toBe(1);
+    expect(summary.muscles.biceps.effectiveSets).toBe(5);
+    expect(summary.muscles.dorsaux.effectiveSets).toBe(0);
+    // Events for 'pull' remain completely unpopulated
+    expect(events.pull).toBeUndefined();
+  });
+
+  describe('Adaptive Load Suggestion (RIR & Fatigue)', () => {
+    it('finds the last exercise performance chronologically across multiple qualities', () => {
+      const events: Record<string, any> = {
+        pull: {
+          '2026-10-01': {
+            exercises: [
+              { id: 'biceps_curl', name: 'Curl Biceps', sets: 4, reps: 10, weightKg: 14, rir: 2 }
+            ],
+            fatigue: 4
+          }
+        },
+        isolation: {
+          '2026-10-06': {
+            exercises: [
+              { id: 'biceps_curl', name: 'Curl Biceps', sets: 5, reps: 10, weightKg: 15, rir: 3 }
+            ],
+            fatigue: 3
+          }
+        }
+      };
+
+      // Searching before 2026-10-10 should find the 2026-10-06 isolation session
+      const last = findLastExercisePerformance(events, 'biceps_curl', '2026-10-10');
+      expect(last).not.toBeNull();
+      expect(last?.date).toBe('2026-10-06');
+      expect(last?.qualityId).toBe('isolation');
+      expect(last?.exercise.weightKg).toBe(15);
+      expect(last?.exercise.rir).toBe(3);
+
+      // Searching before 2026-10-05 should find the 2026-10-01 pull session
+      const older = findLastExercisePerformance(events, 'biceps_curl', '2026-10-05');
+      expect(older).not.toBeNull();
+      expect(older?.date).toBe('2026-10-01');
+      expect(older?.exercise.weightKg).toBe(14);
+    });
+
+    it('returns new status when exercise has no recorded history', () => {
+      const suggestion = computeAdaptiveProgression(null);
+      expect(suggestion.hasHistory).toBe(false);
+      expect(suggestion.status).toBe('new');
+      expect(suggestion.suggestedWeightKg).toBeUndefined();
+    });
+
+    it('suggests progressive load increase (+2.5% to +5%) for high RIR and low fatigue', () => {
+      const lastPerf = {
+        date: '2026-10-05',
+        qualityId: 'push',
+        exercise: { id: 'bench_press', name: 'Développé couché', sets: 4, reps: 8, weightKg: 80, rir: 3 },
+        sessionFatigue: 3
+      };
+
+      // RIR 3 (+3.5%) + Fatigue 3 (+1.0%) = +4.5% on 80 kg = 83.6 kg -> rounded to 83.5 kg (+3.5 kg)
+      const suggestion = computeAdaptiveProgression(lastPerf, 3);
+      expect(suggestion.hasHistory).toBe(true);
+      expect(suggestion.status).toBe('increase');
+      expect(suggestion.suggestedWeightKg).toBe(83.5);
+      expect(suggestion.weightDeltaKg).toBe(3.5);
+      expect(suggestion.suggestedRir).toBe(2);
+    });
+
+    it('suggests moderate bump (+2%) on optimal RIR 2 with normal fatigue', () => {
+      const lastPerf = {
+        date: '2026-10-05',
+        qualityId: 'isolation',
+        exercise: { id: 'biceps_curl', name: 'Curl Biceps', sets: 4, reps: 10, weightKg: 20, rir: 2 },
+        sessionFatigue: 4
+      };
+
+      // RIR 2 (+2.0%) + Fatigue 4 (+0.5%) = +2.5% on 20 kg = 20.5 kg (+0.5 kg)
+      const suggestion = computeAdaptiveProgression(lastPerf, 4);
+      expect(suggestion.hasHistory).toBe(true);
+      expect(suggestion.status).toBe('increase');
+      expect(suggestion.suggestedWeightKg).toBe(20.5);
+      expect(suggestion.weightDeltaKg).toBe(0.5);
+    });
+
+    it('reduces load for 0 RIR (muscular failure) and elevated fatigue', () => {
+      const lastPerf = {
+        date: '2026-10-05',
+        qualityId: 'push',
+        exercise: { id: 'bench_press', name: 'Développé couché', sets: 4, reps: 6, weightKg: 100, rir: 0 },
+        sessionFatigue: 8
+      };
+
+      // RIR 0 (-2.5%) + Fatigue 8 (-2.5%) = -5% on 100 kg = 95 kg (-5 kg)
+      const suggestion = computeAdaptiveProgression(lastPerf, 8);
+      expect(suggestion.hasHistory).toBe(true);
+      expect(suggestion.status).toBe('decrease');
+      expect(suggestion.suggestedWeightKg).toBe(95);
+      expect(suggestion.weightDeltaKg).toBe(-5);
+      expect(suggestion.suggestedRir).toBe(3); // Safer buffer after failure
+    });
+
+    it('handles bodyweight exercise by progressing reps', () => {
+      const lastPerf = {
+        date: '2026-10-05',
+        qualityId: 'pull',
+        exercise: { id: 'pull_ups', name: 'Tractions', sets: 4, reps: 8, rir: 3 },
+        sessionFatigue: 3
+      };
+
+      const suggestion = computeAdaptiveProgression(lastPerf, 3);
+      expect(suggestion.hasHistory).toBe(true);
+      expect(suggestion.status).toBe('increase');
+      expect(suggestion.suggestedWeightKg).toBeUndefined();
+      expect(suggestion.suggestedReps).toBe(9); // +1 rep
+    });
   });
 });

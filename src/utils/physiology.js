@@ -18,6 +18,7 @@ export const DEFAULT_QUALITIES = [
   { id: 'sprint', name: 'Sprint / Alactique', g: 5, o: 3, retentionDays: 5, category: 'mixte', impacts: [{ id: 'seuil', ratio: 0.2, confidence: 'estimé' }, { id: 'vo2max', ratio: 0.25, confidence: 'estimé' }, { id: 'ef', ratio: 0.15, confidence: 'estimé' }, { id: 'leg', ratio: 0.7, confidence: 'estimé' }, { id: 'plyo', ratio: 0.7, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }] },
   { id: 'pull', name: 'Musculation Pull', g: 8, o: 5, retentionDays: 30, category: 'force' },
   { id: 'push', name: 'Musculation Push', g: 8, o: 5, retentionDays: 30, category: 'force' },
+  { id: 'isolation', name: 'Micro-séance / Isolation', g: 4, o: 2, retentionDays: 10, category: 'force' },
   { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, retentionDays: 30, category: 'force', impacts: [{ id: 'plyo', ratio: 0.3, confidence: 'estimé' }, { id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, retentionDays: 5, category: 'force', impacts: [{ id: 'leg', ratio: 0.4, confidence: 'estimé' }, { id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'co2', name: 'Tolérance CO2', g: 6, o: 4, retentionDays: 10, category: 'cardio' },
@@ -522,7 +523,7 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
     }
   }
   pastPrimaryLoads.sort((a, b) => a - b);
-  const defaultRefLoad = qDef.category === 'force' ? 200 : (qDef.category === 'mixte' ? 180 : 250);
+  const defaultRefLoad = qDef.id === 'isolation' ? 80 : (qDef.category === 'force' ? 200 : (qDef.category === 'mixte' ? 180 : 250));
   const refLoad_q = pastPrimaryLoads.length > 0 ? pastPrimaryLoads[Math.floor(pastPrimaryLoads.length / 2)] : defaultRefLoad;
 
   for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
