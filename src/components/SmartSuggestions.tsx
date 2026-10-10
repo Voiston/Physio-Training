@@ -5,23 +5,28 @@ import {
   ArrowUpDown, Dumbbell, Info
 } from 'lucide-react';
 import { Quality, TrainingRecommendation, TrainingBlock } from '../hooks/useData';
+import { MuscularAlert } from '../utils/muscleHelpers';
 
 interface SmartSuggestionsProps {
   recommendations: TrainingRecommendation[];
   activeBlock: TrainingBlock | null;
+  muscularAlerts?: MuscularAlert[];
   onOpenSessionModal: (q: Quality) => void;
   onReorderByUrgency: () => void;
   onReorderByBlock: () => void;
   onResetOrder: () => void;
+  onNavigateToMuscles?: () => void;
 }
 
 export default function SmartSuggestions({
   recommendations,
   activeBlock,
+  muscularAlerts = [],
   onOpenSessionModal,
   onReorderByUrgency,
   onReorderByBlock,
-  onResetOrder
+  onResetOrder,
+  onNavigateToMuscles
 }: SmartSuggestionsProps) {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
@@ -129,6 +134,58 @@ export default function SmartSuggestions({
           </button>
         </div>
       </div>
+
+      {/* ALERTES DE DÉSÉQUILIBRES MUSCULAIRES & PRÉVENTION DES BLESSURES (FEATURE 4) */}
+      {muscularAlerts.filter(a => a.type === 'danger' || a.type === 'warning').length > 0 && (
+        <div className="mb-4 space-y-2">
+          {muscularAlerts.filter(a => a.type === 'danger' || a.type === 'warning').map(alert => (
+            <div 
+              key={alert.id}
+              className={`p-3 rounded-xl border backdrop-blur-md flex items-start justify-between gap-3 ${
+                alert.type === 'danger'
+                  ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                  : 'bg-amber-950/30 border-amber-500/35 text-amber-200'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
+                  alert.type === 'danger' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  <ShieldAlert size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-xs text-white">
+                      {alert.title}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-slate-300 border border-white/10">
+                      {alert.metric}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 mb-1.5 leading-relaxed">
+                    {alert.message}
+                  </p>
+                  {alert.recommendations.length > 0 && (
+                    <div className="text-[11px] text-blue-300 font-medium">
+                      💡 Conseil coach : {alert.recommendations.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {onNavigateToMuscles && (
+                <button
+                  type="button"
+                  onClick={onNavigateToMuscles}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white shrink-0 border border-white/10 transition-colors cursor-pointer"
+                >
+                  Voir bilan →
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Recommendations Cards Grid avec Priorisation Dégradée (#1 Rouge, #2 Orange, #3 Bleu/Gris) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">

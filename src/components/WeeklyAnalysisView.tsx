@@ -17,8 +17,13 @@ import {
 } from 'lucide-react';
 import { 
   computeWeeklyMuscularSummary, 
+  computeMuscularAlerts,
+  getSavedCustomExercises,
   MUSCLE_GROUPS 
 } from '../utils/muscleHelpers';
+import { MuscleBodyMap } from './MuscleBodyMap';
+import { MuscleRadarChart } from './MuscleRadarChart';
+import { MuscleAlertsBanner } from './MuscleAlertsBanner';
 
 interface WeeklyAnalysisViewProps {
   events: Record<string, Record<string, SessionData>>;
@@ -68,11 +73,20 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>('all');
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
   const [breakdownTab, setBreakdownTab] = useState<'qualities' | 'muscles'>('qualities');
+  const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
+
+  // Bibliothèque des exercices personnalisés persistants
+  const customExercises = useMemo(() => getSavedCustomExercises(), []);
 
   // Synthèse musculaire de la semaine sélectionnée
   const weeklyMuscularSummary = useMemo(() => {
-    return computeWeeklyMuscularSummary(events, activeWeek.startDate, activeWeek.endDate);
-  }, [events, activeWeek.startDate, activeWeek.endDate]);
+    return computeWeeklyMuscularSummary(events, activeWeek.startDate, activeWeek.endDate, customExercises);
+  }, [events, activeWeek.startDate, activeWeek.endDate, customExercises]);
+
+  // Alertes physiologiques et biomécaniques (H:Q, Pull:Push, MRV)
+  const muscularAlerts = useMemo(() => {
+    return computeMuscularAlerts(weeklyMuscularSummary);
+  }, [weeklyMuscularSummary]);
 
   // Qualités triées et filtrées pour la semaine active
   const filteredAndSortedQualities = useMemo(() => {
@@ -993,17 +1007,60 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               </div>
             </div>
 
+            {/* ALERTES ET DIAGNOSTICS DE DÉSÉQUILIBRE MUSCULAIRE (FEATURE 4) */}
+            <MuscleAlertsBanner alerts={muscularAlerts} />
+
+            {/* DOUBLE VISUALISATION : MANNEQUIN FACE & DOS + RADAR SPIDER CHART (FEATURE 3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Mannequin anatomique interactif Face & Dos */}
+              <MuscleBodyMap 
+                muscleLoads={weeklyMuscularSummary.muscles}
+                selectedMuscleId={selectedMuscleId}
+                onSelectMuscle={(id) => setSelectedMuscleId(prev => prev === id ? null : id)}
+              />
+
+              {/* Graphique Radar Musculaire (Spider Chart avec Couloir MAV 10-20s) */}
+              <MuscleRadarChart 
+                muscles={weeklyMuscularSummary.muscles}
+                selectedMuscleId={selectedMuscleId}
+                onSelectMuscle={(id) => setSelectedMuscleId(prev => prev === id ? null : id)}
+              />
+            </div>
+
+            {/* Indicateur de filtre/sélection active */}
+            {selectedMuscleId && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs animate-fadeIn">
+                <div className="flex items-center gap-2 text-white">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: MUSCLE_GROUPS[selectedMuscleId]?.color || '#38bdf8' }} />
+                  <span>Groupe musculaire inspecté : <strong className="text-blue-300">{MUSCLE_GROUPS[selectedMuscleId]?.name || selectedMuscleId}</strong> ({weeklyMuscularSummary.muscles[selectedMuscleId]?.effectiveSets || 0} séries effectives)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMuscleId(null)}
+                  className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                >
+                  Afficher tous les groupes
+                </button>
+              </div>
+            )}
+
             {/* GRILLE DÉTAILLÉE PAR GROUPE MUSCULAIRE */}
             {weeklyMuscularSummary.sortedMuscles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {weeklyMuscularSummary.sortedMuscles.map(m => {
                   const targetMav = 20;
                   const percentOfMav = Math.min(100, Math.round((m.effectiveSets / targetMav) * 100));
+                  const isSelected = selectedMuscleId === m.muscleId;
 
                   return (
                     <div
                       key={m.muscleId}
-                      className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 space-y-2.5 transition-all"
+                      className={`p-3.5 rounded-xl transition-all space-y-2.5 cursor-pointer ${
+                        isSelected 
+                          ? 'bg-blue-950/40 border-2 border-blue-400 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10' 
+                          : 'bg-white/[0.03] border border-white/5 hover:border-white/10'
+                      }`}
+                      onClick={() => setSelectedMuscleId(prev => prev === m.muscleId ? null : m.muscleId)}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div>

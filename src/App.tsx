@@ -21,6 +21,11 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastProvider, useToast } from './components/Toast';
 import { computeAllWeeksStats } from './utils/weekHelpers';
 import { 
+  computeWeeklyMuscularSummary, 
+  computeMuscularAlerts, 
+  getSavedCustomExercises 
+} from './utils/muscleHelpers';
+import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
   Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
   PanelLeftClose, PanelLeftOpen, BarChart3
@@ -95,6 +100,14 @@ function AppContent() {
     const weeks = computeAllWeeksStats(events, qualities, 1, 0);
     return weeks.find(w => w.isCurrentWeek) || weeks[weeks.length - 1];
   }, [events, qualities]);
+
+  // Alertes biomécaniques et musculaires de la semaine courante (H:Q, Pull:Push, MRV)
+  const currentMuscularAlerts = useMemo(() => {
+    if (!currentWeekStats) return [];
+    const customCatalog = getSavedCustomExercises();
+    const summary = computeWeeklyMuscularSummary(events, currentWeekStats.startDate, currentWeekStats.endDate, customCatalog);
+    return computeMuscularAlerts(summary);
+  }, [events, currentWeekStats]);
 
   const timeline = useMemo(() => {
     return generateTimeline(21, 14).map(day => ({
@@ -500,6 +513,8 @@ function AppContent() {
                 <SmartSuggestions 
                   recommendations={trainingRecommendations}
                   activeBlock={activeBlockToday}
+                  muscularAlerts={currentMuscularAlerts}
+                  onNavigateToMuscles={() => setActiveTab('weeks')}
                   onOpenSessionModal={(q) => {
                     setModalInfo({ 
                       qId: q.id, 

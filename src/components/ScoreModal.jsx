@@ -14,8 +14,7 @@ import {
   getSavedCustomExercises,
   saveCustomExercise,
   deleteCustomExercise,
-  getAllExerciseCatalog,
-  CustomExercise
+  getAllExerciseCatalog
 } from '../utils/muscleHelpers';
 import { MuscleBodyMap } from './MuscleBodyMap';
 
@@ -716,14 +715,27 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         <label className="text-[10px] font-semibold uppercase text-slate-400 block">
                           Exercice
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => setIsCreatingCustom(!isCreatingCustom)}
-                          className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer"
-                        >
-                          <BookmarkPlus size={11} />
-                          <span>{isCreatingCustom ? 'Fermer création' : '+ Créer exo perso'}</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {customExercises.some(e => e.id === selectedExId) && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteCustomExercise(selectedExId, e)}
+                              className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Supprimer cet exercice de la bibliothèque"
+                            >
+                              <Trash2 size={11} />
+                              <span>Supprimer exo</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatingCustom(!isCreatingCustom)}
+                            className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <BookmarkPlus size={11} />
+                            <span>{isCreatingCustom ? 'Fermer création' : '+ Créer exo perso'}</span>
+                          </button>
+                        </div>
                       </div>
                       <select
                         value={selectedExId}
