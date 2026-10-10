@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "SyncRecord": {
+      "title": "SyncRecord",
+      "description": "Données d'entraînement et métriques synchronisées par utilisateur",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Identifiant Firebase Auth du propriétaire",
+          "maxLength": 128
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "Email du compte utilisateur",
+          "maxLength": 128
+        },
+        "key": {
+          "type": "string",
+          "description": "Clé de synchronisation ou identifiant d'appairage",
+          "maxLength": 128
+        },
+        "data": {
+          "type": "string",
+          "description": "Données sérialisées JSON des séances et métriques",
+          "maxLength": 500000
+        },
+        "version": {
+          "type": "number",
+          "description": "Numéro de version du format de données"
+        },
+        "lastDeviceId": {
+          "type": "string",
+          "description": "Identifiant de l'appareil émetteur",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Horodatage ISO de synchronisation",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "userId",
+        "userEmail",
+        "key",
+        "data",
+        "version",
+        "lastDeviceId",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/sync_records/{recordId}": {
+      "schema": "SyncRecord",
+      "description": "Collection des enregistrements de synchronisation multi-appareils"
+    }
+  }
+}

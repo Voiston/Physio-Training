@@ -53,7 +53,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   const [customKeyInput, setCustomKeyInput] = useState(syncKey);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [googleEmailInput, setGoogleEmailInput] = useState('poketime.idle@gmail.com');
+  const [googleEmailInput, setGoogleEmailInput] = useState('');
   const [isEditingKey, setIsEditingKey] = useState(false);
 
   if (!isOpen) return null;
@@ -150,7 +150,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
                 </span>
                 {syncStatus === 'synced' && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Live SSE
+                    Firestore Cloud
                   </span>
                 )}
               </div>

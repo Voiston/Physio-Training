@@ -1,6 +1,0 @@
-{
-  "summary":  "Plan d'implémentation pour la synchronisation automatique temps réel entre smartphone et PC via Firebase Authentication (Google Sign-In) et Firestore, avec persistance hors-ligne et migration fluide des données existantes.",
-  "updatedAt":  "2026-10-10T21:08:48.788692939Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

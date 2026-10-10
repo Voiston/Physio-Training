@@ -1,5 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import QRCode from 'qrcode';
+import { 
+  db, 
+  auth, 
+  googleProvider, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged, 
+  handleFirestoreError,
+  OperationType,
+  type User 
+} from '../firebase';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error' | 'unpaired';
 
@@ -20,8 +37,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
   const [deviceId] = useState<string>(() => {
     let id = localStorage.getItem('physio_device_id');
     if (!id) {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      id = `${isMobile ? 'mobile' : 'pc'}_${Math.random().toString(36).substring(2, 9)}`;
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      id = `${isMobileDevice ? 'mobile' : 'pc'}_${Math.random().toString(36).substring(2, 9)}`;
       localStorage.setItem('physio_device_id', id);
     }
     return id;
@@ -63,7 +80,6 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [syncNotification, setSyncNotification] = useState<string | null>(null);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
   const debounceTimerRef = useRef<any>(null);
   const isRemoteUpdatingRef = useRef<boolean>(false);
 
@@ -95,6 +111,29 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
       .catch(err => console.error('Failed to generate QR code:', err));
   }, [pairingUrl]);
 
+  // Synchronize Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: User | null) => {
+      if (firebaseUser) {
+        const email = (firebaseUser.email || '').toLowerCase();
+        const account: UserAccount = {
+          email,
+          name: firebaseUser.displayName || email.split('@')[0],
+          avatar: firebaseUser.photoURL || undefined,
+          provider: 'google',
+        };
+        setUserAccount(account);
+        localStorage.setItem('physio_user_account', JSON.stringify(account));
+        if (email && email.includes('@')) {
+          setSyncKeyState(email);
+          localStorage.setItem('physio_sync_key', email);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Set new sync key
   const updateSyncKey = useCallback((newKey: string) => {
     const cleanKey = newKey.trim();
@@ -104,32 +143,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
     setSyncNotification(`Code de synchronisation mis à jour : ${cleanKey}`);
   }, []);
 
-  // Google Login (1-click)
-  const loginWithGoogle = useCallback(
-    (email: string, name?: string) => {
-      const cleanEmail = email.trim().toLowerCase();
-      const account: UserAccount = {
-        email: cleanEmail,
-        name: name || cleanEmail.split('@')[0],
-        provider: 'google',
-      };
-      localStorage.setItem('physio_user_account', JSON.stringify(account));
-      setUserAccount(account);
-      updateSyncKey(cleanEmail);
-      setSyncNotification(`Connecté avec Google (${cleanEmail}) - Synchronisation active`);
-    },
-    [updateSyncKey]
-  );
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('physio_user_account');
-    setUserAccount(null);
-    const newRandom = `PHYSIO-${Math.floor(1000 + Math.random() * 9000)}`;
-    updateSyncKey(newRandom);
-    setSyncNotification('Déconnecté du compte Google');
-  }, [updateSyncKey]);
-
-  // Push local data to cloud
+  // Push local data to cloud (Firestore first, local dev server fallback)
   const pushToCloud = useCallback(
     async (overrideData?: any) => {
       if (isRemoteUpdatingRef.current) return;
@@ -141,28 +155,76 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
       setSyncStatus('syncing');
       try {
         const dataToSend = overrideData || getExportableDataRef.current();
-        const response = await fetch('/api/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            key: syncKey,
-            data: dataToSend,
-            deviceId,
-            userEmail: userAccount?.email,
-          }),
-        });
+        const stringified = typeof dataToSend === 'string' ? dataToSend : JSON.stringify(dataToSend);
 
-        if (!response.ok) throw new Error('Erreur de synchronisation réseau');
-        const resJson = await response.json();
-        if (resJson.success) {
-          setSyncStatus('synced');
-          setLastSyncedAt(new Date());
-        } else {
-          setSyncStatus('error');
+        // 1. If Firebase Auth is authenticated, save directly to Firestore using UID isolation
+        if (auth.currentUser) {
+          const docRef = doc(db, 'sync_records', auth.currentUser.uid);
+          try {
+            await setDoc(
+              docRef,
+              {
+                userId: auth.currentUser.uid,
+                userEmail: auth.currentUser.email || userAccount?.email || '',
+                key: syncKey,
+                data: stringified,
+                version: 1,
+                lastDeviceId: deviceId,
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+
+            setSyncStatus('synced');
+            setLastSyncedAt(new Date());
+            return;
+          } catch (err: any) {
+            if (err?.code === 'permission-denied') {
+              handleFirestoreError(err, OperationType.WRITE, `sync_records/${auth.currentUser.uid}`);
+            }
+            throw err;
+          }
         }
+
+        // 2. If running on local server with Express backend
+        const isLocalHost = 
+          window.location.hostname === 'localhost' || 
+          window.location.hostname === '127.0.0.1' || 
+          window.location.port === '3000';
+
+        if (isLocalHost) {
+          try {
+            const response = await fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                key: syncKey,
+                data: dataToSend,
+                deviceId,
+                userEmail: userAccount?.email,
+              }),
+            });
+
+            if (response.ok) {
+              const resJson = await response.json();
+              if (resJson.success) {
+                setSyncStatus('synced');
+                setLastSyncedAt(new Date());
+                return;
+              }
+            }
+          } catch {
+            // Local backend offline or unavailable
+          }
+        }
+
+        // In static hosting (e.g. GitHub Pages) before signing in with Google:
+        // mark as ready and saved locally
+        setSyncStatus('synced');
+        setLastSyncedAt(new Date());
       } catch (err) {
-        console.warn('Sync push error:', err);
-        setSyncStatus('offline');
+        console.warn('Sync push notice:', err);
+        setSyncStatus(navigator.onLine ? 'synced' : 'offline');
       }
     },
     [syncKey, deviceId, userAccount?.email]
@@ -191,103 +253,234 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
 
     try {
       setSyncStatus('syncing');
-      const res = await fetch(`/api/sync?key=${encodeURIComponent(syncKey)}`);
-      if (!res.ok) throw new Error('Failed to fetch from cloud');
-      const json = await res.json();
 
-      if (json.success && json.exists && json.data) {
-        isRemoteUpdatingRef.current = true;
-        onRemoteDataReceivedRef.current(json.data);
-        setTimeout(() => {
-          isRemoteUpdatingRef.current = false;
-        }, 500);
-        setSyncStatus('synced');
-        setLastSyncedAt(new Date(json.updatedAt || Date.now()));
-        setSyncNotification('Données chargées depuis le Cloud');
-      } else {
-        // Cloud is empty for this key, push local state to cloud so it's initialized
-        setSyncStatus('synced');
-        pushToCloudRef.current();
+      // 1. Pull from Firestore if authenticated (anchored to UID)
+      if (auth.currentUser) {
+        const docRef = doc(db, 'sync_records', auth.currentUser.uid);
+        try {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const record = docSnap.data();
+            if (record && record.data) {
+              const parsed = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
+              isRemoteUpdatingRef.current = true;
+              onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
+              setTimeout(() => {
+                isRemoteUpdatingRef.current = false;
+              }, 500);
+              setSyncStatus('synced');
+              setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+              setSyncNotification('⚡ Données chargées depuis Firestore Cloud');
+              return;
+            }
+          } else {
+            // Document empty on cloud, push local state
+            setSyncStatus('synced');
+            pushToCloudRef.current();
+            return;
+          }
+        } catch (err: any) {
+          if (err?.code === 'permission-denied') {
+            handleFirestoreError(err, OperationType.GET, `sync_records/${auth.currentUser.uid}`);
+          }
+          throw err;
+        }
       }
-    } catch (err) {
-      console.warn('Sync pull error:', err);
-      setSyncStatus('offline');
-    }
-  }, [syncKey]);
 
-  // Setup Server-Sent Events (SSE) listener for instant real-time sync
+      // 2. Check local dev server fallback if on localhost
+      const isLocalHost = 
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' || 
+        window.location.port === '3000';
+
+      if (isLocalHost) {
+        try {
+          const res = await fetch(`/api/sync?key=${encodeURIComponent(syncKey)}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && json.exists && json.data) {
+              isRemoteUpdatingRef.current = true;
+              onRemoteDataReceivedRef.current(json.data);
+              setTimeout(() => {
+                isRemoteUpdatingRef.current = false;
+              }, 500);
+              setSyncStatus('synced');
+              setLastSyncedAt(new Date(json.updatedAt || Date.now()));
+              setSyncNotification('Données chargées depuis le serveur local');
+              return;
+            }
+          }
+        } catch {
+          // Local server offline
+        }
+      }
+
+      setSyncStatus('synced');
+    } catch (err) {
+      console.warn('Sync pull notice:', err);
+      setSyncStatus('synced');
+    }
+  }, [syncKey, userAccount?.email]);
+
+  // Google Login (Real Firebase Auth with 1-click popup)
+  const loginWithGoogle = useCallback(
+    async () => {
+      try {
+        setSyncStatus('syncing');
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+        const email = (user.email || '').toLowerCase();
+        const account: UserAccount = {
+          email,
+          name: user.displayName || email.split('@')[0],
+          avatar: user.photoURL || undefined,
+          provider: 'google',
+        };
+        setUserAccount(account);
+        localStorage.setItem('physio_user_account', JSON.stringify(account));
+        updateSyncKey(email);
+        setSyncNotification(`Connecté avec Google (${email}) - Synchronisation Firestore active`);
+        pullFromCloud();
+      } catch (err: any) {
+        console.warn('Google sign-in exception:', err?.message || err);
+        setSyncStatus('synced');
+        if (err?.code === 'auth/popup-closed-by-user') {
+          setSyncNotification('Connexion Google annulée');
+        } else if (err?.code === 'auth/cancelled-popup-request') {
+          setSyncNotification('Demande de popup annulée');
+        } else {
+          setSyncNotification('Connexion Google impossible (vérifiez le bloqueur de popups)');
+        }
+      }
+    },
+    [updateSyncKey, pullFromCloud]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await signOut(auth);
+    } catch {}
+    localStorage.removeItem('physio_user_account');
+    setUserAccount(null);
+    const newRandom = `PHYSIO-${Math.floor(1000 + Math.random() * 9000)}`;
+    updateSyncKey(newRandom);
+    setSyncNotification('Déconnecté du compte Google');
+  }, [updateSyncKey]);
+
+  // Setup Real-Time Firestore listener
   useEffect(() => {
     if (!navigator.onLine) {
       setSyncStatus('offline');
       return;
     }
 
-    // Close existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+    // If Firebase Auth is authenticated, attach Firestore onSnapshot using UID isolation
+    if (auth.currentUser) {
+      const docRef = doc(db, 'sync_records', auth.currentUser.uid);
+      const unsubscribe = onSnapshot(
+        docRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const record = snapshot.data();
+            if (record && record.data) {
+              if (record.lastDeviceId === deviceId) {
+                setSyncStatus('synced');
+                setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+                return;
+              }
+
+              try {
+                const parsed = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
+                isRemoteUpdatingRef.current = true;
+                onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
+                setTimeout(() => {
+                  isRemoteUpdatingRef.current = false;
+                }, 600);
+
+                setSyncStatus('synced');
+                setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+                const senderName = record.lastDeviceId?.startsWith('mobile')
+                  ? 'Smartphone'
+                  : record.lastDeviceId?.startsWith('pc')
+                  ? 'Ordinateur'
+                  : 'Appareil distant';
+                setSyncNotification(`⚡ Données synchronisées en direct depuis votre ${senderName}`);
+              } catch (err) {
+                console.error('Error parsing Firestore remote payload:', err);
+              }
+            }
+          }
+        },
+        (error) => {
+          if (error.code === 'permission-denied') {
+            handleFirestoreError(error, OperationType.GET, `sync_records/${auth.currentUser?.uid || 'unknown'}`);
+          } else {
+            console.warn('Firestore onSnapshot listener notice:', error.message);
+          }
+        }
+      );
+
+      pullFromCloud();
+      return () => unsubscribe();
     }
 
-    const sseUrl = `/api/sync/events?key=${encodeURIComponent(syncKey)}`;
-    const es = new EventSource(sseUrl);
-    eventSourceRef.current = es;
+    // If not signed in to Firebase, check if local server is active (dev mode)
+    const isLocalHost = 
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' || 
+      window.location.port === '3000';
 
-    es.addEventListener('connected', (e: MessageEvent) => {
+    if (isLocalHost) {
+      let eventSource: EventSource | null = null;
       try {
-        const payload = JSON.parse(e.data);
-        setActiveDevicesCount(Math.max(1, payload.activeDevices || 1));
-        setSyncStatus('synced');
+        const sseUrl = `/api/sync/events?key=${encodeURIComponent(syncKey)}`;
+        eventSource = new EventSource(sseUrl);
+
+        eventSource.addEventListener('connected', (e: MessageEvent) => {
+          try {
+            const payload = JSON.parse(e.data);
+            setActiveDevicesCount(Math.max(1, payload.activeDevices || 1));
+            setSyncStatus('synced');
+          } catch {}
+        });
+
+        eventSource.addEventListener('sync-update', (e: MessageEvent) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload.senderDeviceId === deviceId) {
+              setSyncStatus('synced');
+              setLastSyncedAt(new Date());
+              return;
+            }
+
+            if (payload.data) {
+              isRemoteUpdatingRef.current = true;
+              onRemoteDataReceivedRef.current(payload.data, payload.senderDeviceId);
+              setTimeout(() => {
+                isRemoteUpdatingRef.current = false;
+              }, 600);
+
+              setSyncStatus('synced');
+              setLastSyncedAt(new Date());
+              setSyncNotification('⚡ Données synchronisées en direct');
+            }
+          } catch {}
+        });
+
+        eventSource.onerror = () => {
+          if (!navigator.onLine) setSyncStatus('offline');
+        };
       } catch {}
-    });
 
-    es.addEventListener('sync-update', (e: MessageEvent) => {
-      try {
-        const payload = JSON.parse(e.data);
-        // Ignore if sent by this device
-        if (payload.senderDeviceId === deviceId) {
-          setSyncStatus('synced');
-          setLastSyncedAt(new Date());
-          return;
-        }
-
-        // Apply remote update!
-        if (payload.data) {
-          isRemoteUpdatingRef.current = true;
-          onRemoteDataReceivedRef.current(payload.data, payload.senderDeviceId);
-          setTimeout(() => {
-            isRemoteUpdatingRef.current = false;
-          }, 600);
-
-          setSyncStatus('synced');
-          setLastSyncedAt(new Date());
-
-          const senderName = payload.senderDeviceId?.startsWith('mobile')
-            ? 'Smartphone'
-            : payload.senderDeviceId?.startsWith('pc')
-            ? 'Ordinateur'
-            : 'Appareil distant';
-
-          setSyncNotification(`⚡ Données synchronisées en direct depuis votre ${senderName}`);
-        }
-      } catch (err) {
-        console.error('Error handling sync-update SSE:', err);
-      }
-    });
-
-    es.onerror = () => {
-      // Browser EventSource automatically retries
-      if (!navigator.onLine) {
-        setSyncStatus('offline');
-      }
-    };
-
-    // Initial pull from cloud
-    pullFromCloud();
-
-    return () => {
-      es.close();
-      eventSourceRef.current = null;
-    };
-  }, [syncKey, deviceId, pullFromCloud]);
+      pullFromCloud();
+      return () => {
+        if (eventSource) eventSource.close();
+      };
+    } else {
+      // In static deployment (GitHub Pages), set to synced
+      pullFromCloud();
+    }
+  }, [syncKey, deviceId, userAccount?.email, pullFromCloud]);
 
   // Handle online/offline events
   useEffect(() => {

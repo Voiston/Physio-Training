@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidSyncRecord(data) {
+      return data.keys().hasAll(['userId', 'userEmail', 'key', 'data', 'version', 'lastDeviceId', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'userEmail', 'key', 'data', 'version', 'lastDeviceId', 'updatedAt'])
+        && data.userId is string && data.userId.size() <= 128 && data.userId == request.auth.uid
+        && data.userEmail is string && data.userEmail.size() <= 128 && data.userEmail == request.auth.token.email
+        && data.key is string && data.key.size() <= 128
+        && data.data is string && data.data.size() <= 500000
+        && data.version is int
+        && data.lastDeviceId is string && data.lastDeviceId.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    match /sync_records/{recordId} {
+      // Document isolation strictly anchored to authenticated user UID
+      allow get: if isVerifiedUser()
+        && isValidId(recordId)
+        && recordId == request.auth.uid
+        && (resource == null || resource.data.userId == request.auth.uid);
+
+      allow list: if isVerifiedUser()
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if isVerifiedUser()
+        && isValidId(recordId)
+        && recordId == request.auth.uid
+        && isValidSyncRecord(incoming());
+
+      allow update: if isVerifiedUser()
+        && isValidId(recordId)
+        && recordId == request.auth.uid
+        && isValidSyncRecord(incoming())
+        && incoming().userId == existing().userId
+        && incoming().userEmail == existing().userEmail
+        && incoming().diff(existing()).affectedKeys().hasOnly(['key', 'data', 'version', 'lastDeviceId', 'updatedAt']);
+
+      allow delete: if isVerifiedUser()
+        && isValidId(recordId)
+        && recordId == request.auth.uid
+        && existing().userId == request.auth.uid;
+    }
+  }
+}

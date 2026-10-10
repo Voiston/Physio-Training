@@ -15,20 +15,91 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <script>
-      // Suppress Vite HMR WebSocket closed errors in preview/cloud environment
-      window.addEventListener('error', function(e) {
-        if (e && e.message && (e.message.includes('WebSocket') || e.message.includes('vite'))) {
-          e.stopImmediatePropagation();
+      // Handle Vite HMR WebSocket in preview/cloud environment (HMR is disabled in AI Studio)
+      (function() {
+        const OrigWebSocket = window.WebSocket;
+        if (OrigWebSocket) {
+          class ViteSafeWebSocket extends EventTarget {
+            static CONNECTING = 0;
+            static OPEN = 1;
+            static CLOSING = 2;
+            static CLOSED = 3;
+
+            CONNECTING = 0;
+            OPEN = 1;
+            CLOSING = 2;
+            CLOSED = 3;
+            readyState = 1;
+            url = '';
+            protocol = '';
+            extensions = '';
+            bufferedAmount = 0;
+            binaryType = 'blob';
+            onopen = null;
+            onclose = null;
+            onerror = null;
+            onmessage = null;
+
+            constructor(url, protocols) {
+              super();
+              const isViteHmr =
+                protocols === 'vite-hmr' ||
+                (Array.isArray(protocols) && protocols.includes('vite-hmr')) ||
+                (typeof url === 'string' && (url.includes('vite-hmr') || url.includes('token=')));
+
+              if (!isViteHmr) {
+                return new OrigWebSocket(url, protocols);
+              }
+
+              this.url = String(url);
+              this.protocol = 'vite-hmr';
+              this.readyState = 1; // OPEN
+
+              setTimeout(() => {
+                const openEvt = new Event('open');
+                if (typeof this.onopen === 'function') {
+                  this.onopen(openEvt);
+                }
+                this.dispatchEvent(openEvt);
+              }, 0);
+            }
+
+            send(data) {}
+            close(code, reason) {
+              this.readyState = 3;
+              const closeEvt = new CloseEvent('close', { code: code || 1000, reason: reason || '', wasClean: true });
+              if (typeof this.onclose === 'function') {
+                this.onclose(closeEvt);
+              }
+              this.dispatchEvent(closeEvt);
+            }
+          }
+
+          window.WebSocket = ViteSafeWebSocket;
         }
-      }, true);
-      window.addEventListener('unhandledrejection', function(e) {
-        if (e && e.reason && typeof e.reason.message === 'string' && (e.reason.message.includes('WebSocket') || e.reason.message.includes('vite'))) {
-          e.stopImmediatePropagation();
-        }
-      }, true);
+
+        // Intercept any leftover WebSocket error logs or unhandled rejections
+        window.addEventListener('error', function(e) {
+          const msg = (e && (e.message || (e.error && e.error.message))) || '';
+          if (typeof msg === 'string' && (msg.includes('WebSocket') || msg.includes('vite') || msg.includes('vite-hmr'))) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          const msg = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+          if (typeof msg === 'string' && (msg.includes('WebSocket') || msg.includes('vite') || msg.includes('vite-hmr'))) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
     </script>
   </head>
   <body>
