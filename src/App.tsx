@@ -898,14 +898,11 @@ function AppContent() {
       <CloudSyncModal
         isOpen={showCloudSyncModal}
         onClose={() => setShowCloudSyncModal(false)}
-        syncKey={cloudSync.syncKey}
         userAccount={cloudSync.userAccount}
         syncStatus={cloudSync.syncStatus}
         lastSyncedAt={cloudSync.lastSyncedAt}
-        activeDevicesCount={cloudSync.activeDevicesCount}
         pairingUrl={cloudSync.pairingUrl}
         qrCodeUrl={cloudSync.qrCodeUrl}
-        onUpdateSyncKey={cloudSync.updateSyncKey}
         onLoginWithGoogle={cloudSync.loginWithGoogle}
         onLogout={cloudSync.logout}
         onPushToCloud={() => {
@@ -913,7 +910,7 @@ function AppContent() {
           showToast({
             type: 'info',
             title: 'Synchronisation Cloud',
-            message: 'Données locales envoyées vers le serveur Cloud.'
+            message: 'Données locales envoyées vers Firebase Cloud.'
           });
         }}
         onPullFromCloud={() => {
@@ -921,7 +918,7 @@ function AppContent() {
           showToast({
             type: 'info',
             title: 'Synchronisation Cloud',
-            message: 'Données rechargées depuis le serveur Cloud.'
+            message: 'Données rechargées depuis Firebase Cloud.'
           });
         }}
       />

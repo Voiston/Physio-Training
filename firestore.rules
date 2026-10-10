@@ -38,16 +38,6 @@ service cloud.firestore {
         && data.updatedAt is string && data.updatedAt.size() <= 64;
     }
 
-    function isValidRoomRecord(data, roomKey) {
-      return data.keys().hasAll(['key', 'data', 'version', 'lastDeviceId', 'updatedAt'])
-        && data.key is string && data.key.size() <= 128 && data.key == roomKey
-        && data.data is string && data.data.size() <= 1000000
-        && data.version is int
-        && data.lastDeviceId is string && data.lastDeviceId.size() <= 64
-        && data.updatedAt is string && data.updatedAt.size() <= 64
-        && (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 128));
-    }
-
     match /sync_records/{recordId} {
       // Document isolation strictly anchored to authenticated user UID
       allow get: if isVerifiedUser()
@@ -75,20 +65,6 @@ service cloud.firestore {
         && isValidId(recordId)
         && recordId == request.auth.uid
         && existing().userId == request.auth.uid;
-    }
-
-    match /sync_rooms/{roomKey} {
-      // Direct QR-code / paired rooms sync between mobile and desktop devices
-      allow get: if isSignedIn()
-        && isValidId(roomKey);
-
-      allow list: if false;
-
-      allow create, update: if isSignedIn()
-        && isValidId(roomKey)
-        && isValidRoomRecord(incoming(), roomKey);
-
-      allow delete: if false;
     }
   }
 }

@@ -22,7 +22,7 @@ import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
 import { isPrimary } from '../utils/loadHelpers';
-import { SessionExercise } from '../utils/muscleHelpers';
+import { SessionExercise, getSavedCustomExercises } from '../utils/muscleHelpers';
 
 export interface QualityImpact {
   id: string;
@@ -381,6 +381,7 @@ export function useData() {
     });
     setSimulatedEvents({});
     setIsSimulationActive(false);
+    triggerSyncPush();
   };
 
   const applySimulationScenario = (scenarioType: 'tapering' | 'overload' | 'recovery') => {
@@ -483,6 +484,9 @@ export function useData() {
         setPhysioSettingsState(imported.physioSettings);
         localStorage.setItem('physio_settings', JSON.stringify(imported.physioSettings));
       }
+      if (Array.isArray(imported.customExercises)) {
+        localStorage.setItem('physio_custom_exercises', JSON.stringify(imported.customExercises));
+      }
     } catch (e) {
       console.error('Error applying remote data:', e);
     }
@@ -498,6 +502,7 @@ export function useData() {
       blockTemplates,
       targetCompetition,
       physioSettings,
+      customExercises: getSavedCustomExercises(),
       updatedAt: new Date().toISOString(),
     };
   }, [events, dailyMetrics, trainingBlocks, qualities, blockTemplates, targetCompetition, physioSettings]);
@@ -648,6 +653,7 @@ export function useData() {
   const setQualities = (newQualities: Quality[]) => {
     setQualitiesState(newQualities);
     localStorage.setItem('physio_qualities', JSON.stringify(newQualities));
+    triggerSyncPush();
   };
 
   const moveQuality = (qId: string, direction: 'up' | 'down') => {
@@ -665,6 +671,7 @@ export function useData() {
       localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
+    triggerSyncPush();
   };
 
   const moveQualityToTop = (qId: string) => {
@@ -677,6 +684,7 @@ export function useData() {
       localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
+    triggerSyncPush();
   };
 
   const reorderQualities = (sourceId: string, targetId: string, position: 'before' | 'after' = 'before') => {
@@ -697,6 +705,7 @@ export function useData() {
       localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
+    triggerSyncPush();
   };
 
   const moveQualityToIndex = (sourceIndex: number, targetIndex: number) => {
@@ -709,6 +718,7 @@ export function useData() {
       localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
+    triggerSyncPush();
   };
 
   const reorderByBlockFocus = (block?: TrainingBlock | null) => {
@@ -719,6 +729,7 @@ export function useData() {
       localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
+    triggerSyncPush();
   };
 
   const resetQualitiesOrder = () => {
@@ -738,12 +749,14 @@ export function useData() {
       saveBlockTemplates(updated);
       return updated;
     });
+    triggerSyncPush();
   };
 
   const resetBlockTemplates = () => {
     localStorage.removeItem('physio_block_templates');
     const defaults = getSavedBlockTemplates();
     setBlockTemplates(defaults);
+    triggerSyncPush();
   };
 
   const trainingRecommendations = useMemo<TrainingRecommendation[]>(() => {
@@ -757,6 +770,7 @@ export function useData() {
       localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
+    triggerSyncPush();
   };
 
   const exportData = () => {
