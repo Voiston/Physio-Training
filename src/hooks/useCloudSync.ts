@@ -31,13 +31,11 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
 
   // 2. Sync Key & Account
   const [syncKey, setSyncKeyState] = useState<string>(() => {
-    // Check URL params first: ?sync=CODE
     const urlParams = new URLSearchParams(window.location.search);
     const paramKey = urlParams.get('sync');
     if (paramKey && paramKey.trim().length > 0) {
       const cleaned = paramKey.trim();
       localStorage.setItem('physio_sync_key', cleaned);
-      // Clean url without reload
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
       return cleaned;
@@ -46,7 +44,6 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
     const saved = localStorage.getItem('physio_sync_key');
     if (saved) return saved;
 
-    // Default friendly sync code
     const randomCode = `PHYSIO-${Math.floor(1000 + Math.random() * 9000)}`;
     localStorage.setItem('physio_sync_key', randomCode);
     return randomCode;
@@ -69,6 +66,18 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
   const eventSourceRef = useRef<EventSource | null>(null);
   const debounceTimerRef = useRef<any>(null);
   const isRemoteUpdatingRef = useRef<boolean>(false);
+
+  // Keep references to incoming callbacks to prevent effect re-triggering loops
+  const onRemoteDataReceivedRef = useRef(onRemoteDataReceived);
+  const getExportableDataRef = useRef(getExportableData);
+
+  useEffect(() => {
+    onRemoteDataReceivedRef.current = onRemoteDataReceived;
+  }, [onRemoteDataReceived]);
+
+  useEffect(() => {
+    getExportableDataRef.current = getExportableData;
+  }, [getExportableData]);
 
   // Generate QR code for smartphone pairing
   const pairingUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(syncKey)}`;
@@ -106,7 +115,6 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
       };
       localStorage.setItem('physio_user_account', JSON.stringify(account));
       setUserAccount(account);
-      // Synchronize key with Google email
       updateSyncKey(cleanEmail);
       setSyncNotification(`Connecté avec Google (${cleanEmail}) - Synchronisation active`);
     },
@@ -132,7 +140,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
 
       setSyncStatus('syncing');
       try {
-        const dataToSend = overrideData || getExportableData();
+        const dataToSend = overrideData || getExportableDataRef.current();
         const response = await fetch('/api/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -157,17 +165,22 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
         setSyncStatus('offline');
       }
     },
-    [syncKey, deviceId, userAccount, getExportableData]
+    [syncKey, deviceId, userAccount?.email]
   );
+
+  const pushToCloudRef = useRef(pushToCloud);
+  useEffect(() => {
+    pushToCloudRef.current = pushToCloud;
+  }, [pushToCloud]);
 
   // Debounced push for frequent UI modifications
   const triggerDebouncedPush = useCallback(() => {
     if (isRemoteUpdatingRef.current) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      pushToCloud();
+      pushToCloudRef.current();
     }, 900);
-  }, [pushToCloud]);
+  }, []);
 
   // Pull from cloud
   const pullFromCloud = useCallback(async () => {
@@ -184,7 +197,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
 
       if (json.success && json.exists && json.data) {
         isRemoteUpdatingRef.current = true;
-        onRemoteDataReceived(json.data);
+        onRemoteDataReceivedRef.current(json.data);
         setTimeout(() => {
           isRemoteUpdatingRef.current = false;
         }, 500);
@@ -194,13 +207,13 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
       } else {
         // Cloud is empty for this key, push local state to cloud so it's initialized
         setSyncStatus('synced');
-        pushToCloud();
+        pushToCloudRef.current();
       }
     } catch (err) {
       console.warn('Sync pull error:', err);
       setSyncStatus('offline');
     }
-  }, [syncKey, onRemoteDataReceived, pushToCloud]);
+  }, [syncKey]);
 
   // Setup Server-Sent Events (SSE) listener for instant real-time sync
   useEffect(() => {
@@ -239,7 +252,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
         // Apply remote update!
         if (payload.data) {
           isRemoteUpdatingRef.current = true;
-          onRemoteDataReceived(payload.data, payload.senderDeviceId);
+          onRemoteDataReceivedRef.current(payload.data, payload.senderDeviceId);
           setTimeout(() => {
             isRemoteUpdatingRef.current = false;
           }, 600);
@@ -274,7 +287,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
       es.close();
       eventSourceRef.current = null;
     };
-  }, [syncKey, deviceId, onRemoteDataReceived, pullFromCloud]);
+  }, [syncKey, deviceId, pullFromCloud]);
 
   // Handle online/offline events
   useEffect(() => {

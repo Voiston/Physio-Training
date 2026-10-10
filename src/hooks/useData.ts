@@ -193,8 +193,70 @@ export const DEFAULT_PHYSIO_SETTINGS: PhysiologicalSettings = {
   profileName: 'Standard'
 };
 
+function getInitialEvents(): Record<string, Record<string, SessionData>> {
+  try {
+    migrateLocalStorage();
+  } catch (err) {
+    console.warn('Migration error during initial events loading:', err);
+  }
+  const loadedEvents: Record<string, Record<string, SessionData>> = {};
+  DEFAULT_QUALITIES.forEach(q => (loadedEvents[q.id] = {}));
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || key === 'physio_qualities' || key === 'physio_target_competition') continue;
+      const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
+      if (match) {
+        const dateStr = match[1];
+        const category = match[2];
+        if (category === 'readiness' || category === 'vfc' || category === 'hrRest') continue;
+        try {
+          const rawItem = localStorage.getItem(key);
+          if (!rawItem) continue;
+          const parsed = JSON.parse(rawItem);
+          if (!loadedEvents[category]) loadedEvents[category] = {};
+          loadedEvents[category][dateStr] = parsed;
+        } catch {
+          const rawVal = localStorage.getItem(key);
+          if (!loadedEvents[category]) loadedEvents[category] = {};
+          loadedEvents[category][dateStr] = { load: parseInt(rawVal || '0', 10) * 5 };
+        }
+      }
+    }
+  } catch {}
+  return loadedEvents;
+}
+
+function getInitialDailyMetrics(): Record<string, DailyMetrics> {
+  const loadedMetrics: Record<string, DailyMetrics> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
+      if (match) {
+        const dateStr = match[1];
+        const category = match[2];
+        if (category === 'readiness' || category === 'vfc' || category === 'hrRest') {
+          try {
+            const rawItem = localStorage.getItem(key);
+            if (!rawItem) continue;
+            if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
+            loadedMetrics[dateStr][category] = Number(JSON.parse(rawItem));
+          } catch {
+            const rawVal = localStorage.getItem(key);
+            if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
+            loadedMetrics[dateStr][category] = parseInt(rawVal || '0', 10);
+          }
+        }
+      }
+    }
+  } catch {}
+  return loadedMetrics;
+}
+
 export function useData() {
-  const [events, setEvents] = useState<Record<string, Record<string, SessionData>>>({});
+  const [events, setEvents] = useState<Record<string, Record<string, SessionData>>>(() => getInitialEvents());
   const [qualities, setQualitiesState] = useState<Quality[]>(() => {
     try {
       const raw = localStorage.getItem('physio_qualities');
@@ -222,7 +284,7 @@ export function useData() {
     return DEFAULT_QUALITIES;
   });
 
-  const [dailyMetrics, setDailyMetrics] = useState<Record<string, DailyMetrics>>({}); // Stores VFC, Readiness
+  const [dailyMetrics, setDailyMetrics] = useState<Record<string, DailyMetrics>>(() => getInitialDailyMetrics());
   
   const [blockTemplates, setBlockTemplates] = useState<BlockTemplate[]>(() => {
     return getSavedBlockTemplates();
@@ -370,46 +432,6 @@ export function useData() {
     setIsSimulationActive(true);
   };
 
-  useEffect(() => {
-    // Migration ascendante automatique des données présentes dans localStorage
-    migrateLocalStorage();
-
-    const loadedEvents: Record<string, Record<string, SessionData>> = {};
-    qualities.forEach(q => (loadedEvents[q.id] = {}));
-    const loadedMetrics: Record<string, DailyMetrics> = {};
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key || key === 'physio_qualities' || key === 'physio_target_competition') continue;
-      
-      const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
-      if (match) {
-        const dateStr = match[1];
-        const category = match[2];
-        try {
-          const rawItem = localStorage.getItem(key);
-          if (!rawItem) continue;
-          const parsed = JSON.parse(rawItem);
-          if (category === 'readiness' || category === 'vfc' || category === 'hrRest') {
-            if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
-            loadedMetrics[dateStr][category] = Number(parsed);
-          } else if (loadedEvents[category] !== undefined) {
-            loadedEvents[category][dateStr] = parsed;
-          }
-        } catch (e) {
-          const rawVal = localStorage.getItem(key);
-          if (category === 'readiness' || category === 'vfc' || category === 'hrRest') {
-            if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
-            loadedMetrics[dateStr][category] = parseInt(rawVal || '0', 10);
-          } else if (loadedEvents[category] !== undefined) {
-            loadedEvents[category][dateStr] = { load: parseInt(rawVal || '0', 10) * 5 };
-          }
-        }
-      }
-    }
-    setEvents(loadedEvents);
-    setDailyMetrics(loadedMetrics);
-  }, [qualities]);
 
   // Cloud Synchronization for Smartphone ↔ PC Real-Time Sync
   const cloudSyncRef = useRef<any>(null);
