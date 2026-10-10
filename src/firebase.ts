@@ -3,6 +3,7 @@ import {
   getAuth, 
   GoogleAuthProvider, 
   signInWithPopup, 
+  signInAnonymously,
   signOut, 
   onAuthStateChanged, 
   type User 
@@ -79,5 +80,5 @@ export async function testConnection() {
 
 testConnection();
 
-export { signInWithPopup, signOut, onAuthStateChanged };
+export { signInWithPopup, signInAnonymously, signOut, onAuthStateChanged };
 export type { User };
