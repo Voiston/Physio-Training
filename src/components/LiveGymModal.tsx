@@ -996,9 +996,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
             {/* BANNIÈRE MINUTEUR DE REPOS FLOTTANTE / ACTIVE */}
             {restTimer && (
-              <div className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-indigo-500/40 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 animate-fadeIn shrink-0 shadow-lg">
+              <div 
+                role="timer"
+                aria-label={`Minuteur de repos : ${Math.floor(restTimer.remaining / 60)} minutes et ${restTimer.remaining % 60} secondes restantes`}
+                className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-indigo-500/40 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 animate-fadeIn shrink-0 shadow-lg"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-indigo-500/30 border border-indigo-400/50">
+                  <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-indigo-500/30 border border-indigo-400/50" aria-hidden="true">
                     <Timer size={18} className="text-indigo-200 animate-pulse" />
                   </div>
                   <div>
@@ -1010,42 +1014,49 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                         </span>
                       )}
                     </div>
-                    <div className="font-mono font-black text-xl sm:text-2xl text-white tracking-tight tabular-nums">
+                    <div 
+                      className="font-mono font-black text-xl sm:text-2xl text-white tracking-tight tabular-nums"
+                      aria-hidden="true"
+                    >
                       {formatTime(restTimer.remaining)}
                     </div>
                   </div>
                 </div>
 
-                {/* Commandes rapides de repos (+30s, -15s, passer) */}
+                {/* Commandes rapides de repos (+30s, -15s, pause, passer) avec cibles tactiles 44px */}
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => handleAdjustRestTimer(-15)}
-                    className="px-2 sm:px-2.5 py-1 rounded-lg bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-[11px] font-bold text-indigo-200"
+                    className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform"
                     title="Enlever 15 secondes"
+                    aria-label="Enlever 15 secondes au minuteur de repos"
                   >
                     -15s
                   </button>
                   <button
                     type="button"
                     onClick={() => handleAdjustRestTimer(30)}
-                    className="px-2 sm:px-2.5 py-1 rounded-lg bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-[11px] font-bold text-indigo-200"
+                    className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform"
                     title="Ajouter 30 secondes"
+                    aria-label="Ajouter 30 secondes au minuteur de repos"
                   >
                     +30s
                   </button>
                   <button
                     type="button"
                     onClick={handleToggleRestPause}
-                    className="p-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-indigo-200"
-                    title={restTimer.running ? 'Pause' : 'Reprendre'}
+                    className="min-h-[44px] min-w-[44px] p-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-indigo-200 flex items-center justify-center active:scale-95 transition-transform"
+                    title={restTimer.running ? 'Mettre le repos en pause' : 'Reprendre le repos'}
+                    aria-label={restTimer.running ? 'Mettre le chronomètre de repos en pause' : 'Reprendre le chronomètre de repos'}
                   >
-                    {restTimer.running ? <Pause size={14} /> : <Play size={14} />}
+                    {restTimer.running ? <Pause size={16} /> : <Play size={16} />}
                   </button>
                   <button
                     type="button"
                     onClick={handleSkipRestTimer}
-                    className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-white transition-colors"
+                    className="min-h-[44px] px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors active:scale-95 flex items-center justify-center"
+                    aria-label="Passer le minuteur de repos et reprendre l'entraînement"
                   >
                     Passer
                   </button>
@@ -1165,21 +1176,22 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                           >
                             {/* Numéro de série */}
                             <div className="col-span-1 flex flex-col items-center justify-center">
-                              <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
+                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
                                 isSetDone ? 'bg-emerald-500/30 text-emerald-300 font-black' : 'bg-slate-800 text-slate-300'
                               }`}>
                                 {set.setNumber}
                               </span>
                             </div>
 
-                            {/* Charge (kg) avec boutons tactiles +/- agrandis */}
+                            {/* Charge (kg) avec boutons tactiles +/- agrandis à 44px de hauteur */}
                             <div className="col-span-5 sm:col-span-3 flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustWeight(exIdx, sIdx, -2.5)}
-                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
+                                className="min-w-[36px] sm:min-w-[32px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="-2.5 kg"
+                                aria-label={`Diminuer le poids de 2.5 kg pour la série ${set.setNumber} de ${ex.name}`}
                               >
                                 -
                               </button>
@@ -1191,27 +1203,30 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 value={set.weightKg === 0 ? '' : set.weightKg}
                                 onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'weightKg', Number(e.target.value) || 0)}
                                 placeholder="0"
-                                className="w-13 sm:w-16 h-9 sm:h-8 text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                aria-label={`Poids en kg pour la série ${set.setNumber} de ${ex.name}`}
+                                className="w-13 sm:w-16 min-h-[44px] sm:min-h-[40px] text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                               />
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustWeight(exIdx, sIdx, 2.5)}
-                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
+                                className="min-w-[36px] sm:min-w-[32px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="+2.5 kg"
+                                aria-label={`Augmenter le poids de 2.5 kg pour la série ${set.setNumber} de ${ex.name}`}
                               >
                                 +
                               </button>
                             </div>
 
-                            {/* Répétitions avec boutons tactiles +/- agrandis */}
+                            {/* Répétitions avec boutons tactiles +/- agrandis à 44px de hauteur */}
                             <div className="col-span-4 sm:col-span-2 flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustReps(exIdx, sIdx, -1)}
-                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
+                                className="min-w-[34px] sm:min-w-[30px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="-1 rep"
+                                aria-label={`Diminuer d'une répétition pour la série ${set.setNumber} de ${ex.name}`}
                               >
                                 -
                               </button>
@@ -1222,14 +1237,16 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 value={set.reps || ''}
                                 onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'reps', Math.max(1, Number(e.target.value) || 1))}
                                 placeholder="10"
-                                className="w-10 sm:w-12 h-9 sm:h-8 text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                aria-label={`Nombre de répétitions pour la série ${set.setNumber} de ${ex.name}`}
+                                className="w-10 sm:w-12 min-h-[44px] sm:min-h-[40px] text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                               />
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustReps(exIdx, sIdx, 1)}
-                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
+                                className="min-w-[34px] sm:min-w-[30px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="+1 rep"
+                                aria-label={`Augmenter d'une répétition pour la série ${set.setNumber} de ${ex.name}`}
                               >
                                 +
                               </button>
@@ -1241,7 +1258,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 disabled={isSetDone}
                                 value={set.rir}
                                 onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'rir', Number(e.target.value))}
-                                className="h-8 px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                aria-label={`Répétitions en réserve RIR pour la série ${set.setNumber} de ${ex.name}`}
+                                className="min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                               >
                                 <option value="0">0 (Échec)</option>
                                 <option value="1">1 (Trés dur)</option>
@@ -1257,7 +1275,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 disabled={isSetDone}
                                 value={set.restSeconds}
                                 onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'restSeconds', Number(e.target.value))}
-                                className="h-8 px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                aria-label={`Temps de repos prévu après la série ${set.setNumber} de ${ex.name}`}
+                                className="min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                               >
                                 <option value="45">45s</option>
                                 <option value="60">60s</option>
@@ -1267,20 +1286,20 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                               </select>
                             </div>
 
-                            {/* BOUTON TACTILE DE VALIDATION RÉDUIT (SVG CHECK VERT) */}
+                            {/* BOUTON TACTILE DE VALIDATION (MIN-H 44PX WCAG 2.2) */}
                             <div className="col-span-2 sm:col-span-2 flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => handleValidateSet(exIdx, sIdx)}
-                                className={`w-9 sm:w-8.5 h-9 sm:h-8.5 rounded-xl flex items-center justify-center transition-all shadow-sm touch-manipulation active:scale-90 ${
+                                className={`min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center transition-all shadow-sm touch-manipulation active:scale-95 ${
                                   isSetDone
-                                    ? 'bg-emerald-500/25 hover:bg-emerald-500/35 border-2 border-emerald-400 text-emerald-400 shadow-emerald-500/20'
+                                    ? 'bg-emerald-500/25 hover:bg-emerald-500/35 border-2 border-emerald-400 text-emerald-400 shadow-emerald-500/20 ring-2 ring-emerald-500/30'
                                     : 'bg-emerald-500/15 hover:bg-emerald-500/25 active:bg-emerald-500/35 border border-emerald-500/40 text-emerald-400'
                                 }`}
                                 title={isSetDone ? 'Série validée (cliquer pour annuler)' : 'Valider la série'}
-                                aria-label={isSetDone ? 'Série validée' : 'Valider la série'}
+                                aria-label={isSetDone ? `Série ${set.setNumber} de ${ex.name} validée. Cliquer pour annuler.` : `Valider la série ${set.setNumber} de ${ex.name}`}
                               >
-                                <Check size={18} className="text-emerald-400 stroke-[3]" />
+                                <Check size={20} className="text-emerald-400 stroke-[3]" />
                               </button>
 
                               {/* Supprimer la série si plus d'une */}
@@ -1288,10 +1307,11 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveSet(exIdx, sIdx)}
-                                  className="w-6 sm:w-7 h-8 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 flex items-center justify-center transition-colors touch-manipulation"
+                                  className="min-w-[36px] min-h-[44px] text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 flex items-center justify-center transition-colors touch-manipulation active:scale-90"
                                   title="Retirer cette série"
+                                  aria-label={`Supprimer la série ${set.setNumber} de ${ex.name}`}
                                 >
-                                  <X size={14} />
+                                  <X size={16} />
                                 </button>
                               )}
                             </div>
@@ -1417,16 +1437,26 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               {/* RPE Musculaire */}
               <div>
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
-                  <span>RPE Musculaire (Difficulté perçue de 1 à 10)</span>
+                  <label htmlFor="summary-rpe-musc">RPE Musculaire (Difficulté perçue de 1 à 10)</label>
                   <span className="font-mono text-base text-blue-400">{sessionRpeMusc} / 10</span>
                 </div>
                 <input
+                  id="summary-rpe-musc"
                   type="range"
                   min="1"
                   max="10"
                   step="0.5"
                   value={sessionRpeMusc}
                   onChange={(e) => setSessionRpeMusc(Number(e.target.value))}
+                  aria-label="RPE Musculaire : difficulté perçue de l'effort"
+                  aria-valuemin={1}
+                  aria-valuemax={10}
+                  aria-valuenow={sessionRpeMusc}
+                  aria-valuetext={`RPE ${sessionRpeMusc} sur 10. ${
+                    sessionRpeMusc >= 9 ? 'Effort maximal ou proche de l échec' :
+                    sessionRpeMusc >= 7.5 ? 'Effort difficile, 1 à 2 répétitions en réserve' :
+                    sessionRpeMusc >= 6 ? 'Effort modéré à soutenu' : 'Effort léger'
+                  }`}
                   className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
                 />
               </div>
@@ -1434,16 +1464,22 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               {/* Fatigue globale */}
               <div>
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
-                  <span>Fatigue ressentie post-séance</span>
+                  <label htmlFor="summary-fatigue">Fatigue ressentie post-séance</label>
                   <span className="font-mono text-base text-amber-400">{sessionFatigue} / 10</span>
                 </div>
                 <input
+                  id="summary-fatigue"
                   type="range"
                   min="1"
                   max="10"
                   step="0.5"
                   value={sessionFatigue}
                   onChange={(e) => setSessionFatigue(Number(e.target.value))}
+                  aria-label="Fatigue globale ressentie après la séance"
+                  aria-valuemin={1}
+                  aria-valuemax={10}
+                  aria-valuenow={sessionFatigue}
+                  aria-valuetext={`Niveau de fatigue ${sessionFatigue} sur 10`}
                   className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
                 />
               </div>
@@ -1501,17 +1537,23 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         {/* MODALE TIERS : CATALOGUE POUR AJOUTER UN EXERCICE                    */}
         {/* ==================================================================== */}
         {showAddExercisePicker && (
-          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 flex flex-col justify-end sm:justify-center">
+          <div 
+            className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 flex flex-col justify-end sm:justify-center"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-exercise-modal-title"
+          >
             <div className="bg-slate-900 border border-slate-700 rounded-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl max-w-xl mx-auto w-full animate-fadeIn">
               <div className="p-4 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Dumbbell size={18} className="text-blue-400" />
-                  <h3 className="font-bold text-white text-base">Ajouter un exercice</h3>
+                  <Dumbbell size={18} className="text-blue-400" aria-hidden="true" />
+                  <h3 id="add-exercise-modal-title" className="font-bold text-white text-base">Ajouter un exercice</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddExercisePicker(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white"
+                  className="min-h-[40px] min-w-[40px] rounded-lg text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                  aria-label="Fermer le sélecteur d'exercices"
                 >
                   <X size={18} />
                 </button>
@@ -1520,17 +1562,19 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               {/* Recherche et filtres catégories */}
               <div className="p-3 border-b border-slate-800 space-y-2 bg-slate-950/50">
                 <div className="relative">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden="true" />
                   <input
                     type="text"
+                    autoFocus
                     value={exerciseSearch}
                     onChange={(e) => setExerciseSearch(e.target.value)}
                     placeholder="Rechercher (ex: Squat, Développé, Traction...)"
+                    aria-label="Rechercher un exercice dans le catalogue"
                     className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs" role="toolbar" aria-label="Filtres de catégories">
                   {[
                     ...(frequentExercises.length > 0 ? [{ id: 'frequent', label: 'Récents & Fréquents' }] : []),
                     { id: 'all', label: isPullSession ? 'Tous (Pull en 1er)' : 'Tous' },
@@ -1674,6 +1718,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                           <button
                             type="button"
                             onClick={() => toggleMuscleCollapse(muscle.id)}
+                            aria-expanded={isExpanded}
+                            aria-controls={`muscle-group-panel-${muscle.id}`}
                             className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
                               isTargetMuscle
                                 ? 'bg-emerald-950/35 border-emerald-500/40 hover:bg-emerald-950/50 text-emerald-200 shadow-sm'
@@ -1700,7 +1746,10 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
                           {/* Exercices déroulés pour ce muscle */}
                           {isExpanded && (
-                            <div className="space-y-1.5 pl-1 sm:pl-2 pt-0.5 animate-fadeIn">
+                            <div 
+                              id={`muscle-group-panel-${muscle.id}`}
+                              className="space-y-1.5 pl-1 sm:pl-2 pt-0.5 animate-fadeIn"
+                            >
                               {muscleExercises.map(catalogEx => {
                                 const isFrequent = frequentMap.has(catalogEx.id);
                                 const usageCount = frequentMap.get(catalogEx.id);

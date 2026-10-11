@@ -176,18 +176,37 @@ export default function TrainingBlocksModal({
     }
   };
 
+  // Fermeture accessible sur touche Escape
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-      <div className="bg-[#121216] border border-white/10 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="training-blocks-title"
+    >
+      <div 
+        className="bg-[#121216] border border-white/10 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 bg-white/[0.02]">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400">
+            <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400" aria-hidden="true">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <h2 id="training-blocks-title" className="text-lg font-bold text-white flex items-center gap-2">
                 Périodisation & Blocs d'Entraînement
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -196,36 +215,52 @@ export default function TrainingBlocksModal({
             </div>
           </div>
           <button 
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="min-h-[40px] min-w-[40px] rounded-lg text-slate-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+            aria-label="Fermer le gestionnaire de cycles et blocs"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center border-b border-white/10 bg-black/20 px-4 sm:px-6">
+        {/* Tab Navigation avec sémantique WAI-ARIA tablist */}
+        <div 
+          role="tablist" 
+          aria-label="Sections du gestionnaire de blocs"
+          className="flex items-center border-b border-white/10 bg-black/20 px-4 sm:px-6"
+        >
           <button
+            type="button"
+            role="tab"
+            id="tab-blocks"
+            aria-selected={activeTab === 'blocks'}
+            aria-controls="panel-blocks"
             onClick={() => setActiveTab('blocks')}
-            className={`py-3 px-4 font-semibold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-[44px] py-3 px-4 font-semibold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'blocks'
                 ? 'border-blue-500 text-white font-bold bg-white/[0.03]'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Calendar size={14} />
+            <Calendar size={14} aria-hidden="true" />
             <span>Cycles Planifiés & Déclaration ({blocks.length})</span>
           </button>
 
           <button
+            type="button"
+            role="tab"
+            id="tab-templates"
+            aria-selected={activeTab === 'templates'}
+            aria-controls="panel-templates"
             onClick={() => setActiveTab('templates')}
-            className={`py-3 px-4 font-semibold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-[44px] py-3 px-4 font-semibold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'templates'
                 ? 'border-blue-500 text-white font-bold bg-white/[0.03]'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Settings size={14} />
+            <Settings size={14} aria-hidden="true" />
             <span>Personnaliser les Templates ({templates.length})</span>
           </button>
         </div>
@@ -235,7 +270,12 @@ export default function TrainingBlocksModal({
 
           {/* TAB 1 : BLOCS & CYCLES PLANIFIÉS */}
           {activeTab === 'blocks' && (
-            <>
+            <div 
+              role="tabpanel" 
+              id="panel-blocks" 
+              aria-labelledby="tab-blocks"
+              className="space-y-6"
+            >
               {/* Active / Configured Blocks List */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -310,26 +350,32 @@ export default function TrainingBlocksModal({
                             <div className="flex items-center gap-1.5">
                               {onReorderByBlock && (
                                 <button
+                                  type="button"
                                   onClick={() => onReorderByBlock(b)}
-                                  className="px-2.5 py-1 text-xs text-blue-300 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 rounded border border-blue-500/20 transition-colors flex items-center gap-1"
+                                  className="min-h-[40px] px-3 py-1.5 text-xs text-blue-300 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 rounded-xl border border-blue-500/20 transition-colors flex items-center gap-1.5 active:scale-95"
                                   title="Place les qualités ciblées par ce bloc en haut du tableau"
+                                  aria-label={`Trier le tableau principal selon le bloc ${b.name}`}
                                 >
-                                  <ArrowUpDown size={11} />
+                                  <ArrowUpDown size={13} aria-hidden="true" />
                                   <span>Trier tableau</span>
                                 </button>
                               )}
                               <button
+                                type="button"
                                 onClick={() => handleEditBlock(b)}
-                                className="px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded border border-white/10 transition-colors"
+                                className="min-h-[40px] px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors active:scale-95"
+                                aria-label={`Modifier le bloc ${b.name}`}
                               >
                                 Modifier
                               </button>
                               <button
+                                type="button"
                                 onClick={() => onDeleteBlock(b.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 rounded border border-white/10 hover:border-red-500/20 transition-colors"
+                                className="min-h-[40px] min-w-[40px] text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 rounded-xl border border-white/10 hover:border-red-500/20 flex items-center justify-center transition-colors active:scale-95"
                                 title="Supprimer ce bloc"
+                                aria-label={`Supprimer le bloc ${b.name}`}
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </div>
@@ -337,11 +383,19 @@ export default function TrainingBlocksModal({
                           {/* Progress Bar if active */}
                           {isCurrent && progress && (
                             <div className="mt-3 mb-2">
-                              <div className="flex justify-between text-[10px] text-slate-400 mb-1 font-mono">
-                                <span>Progression : {progress.percent}%</span>
+                              <div className="flex justify-between text-[11px] text-slate-300 mb-1 font-mono">
+                                <span>Progression : <strong>{progress.percent}%</strong></span>
                                 <span>{progress.remainingDays} jours restants</span>
                               </div>
-                              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div 
+                                role="progressbar"
+                                aria-label={`Progression du cycle ${b.name}`}
+                                aria-valuenow={progress.percent}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuetext={`${progress.percent}% réalisé, ${progress.remainingDays} jours restants sur ${progress.totalDays} jours`}
+                                className="w-full h-2 bg-white/10 rounded-full overflow-hidden"
+                              >
                                 <div 
                                   className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
                                   style={{ width: `${progress.percent}%` }}
@@ -558,10 +612,12 @@ export default function TrainingBlocksModal({
                           <button
                             key={q.id}
                             type="button"
+                            aria-pressed={isFocus}
+                            aria-label={`${q.name} : ${isFocus ? 'Ciblée pour développement accéléré (x0.45)' : 'En maintien nominal (x1.0)'}`}
                             onClick={() => toggleQualityFocus(q.id)}
-                            className={`p-2 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                            className={`min-h-[44px] p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer active:scale-95 ${
                               isFocus
-                                ? 'bg-red-500/15 border-red-500/50 text-white'
+                                ? 'bg-red-500/15 border-red-500/50 text-white ring-1 ring-red-500/30'
                                 : 'bg-sky-500/5 border-sky-500/20 text-slate-400 hover:bg-sky-500/10'
                             }`}
                           >
@@ -572,17 +628,17 @@ export default function TrainingBlocksModal({
                               <span className="text-[9px] uppercase tracking-wider block">
                                 {isFocus ? (
                                   <span className="text-red-400 font-semibold flex items-center gap-1">
-                                    <Zap size={9} /> Dév. (x0.45)
+                                    <Zap size={9} aria-hidden="true" /> Dév. (x0.45)
                                   </span>
                                 ) : (
                                   <span className="text-sky-400 font-semibold flex items-center gap-1">
-                                    <Shield size={9} /> Maintien (x1.0)
+                                    <Shield size={9} aria-hidden="true" /> Maintien (x1.0)
                                   </span>
                                 )}
                               </span>
                             </div>
-                            <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isFocus ? 'bg-red-500 text-white' : 'bg-white/10 text-transparent'}`}>
-                              <Check size={10} />
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isFocus ? 'bg-red-500 text-white' : 'bg-white/10 text-transparent'}`} aria-hidden="true">
+                              <Check size={12} />
                             </div>
                           </button>
                         );
@@ -625,12 +681,17 @@ export default function TrainingBlocksModal({
                   </div>
                 </form>
               )}
-            </>
+            </div>
           )}
 
           {/* TAB 2 : PERSONNALISATION DES TEMPLATES */}
           {activeTab === 'templates' && (
-            <div className="space-y-5">
+            <div 
+              role="tabpanel"
+              id="panel-templates"
+              aria-labelledby="tab-templates"
+              className="space-y-5"
+            >
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -732,16 +793,18 @@ export default function TrainingBlocksModal({
                         <button
                           key={q.id}
                           type="button"
+                          aria-pressed={isIncluded}
+                          aria-label={`${q.name} : ${isIncluded ? 'Incluse dans le template' : 'Non incluse'}`}
                           onClick={() => toggleTemplateQuality(q.id)}
-                          className={`p-2 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                          className={`min-h-[44px] p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer active:scale-95 ${
                             isIncluded
-                              ? 'bg-red-500/20 border-red-500/50 text-white'
+                              ? 'bg-red-500/20 border-red-500/50 text-white ring-1 ring-red-500/30'
                               : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
                           }`}
                         >
                           <span className="text-xs font-semibold truncate">{q.name}</span>
-                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${isIncluded ? 'bg-red-500 text-white' : 'bg-white/10 text-transparent'}`}>
-                            <Check size={10} />
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isIncluded ? 'bg-red-500 text-white' : 'bg-white/10 text-transparent'}`} aria-hidden="true">
+                            <Check size={12} />
                           </div>
                         </button>
                       );
