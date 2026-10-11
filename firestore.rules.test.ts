@@ -52,7 +52,7 @@ describe('Firestore Security Rules - Dirty Dozen Payloads Validation', () => {
     if (typeof payload.lastDeviceId !== 'string' || payload.lastDeviceId.length > 64) {
       return { allowed: false, reason: 'Invalid lastDeviceId' };
     }
-    if (typeof payload.updatedAt !== 'string' || payload.updatedAt.length > 64) {
+    if (typeof payload.updatedAt !== 'string' || payload.updatedAt.length > 64 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/.test(payload.updatedAt)) {
       return { allowed: false, reason: 'Invalid updatedAt' };
     }
 
@@ -176,6 +176,16 @@ describe('Firestore Security Rules - Dirty Dozen Payloads Validation', () => {
       { uid: 'attacker_uid', email: 'attacker@gmail.com', emailVerified: true },
       'victim_uid',
       { ...validRecord, userId: 'attacker_uid', userEmail: 'attacker@gmail.com' }
+    );
+    expect(res.allowed).toBe(false);
+  });
+
+  // 13. Malformed Timestamp Injection
+  it('blocks payload with malformed or non-ISO timestamp in updatedAt', () => {
+    const res = validatePayload(
+      { uid: validUid, email: validEmail, emailVerified: true },
+      validUid,
+      { ...validRecord, updatedAt: 'invalid-date-string' }
     );
     expect(res.allowed).toBe(false);
   });

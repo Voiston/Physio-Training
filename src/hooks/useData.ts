@@ -844,7 +844,18 @@ export function useData() {
 
         const imported = migrateData(rawImported);
         if (imported.events) {
+          // Préservation des clés système (appairage device, session compte Google et brouillon en cours)
+          const savedDeviceId = localStorage.getItem('physio_device_id');
+          const savedUserAccount = localStorage.getItem('physio_user_account');
+          const savedGymDraft = localStorage.getItem('training_live_session_draft_v1');
+
           localStorage.clear();
+
+          // Restauration immédiate des identifiants système et de session
+          if (savedDeviceId) localStorage.setItem('physio_device_id', savedDeviceId);
+          if (savedUserAccount) localStorage.setItem('physio_user_account', savedUserAccount);
+          if (savedGymDraft) localStorage.setItem('training_live_session_draft_v1', savedGymDraft);
+
           Object.entries(imported.events as Record<string, Record<string, SessionData>>).forEach(([qId, dates]) => {
             Object.entries(dates).forEach(([date, data]) => {
               localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));

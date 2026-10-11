@@ -7,9 +7,10 @@
 - **Invariant d'Immutabilité (Immortality)** : Les champs `userId` et `userEmail` ne peuvent pas être altérés lors d'une mise à jour (`incoming().userId == existing().userId && incoming().userEmail == existing().userEmail`).
 - **Invariant de Clé & ID (ID Poisoning Guard)** : Le `recordId` doit être un identifiant valide (`isValidId(recordId)` avec taille <= 128 et caractères autorisés `^[a-zA-Z0-9_\-\.]+$`).
 - **Invariant de Limite Volumétrique (Denial of Wallet)** : La charge utile `data` ne doit pas excéder 500 000 caractères, `key` <= 128 caractères, `lastDeviceId` <= 64 caractères.
+- **Invariant d'Intégrité Temporelle** : Le champ `updatedAt` doit obligatoirement respecter la syntaxe ISO 8601 (`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.*`) avec taille <= 64 caractères.
 - **Invariant Anti-Fuite d'Existence** : L'accès en lecture `allow get` impose `recordId == request.auth.uid`, interdisant d'énumérer l'existence d'autres enregistrements sur la base du `resource == null`.
 
-## 2. The "Dirty Dozen" Payloads (Attaques rejetées)
+## 2. The "Dirty Dozen + 1" Payloads (Attaques rejetées)
 1. **Unauthenticated Read** : Lecture anonyme / non connectée sur `/sync_records/rec123`.
 2. **Unauthenticated Write** : Écriture anonyme sur `/sync_records/rec123`.
 3. **Spoofed User ID** : Écriture avec `userId: "attacker_uid"` alors que `request.auth.uid == "victim_uid"`.
@@ -22,7 +23,8 @@
 10. **Type Mismatch Attack** : Envoi de `version: "invalid_string"` au lieu d'un nombre entier.
 11. **Ownership Theft Update** : Tentative de remplacer le `userId` du document existant par son propre identifiant.
 12. **Cross-Tenant Squatting / Probing** : Utilisateur B tentant d'enregistrer ou de sonder un document avec `recordId` appartenant à l'utilisateur A.
+13. **Malformed Timestamp Injection** : Envoi d'une chaîne arbitraire non conforme au standard ISO 8601 dans `updatedAt`.
 
 ## 3. Matrice de Contrôle et Tests
-Toutes les 12 attaques ci-dessus retournent obligatoirement `PERMISSION_DENIED`.
+Toutes les 13 attaques ci-dessus retournent obligatoirement `PERMISSION_DENIED`.
 La suite de tests unitaires `firestore.rules.test.ts` valide chaque scénario de test d'intrusion.
