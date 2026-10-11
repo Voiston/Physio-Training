@@ -323,9 +323,9 @@ export default function Grid({
       >
         <table className="w-full text-left border-collapse table-fixed min-w-[700px] sm:min-w-[1300px]">
           <thead>
-            <tr className="bg-[#161619] text-[10px] uppercase text-slate-400 border-b border-white/10">
+            <tr className="bg-[#161619] text-[10px] uppercase text-slate-400 border-b border-white/10 sticky top-0 z-30 shadow-md">
               {/* Colonne 1 : Qualité Physique (Responsive mobile w-36 min-w-[130px], Desktop w-72 min-w-[280px]) */}
-              <th className="p-2 sm:p-3 w-36 sm:w-72 min-w-[130px] sm:min-w-[280px] sticky left-0 bg-[#161619] z-20 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10">
+              <th className="p-2 sm:p-3 w-36 sm:w-72 min-w-[130px] sm:min-w-[280px] sticky left-0 bg-[#161619] z-40 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-200 font-bold tracking-wider flex items-center gap-1.5 text-xs" title="Glisser-déposer les qualités pour réorganiser l'ordre de priorité">
                     <GripVertical size={13} className="text-slate-400" />
@@ -340,7 +340,7 @@ export default function Grid({
               </th>
 
               {/* Colonne 2 : Courbes EMA 3/7/21j (Cachée sur petit écran mobile pour libérer l'espace aux jours, visible dès sm) */}
-              <th className="hidden sm:table-cell p-2 w-64 min-w-[250px] border-r border-white/10 bg-[#161619] z-10 text-center shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
+              <th className="hidden sm:table-cell p-2 w-64 min-w-[250px] border-r border-white/10 bg-[#161619] z-30 text-center shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
                 <div className="flex flex-col items-center justify-center">
                   <span className="text-slate-200 font-bold tracking-wider text-[10px]">Courbes EMA (3j / 7j / 21j)</span>
                   <div className="flex items-center gap-2 mt-0.5 text-[9px] font-semibold">
@@ -367,8 +367,8 @@ export default function Grid({
                     data-today={isToday ? "true" : undefined}
                     className={`py-2 px-1 w-[56px] min-w-[56px] sm:w-[64px] sm:min-w-[64px] text-center border-r border-white/5 relative transition-colors ${
                       isToday 
-                        ? 'bg-blue-600/25 text-blue-200 border-x-2 border-x-blue-500/50 shadow-inner today-beacon z-10' 
-                        : 'hover:bg-white/[0.02]'
+                        ? 'bg-blue-600/30 text-blue-200 border-x-2 border-x-blue-500/50 shadow-inner today-beacon z-30' 
+                        : 'bg-[#161619] hover:bg-white/[0.04]'
                     }`}
                   >
                     {dayBlock && (
@@ -413,13 +413,29 @@ export default function Grid({
                                  : score >= 5 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold'
                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold';
 
+                const cellTitle = score !== '-' 
+                  ? `Readiness du ${day.display?.date || day.dateStr} : ${score}/10. Cliquer pour ajuster.` 
+                  : `Readiness du ${day.display?.date || day.dateStr} non renseignée. Cliquer pour évaluer.`;
+
                 return (
                   <td 
                     key={`ready-${day.dateStr}`} 
-                    className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
-                    onClick={() => onMetricClick(day.dateStr, 'readiness', score)}
+                    className={`p-1 text-center border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
+                    title={cellTitle}
                   >
-                    <div className="flex justify-center items-center h-8">
+                    <div 
+                      className="flex justify-center items-center h-8.5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Readiness du ${day.display?.date || day.dateStr} : ${score !== '-' ? `${score} sur 10` : 'non renseignée'}. Cliquer pour modifier.`}
+                      onClick={() => onMetricClick(day.dateStr, 'readiness', score)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onMetricClick(day.dateStr, 'readiness', score);
+                        }
+                      }}
+                    >
                        <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] ${badgeClass}`}>
                           {score !== '-' ? `${score}/10` : '—'}
                        </span>
@@ -466,11 +482,22 @@ export default function Grid({
                   return (
                   <td 
                       key={`vfc-${day.dateStr}`} 
-                      className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
-                      onClick={() => onMetricClick(day.dateStr, 'vfc', vfc)}
+                      className={`p-1 text-center border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
                       title={cellTitle}
                   >
-                      <div className="flex justify-center items-center h-8">
+                      <div 
+                        className="flex justify-center items-center h-8.5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`VFC du ${day.display} : ${vfc !== '-' ? `${vfc} millisecondes` : 'non renseignée'}. Cliquer pour modifier.`}
+                        onClick={() => onMetricClick(day.dateStr, 'vfc', vfc)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onMetricClick(day.dateStr, 'vfc', vfc);
+                          }
+                        }}
+                      >
                         <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] ${badgeClass}`}>
                           {vfc !== '-' ? `${vfc} ms` : '—'}
                         </span>
@@ -487,17 +514,17 @@ export default function Grid({
                   <span className="flex items-center gap-1.5">
                     <span>FC de Repos (bpm)</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">Basal / Réveil</span>
+                  <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">Basal / Réveil</span>
                 </div>
               </td>
-              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
+              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-300 text-[11px] font-medium bg-[#161619]/60">
                 Tonus cardiaque au réveil
               </td>
               {timeline.map((day) => {
                 const hrAnalysis = computeHrRestAnalysis(dailyMetrics, day.dateStr);
                 const hrRest = hrAnalysis.currentValue !== null ? `${hrAnalysis.currentValue}` : '-';
                 
-                let badgeClass = 'text-slate-500 font-normal';
+                let badgeClass = 'text-slate-400 font-normal';
                 let cellTitle = 'FC Repos non renseignée';
 
                 if (hrAnalysis.currentValue !== null) {
@@ -516,11 +543,22 @@ export default function Grid({
                 return (
                   <td 
                     key={`hrRest-${day.dateStr}`} 
-                    className={`p-1 text-center cursor-pointer hover:bg-white/5 transition-colors border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
-                    onClick={() => onMetricClick(day.dateStr, 'hrRest', hrRest)}
+                    className={`p-1 text-center border-r border-white/5 ${day.offset === 0 ? 'bg-blue-500/10 border-x-2 border-x-blue-500/30' : ''}`}
                     title={cellTitle}
                   >
-                    <div className="flex justify-center items-center h-8">
+                    <div 
+                      className="flex justify-center items-center h-8.5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`FC de repos du ${day.display} : ${hrRest !== '-' ? `${hrRest} battements par minute` : 'non renseignée'}. Cliquer pour modifier.`}
+                      onClick={() => onMetricClick(day.dateStr, 'hrRest', hrRest)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onMetricClick(day.dateStr, 'hrRest', hrRest);
+                        }
+                      }}
+                    >
                        <span className={`px-2 py-0.5 rounded-md font-mono text-[11px] ${badgeClass}`}>
                           {hrRest !== '-' ? `${hrRest} bpm` : '—'}
                        </span>
@@ -556,13 +594,13 @@ export default function Grid({
                     onDragOver={(e) => handleDragOver(e, q.id)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, q.id)}
-                    className={`border-b transition-colors ${
+                    className={`border-b transition-colors relative ${
                       isDragging
                         ? 'opacity-35 bg-blue-950/30'
                         : isOver && dropPosition === 'before'
-                        ? 'shadow-[inset_0_2px_0_0_#3b82f6] bg-blue-500/10'
+                        ? 'shadow-[inset_0_4px_0_0_#3b82f6] bg-blue-500/15'
                         : isOver && dropPosition === 'after'
-                        ? 'shadow-[inset_0_-2px_0_0_#3b82f6] bg-blue-500/10'
+                        ? 'shadow-[inset_0_-4px_0_0_#3b82f6] bg-blue-500/15'
                         : 'border-white/5 hover:bg-white/[0.02]'
                     }`}
                   >
@@ -715,9 +753,14 @@ export default function Grid({
                         cellHeatmapStyle = 'bg-amber-500/12 border-amber-500/25 text-amber-300 hover:bg-amber-500/20';
                       }
 
+                      const dateLabel = day.display?.date || day.dateStr;
                       const cellTitle = sessionData
                         ? `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${sessionData.load} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Fatigue ${sessionData.fatigue !== undefined && sessionData.fatigue !== null ? `${sessionData.fatigue}/10` : '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
                         : cellState.tooltip;
+
+                      const accessibleLabel = sessionData 
+                        ? `${q.name}, ${dateLabel} : séance enregistrée, charge ${sessionData.load} unités.${sessionData.sport === 'bike' ? ' Vélo.' : sessionData.sport === 'run' ? ' Course.' : ''}${cellState.isBurnout ? ' Alerte surmenage.' : ''} Cliquer ou taper Entrée pour ouvrir le détail.`
+                        : `${q.name}, ${dateLabel} : aucune séance enregistrée. ${cellState.status === 'green' ? 'Fenêtre de surcompensation optimale.' : cellState.status === 'orange' ? 'Récupération en cours.' : ''} Cliquer ou taper Entrée pour planifier.`;
 
                       return (
                         <td 
@@ -728,14 +771,24 @@ export default function Grid({
                           }`}
                         >
                            <div 
-                              className={`relative flex items-center justify-center w-full h-8 rounded-lg border transition-all cursor-pointer cell-interactive ${cellHeatmapStyle} ${cellState.isBurnout ? 'burnout' : ''}`}
+                              className={`relative flex items-center justify-center w-full min-h-[34px] sm:min-h-[36px] rounded-lg border transition-all cursor-pointer cell-interactive focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none ${cellHeatmapStyle} ${cellState.isBurnout ? 'burnout' : ''}`}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={accessibleLabel}
                               onClick={() => {
                                 haptics.tap();
                                 onCellClick(q, day.dateStr, sessionData);
                               }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  haptics.tap();
+                                  onCellClick(q, day.dateStr, sessionData);
+                                }
+                              }}
                            >
                              {cellState.isBurnout && (
-                               <span className="absolute top-0 right-0 -mt-1 -mr-1 text-[10px] z-20">🔥</span>
+                               <span className="absolute top-0 right-0 -mt-1 -mr-1 text-[10px] z-20" aria-label="Alerte surmenage">🔥</span>
                              )}
                              {sessionData ? (
                                <span className="font-mono text-xs font-bold leading-none tracking-tight flex items-center justify-center">
@@ -745,9 +798,9 @@ export default function Grid({
                                  {sessionData.isSimulated && <span className="text-[8px] ml-0.5 opacity-90">🔮</span>}
                                </span>
                              ) : cellState.status === 'green' ? (
-                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60"></span>
+                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" aria-hidden="true"></span>
                              ) : cellState.status === 'orange' ? (
-                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60"></span>
+                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60" aria-hidden="true"></span>
                              ) : null}
                            </div>
                         </td>

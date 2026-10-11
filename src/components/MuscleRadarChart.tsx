@@ -121,7 +121,7 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
       <div className="flex items-start justify-between gap-3 mb-2 pb-3 border-b border-white/10">
         <div>
           <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 m-0">
-            <span>🕸️ Radar Musculaire (Couloir Optimal MAV 10-20s)</span>
+            <span>Radar Musculaire (Couloir Optimal MAV 10-20s)</span>
           </h4>
           <p className="text-[11px] text-slate-400 mt-0.5 m-0">
             Repérez instantanément les déséquilibres et les groupes musculaires sous-stimulés.
@@ -132,15 +132,40 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
           <button
             type="button"
             onClick={() => onSelectMuscle?.(selectedMuscleId)}
-            className="px-2 py-1 text-[10px] font-mono rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="px-2.5 py-1 text-xs font-mono rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+            aria-label="Réinitialiser la sélection de muscle"
           >
             ✕ Réinitialiser
           </button>
         )}
       </div>
 
+      {/* Tableau accessible aux lecteurs d'écran (WCAG 2.2 AA) */}
+      <div className="sr-only">
+        <table aria-label="Données du radar musculaire par groupe">
+          <thead>
+            <tr>
+              <th>Groupe musculaire</th>
+              <th>Séries effectives</th>
+              <th>Couloir MAV visé</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {radarData.map(d => (
+              <tr key={d.muscleId}>
+                <td>{d.fullName}</td>
+                <td>{d.sets} séries</td>
+                <td>10-20 séries</td>
+                <td>{d.sets >= 10 && d.sets <= 20 ? 'Optimal' : d.sets > 20 ? 'Plafond dépassé' : d.sets >= 6 ? 'Minimal' : 'Maintien ou inactif'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       {/* Légende du radar */}
-      <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] font-mono px-2 py-1 rounded-xl bg-black/30 border border-white/5 mb-1">
+      <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] font-mono px-2 py-1 rounded-xl bg-black/30 border border-white/5 mb-1" aria-hidden="true">
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-0.5 bg-blue-400 rounded-full inline-block" />
           <span className="text-blue-300 font-semibold">Volume Réalisé (séries)</span>
@@ -175,18 +200,30 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
                 const isOptimal = sets >= 10 && sets <= 20;
 
                 return (
-                  <text
-                    x={x}
-                    y={y}
-                    textAnchor={textAnchor}
+                  <g
                     className="cursor-pointer select-none transition-all"
                     onClick={() => mData && onSelectMuscle?.(mData.muscleId)}
-                    fill={isSelected ? '#38bdf8' : isOptimal ? '#10b981' : sets > 20 ? '#f59e0b' : sets > 0 ? '#cbd5e1' : '#64748b'}
-                    fontSize={11}
-                    fontWeight={isSelected ? 800 : isOptimal ? 700 : 500}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${mData?.fullName || payload.value} : ${sets} séries`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (mData) onSelectMuscle?.(mData.muscleId);
+                      }
+                    }}
                   >
-                    {payload.value}
-                  </text>
+                    <text
+                      x={x}
+                      y={y}
+                      textAnchor={textAnchor}
+                      fill={isSelected ? '#38bdf8' : isOptimal ? '#34d399' : sets > 20 ? '#fbbf24' : sets > 0 ? '#e2e8f0' : '#94a3b8'}
+                      fontSize={11}
+                      fontWeight={isSelected ? 800 : isOptimal ? 700 : 600}
+                    >
+                      {payload.value}
+                    </text>
+                  </g>
                 );
               }}
             />

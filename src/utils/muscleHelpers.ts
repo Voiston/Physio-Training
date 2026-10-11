@@ -1806,3 +1806,42 @@ export function getFrequentRecentExercises(
   return results;
 }
 
+/**
+ * Détermine le groupe musculaire principal d'un exercice en trouvant le ratio le plus élevé dans muscleRatios.
+ */
+export function getExercisePrimaryMuscle(exercise?: { category?: string; muscleRatios?: Record<string, number> } | null): string {
+  if (!exercise || !exercise.muscleRatios || Object.keys(exercise.muscleRatios).length === 0) {
+    if (exercise?.category === 'lower') return 'quadriceps';
+    if (exercise?.category === 'upper_push') return 'pectoraux';
+    if (exercise?.category === 'upper_pull') return 'dorsaux';
+    return 'abdos';
+  }
+  let bestMuscle = '';
+  let highestRatio = -1;
+  for (const [mId, ratio] of Object.entries(exercise.muscleRatios)) {
+    if (ratio > highestRatio) {
+      highestRatio = ratio;
+      bestMuscle = mId;
+    }
+  }
+  return bestMuscle || (exercise.category === 'lower' ? 'quadriceps' : exercise.category === 'upper_push' ? 'pectoraux' : exercise.category === 'upper_pull' ? 'dorsaux' : 'abdos');
+}
+
+/**
+ * Ordre canonique d'affichage des muscles principaux avec étiquettes et catégories associées
+ */
+export const ORDERED_PRIMARY_MUSCLES = [
+  { id: 'pectoraux', name: 'Pectoraux', category: 'upper_push' },
+  { id: 'dorsaux', name: 'Grand Dorsal & Dos', category: 'upper_pull' },
+  { id: 'deltoides_ant', name: 'Épaules (Deltoïdes)', category: 'upper_push' },
+  { id: 'trapezes', name: 'Trapèzes & Haut du dos', category: 'upper_pull' },
+  { id: 'biceps', name: 'Biceps & Fléchisseurs', category: 'upper_pull' },
+  { id: 'triceps', name: 'Triceps', category: 'upper_push' },
+  { id: 'quadriceps', name: 'Quadriceps (Cuisses)', category: 'lower' },
+  { id: 'ischios', name: 'Ischio-jambiers', category: 'lower' },
+  { id: 'glutes', name: 'Fessiers', category: 'lower' },
+  { id: 'mollets', name: 'Mollets', category: 'lower' },
+  { id: 'abdos', name: 'Sangle Abdominale & Gainage', category: 'core' },
+  { id: 'lombaires', name: 'Érecteurs du Rachis (Lombaires)', category: 'core' },
+] as const;
+

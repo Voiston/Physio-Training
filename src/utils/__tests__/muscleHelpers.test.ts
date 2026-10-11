@@ -8,7 +8,9 @@ import {
   findLastExercisePerformance,
   computeAdaptiveProgression,
   getFrequentRecentExercises,
-  recordExerciseUsage
+  recordExerciseUsage,
+  getExercisePrimaryMuscle,
+  ORDERED_PRIMARY_MUSCLES
 } from '../muscleHelpers';
 
 describe('Muscle Helpers & Physiological Modeling', () => {
@@ -368,5 +370,44 @@ describe('Muscle Helpers & Physiological Modeling', () => {
       const stats = getFrequentRecentExercises({}, EXERCISE_CATALOG, 5);
       expect(stats.some(s => s.exerciseId === 'pull_ups')).toBe(true);
     });
+
+    it('determines primary muscle correctly from exercise definition ratios', () => {
+      const bench = EXERCISE_CATALOG.find(e => e.id === 'bench_press')!;
+      expect(getExercisePrimaryMuscle(bench)).toBe('pectoraux');
+
+      const pullUps = EXERCISE_CATALOG.find(e => e.id === 'pull_ups')!;
+      expect(getExercisePrimaryMuscle(pullUps)).toBe('dorsaux');
+
+      const squat = EXERCISE_CATALOG.find(e => e.id === 'squat')!;
+      expect(getExercisePrimaryMuscle(squat)).toBe('quadriceps');
+
+      const rdl = EXERCISE_CATALOG.find(e => e.id === 'rdl')!;
+      expect(getExercisePrimaryMuscle(rdl)).toBe('ischios');
+
+      const lateralRaises = EXERCISE_CATALOG.find(e => e.id === 'lateral_raises')!;
+      expect(getExercisePrimaryMuscle(lateralRaises)).toBe('deltoides_ant');
+
+      const curls = EXERCISE_CATALOG.find(e => e.id === 'biceps_curl')!;
+      expect(getExercisePrimaryMuscle(curls)).toBe('biceps');
+
+      // Fallbacks
+      expect(getExercisePrimaryMuscle({ category: 'upper_push', muscleRatios: {} })).toBe('pectoraux');
+      expect(getExercisePrimaryMuscle({ category: 'upper_pull', muscleRatios: {} })).toBe('dorsaux');
+      expect(getExercisePrimaryMuscle({ category: 'lower', muscleRatios: {} })).toBe('quadriceps');
+      expect(getExercisePrimaryMuscle(null)).toBe('abdos');
+    });
+
+    it('contains all 12 key primary muscle groups in ORDERED_PRIMARY_MUSCLES', () => {
+      expect(ORDERED_PRIMARY_MUSCLES.length).toBe(12);
+      const ids = ORDERED_PRIMARY_MUSCLES.map(m => m.id);
+      expect(ids).toContain('pectoraux');
+      expect(ids).toContain('dorsaux');
+      expect(ids).toContain('quadriceps');
+      expect(ids).toContain('ischios');
+      expect(ids).toContain('biceps');
+      expect(ids).toContain('triceps');
+      expect(ids).toContain('abdos');
+    });
   });
 });
+

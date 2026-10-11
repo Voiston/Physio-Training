@@ -14,7 +14,9 @@ import {
   computeSessionMuscularBreakdown,
   ExerciseDefinition,
   getFrequentRecentExercises,
-  recordExerciseUsage
+  recordExerciseUsage,
+  getExercisePrimaryMuscle,
+  ORDERED_PRIMARY_MUSCLES
 } from '../utils/muscleHelpers';
 import { 
   playCountdownBeep, 
@@ -136,6 +138,31 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   const [showAddExercisePicker, setShowAddExercisePicker] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [expandedMuscles, setExpandedMuscles] = useState<Record<string, boolean>>({});
+
+  // De base, les catalogues sont repliés (sauf si l'utilisateur saisit une recherche)
+  const isMuscleExpanded = (muscleId: string) => {
+    if (exerciseSearch.trim().length > 0) return true;
+    return expandedMuscles[muscleId] === true;
+  };
+
+  const toggleMuscleCollapse = (muscleId: string) => {
+    setExpandedMuscles(prev => ({
+      ...prev,
+      [muscleId]: !prev[muscleId]
+    }));
+  };
+
+  const toggleAllMuscleGroups = () => {
+    const anyOpen = ORDERED_PRIMARY_MUSCLES.some(m => expandedMuscles[m.id]);
+    if (anyOpen) {
+      setExpandedMuscles({});
+    } else {
+      const allOpen: Record<string, boolean> = {};
+      ORDERED_PRIMARY_MUSCLES.forEach(m => { allOpen[m.id] = true; });
+      setExpandedMuscles(allOpen);
+    }
+  };
 
   // Fin de séance (Summary)
   const [sessionRpeMusc, setSessionRpeMusc] = useState<number>(8);
@@ -240,6 +267,22 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       // Ignore
     }
   }, [isOpen]);
+
+  // Fermeture accessible sur touche Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showAddExercisePicker) {
+          setShowAddExercisePicker(false);
+        } else if (stage === 'setup' || stage === 'summary') {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, showAddExercisePicker, stage, onClose]);
 
   // Sauvegarde automatique du brouillon en continu pendant la séance active
   useEffect(() => {
@@ -714,7 +757,12 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-hidden">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="live-gym-title"
+    >
       <div 
         className="relative w-full max-w-4xl bg-slate-900 border-0 sm:border border-slate-700/80 rounded-none sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[96vh] animate-fadeIn"
         onClick={(e) => e.stopPropagation()}
@@ -729,10 +777,10 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               <div>
                 <div className="flex items-center gap-2.5">
                   <span className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <Dumbbell size={24} />
+                    <Dumbbell size={24} aria-hidden="true" />
                   </span>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                    <h2 id="live-gym-title" className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
                       Mode Salle <span className="text-emerald-400">· Live Gym</span>
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">
@@ -1273,7 +1321,11 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               {/* Bouton pour ajouter un exercice */}
               <button
                 type="button"
-                onClick={() => setShowAddExercisePicker(true)}
+                onClick={() => {
+                  setExpandedMuscles({});
+                  setExerciseSearch('');
+                  setShowAddExercisePicker(true);
+                }}
                 className="w-full py-3.5 rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500/60 bg-slate-900/40 hover:bg-blue-950/20 text-slate-300 hover:text-white font-bold text-sm transition-all flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <div className="p-1 rounded-lg bg-blue-500/20 text-blue-400 group-hover:scale-110 transition-transform">
@@ -1480,9 +1532,9 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                   {[
-                    ...(frequentExercises.length > 0 ? [{ id: 'frequent', label: '🔥 Récents & Fréquents' }] : []),
+                    ...(frequentExercises.length > 0 ? [{ id: 'frequent', label: 'Récents & Fréquents' }] : []),
                     { id: 'all', label: isPullSession ? 'Tous (Pull en 1er)' : 'Tous' },
-                    { id: 'upper_pull', label: isPullSession ? '🎯 Pull (Séance)' : 'Pull (Dos/Biceps)' },
+                    { id: 'upper_pull', label: isPullSession ? 'Pull (Séance)' : 'Pull (Dos/Biceps)' },
                     { id: 'upper_push', label: 'Push (Pecs/Épaules/Triceps)' },
                     { id: 'lower', label: 'Jambes' },
                     { id: 'core', label: 'Abdos/Core' }
@@ -1511,111 +1563,222 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                 </div>
               </div>
 
-              {/* Liste filtrée */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-1.5 divide-y divide-slate-800/40">
-                {allExercises
-                  .filter(ex => {
-                    if (selectedCategoryFilter === 'frequent') {
-                      return frequentMap.has(ex.id);
-                    }
-                    const matchCategory = selectedCategoryFilter === 'all' || ex.category === selectedCategoryFilter;
-                    const matchSearch = !exerciseSearch.trim() || ex.name.toLowerCase().includes(exerciseSearch.toLowerCase());
-                    return matchCategory && matchSearch;
-                  })
-                  .sort((a, b) => {
-                    // Priorité 1 : Si séance Pull, les exercices Pull (upper_pull) viennent EN PREMIER
-                    if (isPullSession) {
-                      const aIsPull = a.category === 'upper_pull';
-                      const bIsPull = b.category === 'upper_pull';
-                      if (aIsPull && !bIsPull) return -1;
-                      if (!aIsPull && bIsPull) return 1;
-                    } else if (targetSessionCategory) {
-                      const aIsTarget = a.category === targetSessionCategory;
-                      const bIsTarget = b.category === targetSessionCategory;
-                      if (aIsTarget && !bIsTarget) return -1;
-                      if (!aIsTarget && bIsTarget) return 1;
-                    }
+              {/* Entête contrôle de la liste */}
+              <div className="px-3 pt-2 pb-1 flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/60 bg-slate-950/30">
+                <span className="flex items-center gap-1.5 font-bold text-slate-300">
+                  <Layers size={13} className="text-blue-400" />
+                  {selectedCategoryFilter === 'frequent'
+                    ? 'Vos exercices favoris récents'
+                    : 'Classé par muscle principal travaillé'}
+                </span>
+                {selectedCategoryFilter !== 'frequent' && (
+                  <button
+                    type="button"
+                    onClick={toggleAllMuscleGroups}
+                    className="text-blue-400 hover:text-blue-300 font-bold transition-colors cursor-pointer text-[10px] px-2 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20"
+                  >
+                    {ORDERED_PRIMARY_MUSCLES.some(m => !isMuscleExpanded(m.id)) ? 'Tout déplier' : 'Tout replier'}
+                  </button>
+                )}
+              </div>
 
-                    // Priorité 2 : Les exercices les plus souvent utilisés récemment
-                    const aCount = frequentMap.get(a.id) || 0;
-                    const bCount = frequentMap.get(b.id) || 0;
-                    if (aCount !== bCount) {
-                      return bCount - aCount;
-                    }
+              {/* Liste filtrée et organisée par muscle principal */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+                {selectedCategoryFilter === 'frequent' ? (
+                  /* Affichage direct des exercices fréquents */
+                  <div className="space-y-1.5 divide-y divide-slate-800/40">
+                    {allExercises
+                      .filter(ex => frequentMap.has(ex.id))
+                      .filter(ex => !exerciseSearch.trim() || ex.name.toLowerCase().includes(exerciseSearch.toLowerCase().trim()))
+                      .sort((a, b) => (frequentMap.get(b.id) || 0) - (frequentMap.get(a.id) || 0))
+                      .map(catalogEx => {
+                        const usageCount = frequentMap.get(catalogEx.id) || 1;
+                        const primaryMuscleId = getExercisePrimaryMuscle(catalogEx);
+                        const muscleMeta = MUSCLE_GROUPS[primaryMuscleId];
 
-                    // Priorité 3 : Ordre alphabétique
-                    return a.name.localeCompare(b.name, 'fr');
-                  })
-                  .map(catalogEx => {
-                    const isPullEx = catalogEx.category === 'upper_pull';
-                    const isTargetSessionEx = isPullSession && isPullEx;
-                    const isFrequent = frequentMap.has(catalogEx.id);
-                    const usageCount = frequentMap.get(catalogEx.id);
+                        return (
+                          <button
+                            key={catalogEx.id}
+                            type="button"
+                            onClick={() => handleAddExerciseFromCatalog(catalogEx)}
+                            className="w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between group pt-3 bg-slate-800/90 border border-amber-500/35 hover:border-amber-400 hover:bg-slate-800 shadow-sm cursor-pointer"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1">
+                                  Fréquent ({usageCount}×)
+                                </span>
+                                <span className="font-black text-sm text-white">
+                                  {catalogEx.name}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+                                {muscleMeta && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-300">
+                                    {muscleMeta.name}
+                                  </span>
+                                )}
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${catalogEx.isCompound ? 'bg-blue-500/15 text-blue-300' : 'bg-emerald-500/15 text-emerald-300'}`}>
+                                  {catalogEx.isCompound ? 'Polyarticulaire' : 'Isolation'}
+                                </span>
+                                <span>·</span>
+                                <span className="text-[10px]">Défaut : {catalogEx.defaultReps} reps</span>
+                              </div>
+                            </div>
+                            <Plus size={18} className="text-amber-400 group-hover:scale-125 transition-transform shrink-0 ml-2" />
+                          </button>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  /* Affichage par groupe de muscle principal (liste déroulante accordéon) */
+                  ORDERED_PRIMARY_MUSCLES
+                    .filter(muscle => {
+                      if (selectedCategoryFilter === 'all') return true;
+                      return muscle.category === selectedCategoryFilter;
+                    })
+                    .sort((a, b) => {
+                      // Si séance Pull, placer les muscles de Pull en premier
+                      if (isPullSession) {
+                        const aIsPull = a.category === 'upper_pull';
+                        const bIsPull = b.category === 'upper_pull';
+                        if (aIsPull && !bIsPull) return -1;
+                        if (!aIsPull && bIsPull) return 1;
+                      } else if (targetSessionCategory) {
+                        const aIsTarget = a.category === targetSessionCategory;
+                        const bIsTarget = b.category === targetSessionCategory;
+                        if (aIsTarget && !bIsTarget) return -1;
+                        if (!aIsTarget && bIsTarget) return 1;
+                      }
+                      return 0;
+                    })
+                    .map(muscle => {
+                      const muscleExercises = allExercises
+                        .filter(ex => getExercisePrimaryMuscle(ex) === muscle.id)
+                        .filter(ex => !exerciseSearch.trim() || ex.name.toLowerCase().includes(exerciseSearch.toLowerCase().trim()))
+                        .sort((a, b) => {
+                          const aCount = frequentMap.get(a.id) || 0;
+                          const bCount = frequentMap.get(b.id) || 0;
+                          if (aCount !== bCount) return bCount - aCount;
+                          return a.name.localeCompare(b.name, 'fr');
+                        });
 
-                    return (
-                      <button
-                        key={catalogEx.id}
-                        type="button"
-                        onClick={() => handleAddExerciseFromCatalog(catalogEx)}
-                        className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between group pt-3 ${
-                          isTargetSessionEx
-                            ? 'bg-gradient-to-r from-emerald-950/45 via-slate-800/90 to-slate-800/80 border-2 border-emerald-500/60 hover:border-emerald-400 hover:bg-emerald-950/50 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/30'
-                            : isFrequent
-                            ? 'bg-slate-800/90 border border-amber-500/35 hover:border-amber-400 hover:bg-slate-800 shadow-sm'
-                            : 'hover:bg-slate-800/80'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {isTargetSessionEx && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1">
-                                🎯 Cible Séance (Pull)
+                      if (muscleExercises.length === 0) return null;
+
+                      const isExpanded = isMuscleExpanded(muscle.id);
+                      const isTargetMuscle = (isPullSession && muscle.category === 'upper_pull') || (targetSessionCategory === muscle.category);
+
+                      return (
+                        <div key={muscle.id} className="space-y-1.5 pt-0.5">
+                          {/* En-tête déroulant du muscle principal */}
+                          <button
+                            type="button"
+                            onClick={() => toggleMuscleCollapse(muscle.id)}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                              isTargetMuscle
+                                ? 'bg-emerald-950/35 border-emerald-500/40 hover:bg-emerald-950/50 text-emerald-200 shadow-sm'
+                                : 'bg-slate-800/80 border-slate-700/60 hover:bg-slate-800 text-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-xs text-white tracking-wide">
+                                {muscle.name}
                               </span>
-                            )}
-                            {isFrequent && !isTargetSessionEx && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1">
-                                🔥 Fréquent ({usageCount}×)
+                              {isTargetMuscle && (
+                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  {isPullSession ? 'Cible Pull' : 'Cible Séance'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-400">
+                              <span className="text-[10px] font-mono font-bold bg-black/40 px-2 py-0.5 rounded-md text-slate-300">
+                                {muscleExercises.length} exo{muscleExercises.length > 1 ? 's' : ''}
                               </span>
-                            )}
-                            {isFrequent && isTargetSessionEx && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300/90 border border-amber-500/30 inline-flex items-center gap-1">
-                                🔥 ({usageCount}×)
-                              </span>
-                            )}
-                            <span className={`block ${
-                              isTargetSessionEx 
-                                ? 'font-black text-sm text-white group-hover:text-emerald-200' 
-                                : isFrequent 
-                                ? 'font-black text-sm text-white' 
-                                : 'font-bold text-sm text-slate-200 group-hover:text-white'
-                            }`}>
-                              {catalogEx.name}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                              isTargetSessionEx
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : catalogEx.isCompound 
-                                ? 'bg-blue-500/15 text-blue-300' 
-                                : 'bg-emerald-500/15 text-emerald-300'
-                            }`}>
-                              {catalogEx.isCompound ? 'Polyarticulaire' : 'Isolation'}
-                            </span>
-                            <span>·</span>
-                            <span className="text-[10px]">Défaut : {catalogEx.defaultReps} reps</span>
-                            <span>·</span>
-                            <span className="text-[10px] text-slate-400">
-                              {Object.entries(catalogEx.muscleRatios || {})
-                                .map(([mId, r]) => `${MUSCLE_GROUPS[mId]?.name || mId} (${Math.round(r * 100)}%)`)
-                                .join(', ')}
-                            </span>
-                          </div>
+                              {isExpanded ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
+                            </div>
+                          </button>
+
+                          {/* Exercices déroulés pour ce muscle */}
+                          {isExpanded && (
+                            <div className="space-y-1.5 pl-1 sm:pl-2 pt-0.5 animate-fadeIn">
+                              {muscleExercises.map(catalogEx => {
+                                const isFrequent = frequentMap.has(catalogEx.id);
+                                const usageCount = frequentMap.get(catalogEx.id);
+                                const isTargetSessionEx = isTargetMuscle;
+
+                                return (
+                                  <button
+                                    key={catalogEx.id}
+                                    type="button"
+                                    onClick={() => handleAddExerciseFromCatalog(catalogEx)}
+                                    className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between group cursor-pointer ${
+                                      isTargetSessionEx
+                                        ? 'bg-gradient-to-r from-emerald-950/45 via-slate-800/90 to-slate-800/80 border-2 border-emerald-500/60 hover:border-emerald-400 hover:bg-emerald-950/50 shadow-sm'
+                                        : isFrequent
+                                        ? 'bg-slate-800/90 border border-amber-500/35 hover:border-amber-400 hover:bg-slate-800 shadow-sm'
+                                        : 'hover:bg-slate-800/80 border border-slate-800/70 bg-slate-900/40'
+                                    }`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {isTargetSessionEx && (
+                                          <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1">
+                                            {isPullSession ? 'Pull' : 'Séance'}
+                                          </span>
+                                        )}
+                                        {isFrequent && !isTargetSessionEx && (
+                                          <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1">
+                                            Fréquent ({usageCount}×)
+                                          </span>
+                                        )}
+                                        {isFrequent && isTargetSessionEx && (
+                                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300/90 border border-amber-500/30 inline-flex items-center gap-1">
+                                            Fréquent ({usageCount}×)
+                                          </span>
+                                        )}
+                                        <span className={`block ${
+                                          isTargetSessionEx 
+                                            ? 'font-black text-sm text-white group-hover:text-emerald-200' 
+                                            : isFrequent 
+                                            ? 'font-black text-sm text-white' 
+                                            : 'font-bold text-sm text-slate-200 group-hover:text-white'
+                                        }`}>
+                                          {catalogEx.name}
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-300">
+                                          {muscle.name}
+                                        </span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                          isTargetSessionEx
+                                            ? 'bg-emerald-500/20 text-emerald-300'
+                                            : catalogEx.isCompound 
+                                            ? 'bg-blue-500/15 text-blue-300' 
+                                            : 'bg-emerald-500/15 text-emerald-300'
+                                        }`}>
+                                          {catalogEx.isCompound ? 'Polyarticulaire' : 'Isolation'}
+                                        </span>
+                                        <span>·</span>
+                                        <span className="text-[10px]">Défaut : {catalogEx.defaultReps} reps</span>
+                                        <span>·</span>
+                                        <span className="text-[10px] text-slate-400">
+                                          {Object.entries(catalogEx.muscleRatios || {})
+                                            .map(([mId, r]) => `${MUSCLE_GROUPS[mId]?.name || mId} (${Math.round(r * 100)}%)`)
+                                            .join(', ')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Plus size={18} className={`${isTargetSessionEx ? 'text-emerald-400' : isFrequent ? 'text-amber-400' : 'text-blue-400'} group-hover:scale-125 transition-transform shrink-0 ml-2`} />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                        <Plus size={18} className={`${isTargetSessionEx ? 'text-emerald-400' : isFrequent ? 'text-amber-400' : 'text-blue-400'} group-hover:scale-125 transition-transform shrink-0 ml-2`} />
-                      </button>
-                    );
-                  })}
+                      );
+                    })
+                )}
               </div>
             </div>
           </div>

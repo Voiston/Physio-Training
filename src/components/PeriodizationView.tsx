@@ -105,41 +105,48 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
         </div>
 
         {/* Boutons d'action : 1 bouton principal plein + 3 actions secondaires neutres */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5" role="toolbar" aria-label="Actions de périodisation">
           {/* Action Principale */}
           <button
+            type="button"
             onClick={onOpenBlocksModal}
-            className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-600/25 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-600/25 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
           >
-            <Plus size={15} />
+            <Plus size={16} aria-hidden="true" />
             <span>Gérer les Blocs</span>
           </button>
 
           {/* Boutons Secondaires Neutres */}
           <button
+            type="button"
             onClick={onOpenCompetitionModal}
-            className="flex items-center gap-2 px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer"
+            aria-label={targetCompetition ? `Course objectif : ${targetCompetition.name}. Modifier l'objectif` : "Configurer une course objectif"}
+            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             title="Configurer la course objectif et le protocole d'affûtage"
           >
-            <Trophy size={15} className={targetCompetition ? "text-amber-400" : "text-slate-400"} />
+            <Trophy size={16} className={targetCompetition ? "text-amber-400" : "text-slate-400"} aria-hidden="true" />
             <span>{targetCompetition ? targetCompetition.name : 'Course Objectif'}</span>
           </button>
 
           <button
+            type="button"
             onClick={onOpenPhysioSettingsModal}
-            className="flex items-center gap-2 px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer"
+            aria-label={`Calibrage Banister : fatigue ${physioSettings?.tauFatigue || 7} jours, fitness ${physioSettings?.tauFitness || 28} jours`}
+            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             title="Ajuster les constantes de temps de Banister (Fatigue et Fitness)"
           >
-            <Sliders size={15} className="text-slate-400" />
+            <Sliders size={16} className="text-slate-400" aria-hidden="true" />
             <span>Calibrage ({physioSettings?.tauFatigue || 7}j / {physioSettings?.tauFitness || 28}j)</span>
           </button>
 
           <button
+            type="button"
             onClick={onOpenReportModal}
-            className="flex items-center gap-2 px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer"
+            aria-label="Générer un bilan synthétique imprimable en PDF"
+            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             title="Générer un bilan synthétique imprimable"
           >
-            <FileText size={15} className="text-slate-400" />
+            <FileText size={16} className="text-slate-400" aria-hidden="true" />
             <span>Bilan PDF</span>
           </button>
         </div>
@@ -211,7 +218,14 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                       </div>
                       
                       {/* Barre de progression avec dégradé soigné */}
-                      <div className="w-full bg-slate-950/80 rounded-full h-2.5 p-0.5 border border-white/10 overflow-hidden shadow-inner">
+                      <div 
+                        role="progressbar"
+                        aria-valuenow={progress.percent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Progression temporelle du cycle : semaine ${progress.currentWeek} sur ${progress.totalWeeks}, ${progress.percent}%`}
+                        className="w-full bg-slate-950/80 rounded-full h-2.5 p-0.5 border border-white/10 overflow-hidden shadow-inner"
+                      >
                         <div 
                           className="h-full rounded-full bg-gradient-to-r from-blue-500 via-sky-400 to-emerald-400 transition-all duration-700 shadow-sm shadow-blue-500/40"
                           style={{ width: `${Math.max(4, Math.min(100, progress.percent))}%` }}
@@ -458,12 +472,14 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {templates.slice(0, 4).map(tmpl => (
-            <div 
+            <button
               key={tmpl.id}
+              type="button"
               onClick={onOpenBlocksModal}
-              className="p-4 rounded-xl bg-black/40 border border-white/10 hover:border-blue-500/40 hover:bg-slate-800/30 transition-all cursor-pointer flex flex-col justify-between group shadow-md"
+              aria-label={`Modèle ${tmpl.name}, durée ${tmpl.durationWeeks} semaines. Cliquer pour ouvrir la gestion des blocs.`}
+              className="p-4 rounded-xl bg-black/40 border border-white/10 hover:border-blue-500/40 hover:bg-slate-800/30 transition-all cursor-pointer flex flex-col justify-between group shadow-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             >
-              <div>
+              <div className="w-full">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
                     {tmpl.name}
@@ -479,7 +495,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
               </div>
 
               {/* Badges de filières aérés avec gap et contraste élevé */}
-              <div className="flex flex-wrap gap-2 pt-2.5 border-t border-white/10">
+              <div className="flex flex-wrap gap-2 pt-2.5 border-t border-white/10 w-full">
                 {tmpl.focusQualities.map(id => {
                   const qName = qualities.find(q => q.id === id)?.name || id;
                   return (
@@ -492,7 +508,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                   );
                 })}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

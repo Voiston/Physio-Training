@@ -138,6 +138,14 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-slate-100 font-sans p-2 sm:p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden relative">
+      {/* Skip-link d'accès direct au contenu pour navigation clavier et lecteurs d'écran */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:font-bold focus:rounded-xl focus:shadow-2xl focus:outline-none focus:ring-2 focus:ring-white transition-all"
+      >
+        Passer au contenu principal
+      </a>
+
       {/* Background Mesh Gradients */}
       <div className="fixed top-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-900/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[150px] pointer-events-none"></div>
@@ -148,10 +156,10 @@ function AppContent() {
       <div className="relative z-10 flex flex-col h-full gap-5 max-w-[1550px] mx-auto">
         
         {/* Header Section */}
-        <header className="flex flex-wrap items-center justify-between px-4 lg:px-6 py-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md shadow-2xl gap-4">
+        <header className="flex flex-wrap items-center justify-between px-4 lg:px-6 py-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md shadow-2xl gap-4" role="banner">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-500/20 rounded-xl shadow-inner border border-blue-500/30 text-blue-400">
-              <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
+              <Activity className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -181,7 +189,7 @@ function AppContent() {
               }`}
               title="Synchronisation automatique temps réel entre votre smartphone et votre PC"
             >
-              <Cloud size={15} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} />
+              <Cloud size={15} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} aria-hidden="true" />
               <span className="hidden sm:inline">Synchro Cloud</span>
               <span className="sm:hidden">Sync</span>
               {cloudSync.syncStatus === 'synced' && (
@@ -198,8 +206,8 @@ function AppContent() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10 group"
               title="Lancer le Mode Salle : suivi tactile en direct, minuteur de repos et charge adaptative"
             >
-              <Dumbbell size={15} className="text-emerald-400 group-hover:rotate-12 transition-transform" />
-              <span>Mode Salle ⏱️</span>
+              <Dumbbell size={15} className="text-emerald-400 group-hover:rotate-12 transition-transform" aria-hidden="true" />
+              <span>Mode Salle</span>
               {hasGymDraft && (
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping ml-0.5" title="Séance en cours" />
               )}
@@ -562,7 +570,8 @@ function AppContent() {
           onCommit={commitSimulation}
         />
 
-        {/* CONTENU SELON L'ONGLET ACTIF */}
+        {/* CONTENU SELON L'ONGLET ACTIF (Encapsulé dans le repère sémantique main) */}
+        <main id="main-content" tabIndex={-1} className="flex flex-col gap-5 focus:outline-none" role="main">
 
         {/* ONGLET 1 : GRILLE & PLANIFICATION */}
         {activeTab === 'grid' && (
@@ -940,6 +949,7 @@ function AppContent() {
           </div>
         )}
 
+        </main>
       </div>
 
       {modalInfo && (
@@ -1104,7 +1114,7 @@ function AppContent() {
             const qName = qObj ? qObj.name : qualityId;
             showToast({
               type: 'success',
-              title: 'Séance en direct enregistrée ! 🏋️',
+              title: 'Séance en direct enregistrée',
               message: `${qName} · ${sessionData.duration} min · Tonnage : ${(sessionData.tonnageKg || 0).toLocaleString()} kg · Charge : ${sessionData.load} pts`
             });
             setShowLiveGymModal(false);
@@ -1177,9 +1187,10 @@ function AppContent() {
           onClick={() => setShowLiveGymModal(true)}
           className="relative -mt-6 mx-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-600/40 border border-emerald-400/50 touch-press active:scale-88 active:brightness-125 active:shadow-emerald-500/60 transition-all cursor-pointer group"
           title="Lancer le Mode Salle"
+          aria-label="Lancer le Mode Salle d'entraînement"
         >
-          <Dumbbell size={20} className={`group-hover:rotate-12 transition-transform ${hasGymDraft ? 'animate-pulse' : ''}`} />
-          <span className="text-[9px] font-extrabold mt-0.5 tracking-tight whitespace-nowrap">Salle ⏱️</span>
+          <Dumbbell size={20} className={`group-hover:rotate-12 transition-transform ${hasGymDraft ? 'animate-pulse' : ''}`} aria-hidden="true" />
+          <span className="text-[9px] font-extrabold mt-0.5 tracking-tight whitespace-nowrap">Salle</span>
           {hasGymDraft && (
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
           )}

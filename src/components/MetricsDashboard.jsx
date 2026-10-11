@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   AreaChart, Area, ComposedChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, ReferenceLine 
@@ -8,7 +8,7 @@ import {
   Minus, ArrowUp, ArrowDown, Info, Gauge, Trophy, FileText, 
   ShieldAlert, Play, CheckCircle2, Sliders, Heart, Dumbbell, Flame,
   Search, X, Layers, SlidersHorizontal, BarChart3, Calendar, Clock,
-  Pin, RotateCcw, Zap, Filter
+  Pin, RotateCcw, Zap, Filter, ChevronLeft, ChevronRight, Target, Table as TableIcon
 } from 'lucide-react';
 import { calculateEMA, calculateExpDecay } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
@@ -172,10 +172,22 @@ export default function MetricsDashboard({
   const [banisterCurves, setBanisterCurves] = useState({ atl: true, ctl: true, tsb: true });
   const [vfcCurves, setVfcCurves] = useState({ vfc: true, ema3: true, ema7: true });
 
-  // Nouveaux états d'interactivité : inspection d'un point Banister et filtre du ruban de rémanence
+  // Nouveaux états d'interactivité : inspection d'un point Banister, affichage tableau accessible et filtre du ruban
   const [selectedBanisterDay, setSelectedBanisterDay] = useState(null);
   const [isDayPinned, setIsDayPinned] = useState(false);
   const [remanenceFilter, setRemanenceFilter] = useState('all'); // 'all' | 'urgent' | 'recall' | 'optimal'
+  const [showDataTable, setShowDataTable] = useState(false);
+
+  // Écouteur clavier pour fermeture accessible des infobulles scientifiques (Touche Escape - WCAG 2.1)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && activeTooltip) {
+        setActiveTooltip(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTooltip]);
 
   const showPhysiology = viewMode === 'all' || viewMode === 'physiology';
   const showQualities = viewMode === 'all' || viewMode === 'qualities';
@@ -399,6 +411,29 @@ export default function MetricsDashboard({
     const nonFuture = chartData.filter(d => !d.isFuture);
     return nonFuture[nonFuture.length - 1] || chartData[chartData.length - 1] || null;
   }, [selectedBanisterDay, chartData]);
+
+  // Contrôles de navigation séquentielle accessible (J-1 / J+1 / clavier)
+  const currentDayIndex = useMemo(() => {
+    if (!currentInspectedDay || !chartData.length) return -1;
+    return chartData.findIndex(d => d.dateStr === currentInspectedDay.dateStr);
+  }, [currentInspectedDay, chartData]);
+
+  const canGoPrev = currentDayIndex > 0;
+  const canGoNext = currentDayIndex >= 0 && currentDayIndex < chartData.length - 1;
+
+  const handlePrevDay = () => {
+    if (canGoPrev) {
+      setSelectedBanisterDay(chartData[currentDayIndex - 1]);
+      setIsDayPinned(true);
+    }
+  };
+
+  const handleNextDay = () => {
+    if (canGoNext) {
+      setSelectedBanisterDay(chartData[currentDayIndex + 1]);
+      setIsDayPinned(true);
+    }
+  };
 
   // Interprétation dynamique Banister pour le jour inspecté (avec garde CTL en construction)
   const banisterInterpretation = useMemo(() => {
@@ -732,7 +767,7 @@ export default function MetricsDashboard({
           {dataItem?.sessions && dataItem.sessions.length > 0 && (
             <div className="mt-2 pt-2 border-t border-white/10">
               <span className="text-[10px] text-slate-400 font-semibold block mb-1">
-                🏋️ {dataItem.sessions.length} séance(s) réalisée(s) :
+                Séances du jour ({dataItem.sessions.length}) :
               </span>
               <div className="space-y-1">
                 {dataItem.sessions.map((s, idx) => (
@@ -748,9 +783,9 @@ export default function MetricsDashboard({
           {/* Biométrie du réveil */}
           {(dataItem?.vfc || dataItem?.hrRest || dataItem?.readiness) && (
             <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2 text-[10px] font-mono">
-              {dataItem.readiness && <span className="text-blue-300">⚡ {dataItem.readiness}/10</span>}
-              {dataItem.vfc && <span className="text-emerald-300">🫀 {dataItem.vfc} ms</span>}
-              {dataItem.hrRest && <span className="text-rose-300">💓 {dataItem.hrRest} bpm</span>}
+              {dataItem.readiness && <span className="text-blue-300">Readiness : {dataItem.readiness}/10</span>}
+              {dataItem.vfc && <span className="text-emerald-300">VFC : {dataItem.vfc} ms</span>}
+              {dataItem.hrRest && <span className="text-rose-300">FC : {dataItem.hrRest} bpm</span>}
             </div>
           )}
         </div>
@@ -1171,20 +1206,21 @@ export default function MetricsDashboard({
               </div>
             </div>
 
-            {/* Standardisation : boutons adaptés mobile & desktop */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Standardisation : boutons adaptés mobile & desktop respectant 44px de cible tactile */}
+            <div className="flex flex-wrap items-center gap-2">
               {onToggleSimulation && (
                 <button
                   type="button"
                   onClick={() => onToggleSimulation()}
-                  className={`flex items-center gap-1.5 h-8 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border ${
+                  aria-pressed={isSimulationActive}
+                  className={`flex items-center gap-2 min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
                     isSimulationActive 
-                      ? 'bg-purple-950/40 text-purple-300 border-purple-500/40 shadow-sm' 
-                      : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10'
+                      ? 'bg-purple-950/50 text-purple-200 border-purple-500/50 shadow-sm' 
+                      : 'bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border-white/10'
                   }`}
                   title="Activer la simulation prédictive pour projeter les jours futurs"
                 >
-                  <Sparkles size={13} className={isSimulationActive ? 'text-purple-400' : 'text-slate-400'} />
+                  <Sparkles size={14} className={isSimulationActive ? 'text-purple-400' : 'text-slate-400'} />
                   <span className="hidden sm:inline">{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
                   <span className="sm:hidden">Simu</span>
                 </button>
@@ -1194,10 +1230,10 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={onOpenCompetitionModal}
-                  className="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-2 min-h-[44px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title="Configurer une compétition ou un objectif de course"
                 >
-                  <Trophy size={13} className="text-slate-400" />
+                  <Trophy size={14} className="text-slate-400" />
                   <span>
                     {taperingAnalysis?.targetCompetition 
                       ? `${taperingAnalysis.targetCompetition.name} (J-${taperingAnalysis.daysRemaining})` 
@@ -1210,10 +1246,10 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={onOpenPhysioSettingsModal}
-                  className="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-2 min-h-[44px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title="Calibrer les constantes de rémanence Banister (tau fatigue et condition)"
                 >
-                  <Sliders size={13} className="text-slate-400" />
+                  <Sliders size={14} className="text-slate-400" />
                   <span className="hidden sm:inline">Calibrage (τ₁:{tauFatigue}j, τ₂:{tauFitness}j)</span>
                   <span className="sm:hidden font-mono">τ:{tauFatigue}/{tauFitness}j</span>
                 </button>
@@ -1223,10 +1259,10 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={onOpenReportModal}
-                  className="flex items-center gap-1.5 h-8 px-3 sm:px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-500/40 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/25 cursor-pointer"
+                  className="flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-500/40 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/25 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                   title="Générer un bilan d'entraînement imprimable en PDF"
                 >
-                  <FileText size={13} className="text-white" />
+                  <FileText size={14} className="text-white" />
                   <span>Bilan PDF</span>
                 </button>
               )}
@@ -1263,7 +1299,7 @@ export default function MetricsDashboard({
                   <button
                     type="button"
                     onClick={onOpenCompetitionModal}
-                    className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    className="min-h-[44px] px-2 inline-flex items-center text-xs font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg"
                   >
                     Définir
                   </button>
@@ -1402,9 +1438,17 @@ export default function MetricsDashboard({
 
               {balance && (
                 <div className="space-y-3">
-                  {/* Barre de ratio visuelle */}
+                  {/* Barre de ratio visuelle avec sémantique accessible */}
                   <div>
-                    <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-white/10 shadow-inner mb-2">
+                    <div 
+                      role="meter"
+                      aria-label="Répartition de la charge d'entraînement : Cardio vs Musculaire sur 7 jours"
+                      aria-valuenow={balance.cardioPercent}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuetext={`Cardio : ${balance.cardioPercent}%, Musculaire : ${balance.muscPercent}%. Charge 7j : ${balance.totalCardioLoad} UA cardio contre ${balance.totalMuscLoad} UA musculaire.`}
+                      className="w-full h-2.5 rounded-full overflow-hidden flex bg-white/10 shadow-inner mb-2"
+                    >
                       <div 
                         className="bg-sky-400 h-full transition-all duration-500" 
                         style={{ width: `${balance.cardioPercent}%` }}
@@ -1456,8 +1500,9 @@ export default function MetricsDashboard({
                     <p className="m-0 leading-tight">
                       <strong className="text-white">Diagnostic :</strong> {balance.description}
                     </p>
-                    <p className="m-0 text-emerald-300 text-[10px] leading-tight">
-                      🎯 {balance.recommendation}
+                    <p className="m-0 text-emerald-300 text-[11px] leading-tight flex items-center gap-1.5 font-medium">
+                      <Target size={13} className="text-emerald-400 shrink-0" />
+                      <span>{balance.recommendation}</span>
                     </p>
                   </div>
                 </div>
@@ -1468,25 +1513,29 @@ export default function MetricsDashboard({
 
       {/* ENCART COACH VIRTUEL */}
       {coachInsights.length > 0 && (
-        <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
-            <Sparkles size={16} className="text-blue-400" /> Analyse Intelligente de Charge & Récupération
+        <section 
+          aria-labelledby="coach-insights-heading"
+          className="bg-white/5 p-4 rounded-2xl border border-white/10 shadow-lg"
+        >
+          <h4 id="coach-insights-heading" className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 mb-3.5">
+            <Sparkles size={16} className="text-blue-400" aria-hidden="true" />
+            <span>Analyse Intelligente de Charge & Récupération ({coachInsights.length} recommandation{coachInsights.length > 1 ? 's' : ''})</span>
           </h4>
-          <div className="space-y-3">
+          <div className="space-y-2.5" role="list" aria-label="Recommandations physiologiques actives">
             {coachInsights.map((insight, i) => {
-              let bClass = 'bg-white/5 border border-white/5 text-slate-300';
-              if (insight.type === 'danger') bClass = 'bg-red-500/10 border border-red-500/20 text-red-200';
-              else if (insight.type === 'warning') bClass = 'bg-amber-500/10 border border-amber-500/20 text-amber-200';
-              else if (insight.type === 'good') bClass = 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-200';
+              let bClass = 'bg-white/5 border border-white/10 text-slate-200';
+              if (insight.type === 'danger') bClass = 'bg-red-500/15 border border-red-500/30 text-red-100';
+              else if (insight.type === 'warning') bClass = 'bg-amber-500/15 border border-amber-500/30 text-amber-100';
+              else if (insight.type === 'good') bClass = 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-100';
               return (
-                <div key={i} className={`flex items-start gap-3 p-3 rounded-xl text-sm ${bClass}`}>
-                  <div className="mt-0.5 opacity-80 shrink-0">{insight.icon}</div>
+                <div key={i} role="listitem" className={`flex items-start gap-3 p-3 rounded-xl text-xs sm:text-sm font-medium ${bClass}`}>
+                  <div className="mt-0.5 opacity-90 shrink-0" aria-hidden="true">{insight.icon}</div>
                   <span className="leading-relaxed">{insight.text}</span>
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
       )}
 
           {/* BANDEAU KPI BANISTER : TSB · ATL · CTL AVEC INFOBULLES SCIENTIFIQUES AU SURVOL */}
@@ -1659,12 +1708,10 @@ export default function MetricsDashboard({
                 }
 
                 return (
-                  <div
+                  <article
                     key={key}
-                    onMouseEnter={() => setActiveTooltip(key)}
-                    onMouseLeave={() => setActiveTooltip(null)}
-                    onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}
-                    className={`relative p-4 rounded-2xl border transition-all cursor-pointer group shadow-xl ${cardBorder} ${isActive ? 'ring-2 ring-blue-500/50 scale-[1.01]' : ''}`}
+                    aria-labelledby={`kpi-heading-${key}`}
+                    className={`relative p-4 rounded-2xl border transition-all shadow-xl ${cardBorder} ${isActive ? 'ring-2 ring-blue-500/50 scale-[1.01]' : ''}`}
                   >
                     {/* Header carte */}
                     <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -1672,16 +1719,22 @@ export default function MetricsDashboard({
                         <span className={`px-2 py-0.5 rounded font-black font-mono text-xs border ${badgeClass}`}>
                           {info.name}
                         </span>
-                        <span className="text-xs font-bold text-slate-200 truncate">
+                        <h4 id={`kpi-heading-${key}`} className="text-xs font-bold text-slate-200 truncate m-0">
                           {key === 'tsb' ? 'Forme (TSB)' : key === 'atl' ? 'Fatigue Aiguë (ATL)' : 'Condition Durable (CTL)'}
-                        </span>
+                        </h4>
                       </div>
                       <button
                         type="button"
-                        className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                        id={`kpi-info-btn-${key}`}
+                        aria-haspopup="dialog"
+                        aria-expanded={isActive}
+                        aria-controls={`physio-tooltip-${key}`}
+                        onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}
+                        aria-label={`Afficher le rôle et les seuils de normalité de ${info.name}`}
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2 -my-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
                         title="Afficher le rôle et les seuils de normalité"
                       >
-                        <Info size={14} className={isActive ? 'text-blue-400' : ''} />
+                        <Info size={18} className={isActive ? 'text-blue-400' : ''} aria-hidden="true" />
                       </button>
                     </div>
 
@@ -1708,9 +1761,17 @@ export default function MetricsDashboard({
                       </div>
                     </div>
 
-                    {/* Jauge visuelle avec curseur dynamique de situation athlète */}
+                    {/* Jauge visuelle avec rôle meter accessible et curseur dynamique de situation athlète */}
                     <div className="my-2.5">
-                      <div className="relative w-full h-2.5 rounded-full overflow-hidden flex bg-white/10 shadow-inner">
+                      <div 
+                        role="meter"
+                        aria-label={`Niveau et positionnement de ${info.name}`}
+                        aria-valuenow={Math.round(gaugePercent)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuetext={`${info.name} : ${mainNumber} ${unitLabel}, ${info.currentInterpretation}`}
+                        className="relative w-full h-2.5 rounded-full overflow-hidden flex bg-white/10 shadow-inner"
+                      >
                         {isTsb && (
                           <>
                             <div className="h-full bg-red-500/70" style={{ width: '18.75%' }} title="Surcharge critique (< -35% CTL)" />
@@ -1754,16 +1815,24 @@ export default function MetricsDashboard({
                       </div>
                     </div>
 
-                    {/* Diagnostic textuel */}
+                    {/* Diagnostic textuel avec bouton accessible */}
                     <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] min-w-0 gap-2">
                       <span className={`font-semibold truncate min-w-0 ${statusColor}`}>
                         {info.currentInterpretation}
                       </span>
-                      <span className="text-[10px] text-blue-400 opacity-80 group-hover:opacity-100 group-hover:underline flex items-center gap-0.5 shrink-0">
-                        Seuils & Rôle <Info size={10} />
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTooltip(activeTooltip === key ? null : key)}
+                        aria-haspopup="dialog"
+                        aria-expanded={isActive}
+                        aria-controls={`physio-tooltip-${key}`}
+                        className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 shrink-0 p-1 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
+                      >
+                        <span>Seuils & Rôle</span>
+                        <Info size={12} aria-hidden="true" />
+                      </button>
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -1771,7 +1840,12 @@ export default function MetricsDashboard({
             {/* POPOVER / INFOBULLE DÉTAILLÉE FLOTTANTE AU SURVOL / CLIC */}
             {activeTooltip && physioTooltips[activeTooltip] && (
               <div 
-                className="absolute z-50 left-0 right-0 top-full mt-3 p-4 sm:p-5 bg-[#0f172a]/98 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl animate-fadeIn text-slate-100 max-w-3xl mx-auto"
+                id={`physio-tooltip-${activeTooltip}`}
+                role="dialog"
+                aria-modal="true"
+                tabIndex={-1}
+                aria-label={physioTooltips[activeTooltip].fullTitle}
+                className="absolute z-50 left-0 right-0 top-full mt-3 p-4 sm:p-5 bg-[#0f172a]/98 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl animate-fadeIn text-slate-100 max-w-3xl mx-auto focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onMouseEnter={() => setActiveTooltip(activeTooltip)}
                 onMouseLeave={() => setActiveTooltip(null)}
               >
@@ -1785,15 +1859,18 @@ export default function MetricsDashboard({
                         {physioTooltips[activeTooltip].fullTitle}
                       </h4>
                     </div>
-                    <p className="text-xs text-blue-300 font-mono mt-1">
-                      📐 {physioTooltips[activeTooltip].formula}
+                    <p className="text-xs text-blue-300 font-mono mt-1 flex items-center gap-1.5">
+                      <SlidersHorizontal size={12} className="text-blue-400 shrink-0" />
+                      <span>Formule : {physioTooltips[activeTooltip].formula}</span>
                     </p>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setActiveTooltip(null)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    aria-label="Fermer la fenêtre d'explication (ou touche Échap)"
+                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -1845,73 +1922,228 @@ export default function MetricsDashboard({
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400 italic">
-                    Cliquez en dehors pour fermer
+                    Cliquez en dehors ou appuyez sur Échap pour fermer
                   </span>
                 </div>
               </div>
             )}
           </div>
 
+          {/* BARRE D'ACCESSIBILITÉ & NAVIGATION CLAVIER TEMPORELLE (WCAG 2.1 & 2.2) */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={14} className="text-blue-400" />
+                <span className="hidden sm:inline">Navigation temporelle accessible :</span>
+                <span className="sm:hidden">Naviguer :</span>
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={!canGoPrev}
+                  onClick={handlePrevDay}
+                  className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none text-slate-200 border border-white/10 transition-all flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
+                  aria-label="Inspecter le jour précédent (J-1)"
+                  title="Reculer d'un jour (J-1)"
+                >
+                  <ChevronLeft size={16} aria-hidden="true" />
+                  <span>J-1</span>
+                </button>
+
+                {/* Sélecteur de date accessible au clavier */}
+                <label htmlFor="banister-day-select" className="sr-only">Sélectionner une date à inspecter</label>
+                <select
+                  id="banister-day-select"
+                  value={currentInspectedDay?.dateStr || ''}
+                  onChange={(e) => {
+                    const target = chartData.find(d => d.dateStr === e.target.value);
+                    if (target) {
+                      setSelectedBanisterDay(target);
+                      setIsDayPinned(true);
+                    }
+                  }}
+                  className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-mono bg-slate-800 text-slate-200 border border-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
+                >
+                  {chartData.map(d => (
+                    <option key={d.dateStr} value={d.dateStr}>
+                      {d.dateStr} {d.isToday ? '(Aujourd\'hui)' : d.isFuture ? `(+${d.offset}j)` : `(J${d.offset})`} — TSB: {d.tsb > 0 ? `+${d.tsb}` : d.tsb}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  disabled={!canGoNext}
+                  onClick={handleNextDay}
+                  className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none text-slate-200 border border-white/10 transition-all flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
+                  aria-label="Inspecter le jour suivant (J+1)"
+                  title="Avancer d'un jour (J+1)"
+                >
+                  <span>J+1</span>
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDataTable(prev => !prev)}
+              aria-expanded={showDataTable}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/10 transition-all flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
+              title="Afficher le tableau accessible des relevés Banister et VFC"
+            >
+              <TableIcon size={16} className="text-blue-400" aria-hidden="true" />
+              <span>{showDataTable ? 'Masquer tableau' : 'Tableau de données (WCAG)'}</span>
+            </button>
+          </div>
+
+          {/* TABLEAU ACCESSIBLE ALTERNATIF (WCAG 1.1.1 & 2.1.1) */}
+          {showDataTable && (
+            <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 overflow-hidden shadow-xl animate-fadeIn">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                <div className="flex items-center gap-2">
+                  <TableIcon size={16} className="text-blue-400" aria-hidden="true" />
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider m-0">Tableau de Données Physiologiques (Modélisation Banister PMC & VFC)</h4>
+                </div>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {chartData.length} jours répertoriés
+                </span>
+              </div>
+              <div className="overflow-x-auto max-h-72">
+                <table className="w-full text-left text-xs border-collapse">
+                  <caption className="sr-only">Relevé chronologique des métriques Banister : charge quotidienne, fatigue aiguë ATL, condition CTL, forme TSB et VFC</caption>
+                  <thead className="bg-white/5 text-slate-300 font-semibold sticky top-0 backdrop-blur-md">
+                    <tr>
+                      <th scope="col" className="p-2 border-b border-white/10 font-mono">Date</th>
+                      <th scope="col" className="p-2 border-b border-white/10">Repère</th>
+                      <th scope="col" className="p-2 border-b border-white/10 text-right">Charge</th>
+                      <th scope="col" className="p-2 border-b border-white/10 text-right">ATL ({tauFatigue}j)</th>
+                      <th scope="col" className="p-2 border-b border-white/10 text-right">CTL ({tauFitness}j)</th>
+                      <th scope="col" className="p-2 border-b border-white/10 text-right">TSB Forme</th>
+                      <th scope="col" className="p-2 border-b border-white/10 text-right">VFC</th>
+                      <th scope="col" className="p-2 border-b border-white/10 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-mono">
+                    {chartData.map((d) => {
+                      const isSelected = d.dateStr === currentInspectedDay?.dateStr;
+                      return (
+                        <tr 
+                          key={d.dateStr}
+                          className={`hover:bg-white/5 transition-colors ${isSelected ? 'bg-blue-500/15 text-white font-bold' : 'text-slate-300'}`}
+                        >
+                          <td className="p-2">{d.dateStr}</td>
+                          <td className="p-2 font-sans text-[11px]">
+                            {d.isToday ? (
+                              <span className="text-blue-400 font-bold">Aujourd'hui</span>
+                            ) : d.isFuture ? (
+                              <span className="text-purple-400">J+{d.offset}</span>
+                            ) : (
+                              <span className="text-slate-400">J{d.offset}</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-right text-amber-300 font-bold">{d.load}</td>
+                          <td className="p-2 text-right text-rose-400">{d.loadEMA7}</td>
+                          <td className="p-2 text-right text-sky-400">{d.loadEMA21}</td>
+                          <td className="p-2 text-right">
+                            <span className={d.tsb >= 5 ? 'text-emerald-400 font-bold' : d.tsb >= -10 ? 'text-sky-300' : 'text-rose-400'}>
+                              {d.tsb > 0 ? `+${d.tsb}` : d.tsb}
+                            </span>
+                          </td>
+                          <td className="p-2 text-right text-emerald-400">{d.vfc ? `${d.vfc} ms` : '-'}</td>
+                          <td className="p-2 text-center font-sans">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBanisterDay(d);
+                                setIsDayPinned(true);
+                              }}
+                              className="min-h-[44px] px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-blue-600 text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                              aria-label={`Inspecter la journée du ${d.dateStr}`}
+                            >
+                              Inspecter
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* GRAPHIQUES GLOBAUX BANISTER + VFC */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
             
             {/* GRAPHIQUE 1 : Charge Globale (Banister) */}
-            <div className="flex flex-col h-[340px] sm:h-[380px] bg-slate-900/60 border border-white/10 rounded-2xl p-3.5 sm:p-4 min-h-0 relative shadow-xl">
+            <section 
+              aria-labelledby="heading-banister-pmc"
+              className="flex flex-col h-[340px] sm:h-[380px] bg-slate-900/60 border border-white/10 rounded-2xl p-3.5 sm:p-4 min-h-0 relative shadow-xl"
+            >
+              <div className="sr-only">
+                Graphique de modélisation Banister Performance Management Chart. Affiche les courbes de fatigue ATL ({tauFatigue} jours), condition CTL ({tauFitness} jours) et forme TSB. Jour inspecté : {currentInspectedDay?.dateStr || 'Aujourd\'hui'}.
+              </div>
+
               <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-1.5 sm:gap-2">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <Activity size={13} className="text-blue-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  <h4 id="heading-banister-pmc" className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
                     <span className="sm:hidden">Modèle PMC</span>
                     <span className="hidden sm:inline">Modélisation PMC (Charge & Forme)</span>
-                  </span>
+                  </h4>
                 </div>
                 
-                {/* Légendes interactives compactes cliquables pour afficher/masquer */}
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                {/* Légendes interactives avec cibles tactiles de 44px et aria-pressed */}
+                <div className="flex items-center gap-1.5 flex-wrap" role="toolbar" aria-label="Affichage des courbes PMC">
                   <button
                     type="button"
                     onClick={() => setBanisterCurves(p => ({ ...p, atl: !p.atl }))}
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    aria-pressed={banisterCurves.atl}
+                    className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${
                       banisterCurves.atl 
                         ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
                     }`}
                     title="Cliquer pour afficher/masquer la courbe de fatigue ATL"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                    ATL <span className="hidden xs:inline">({tauFatigue}j)</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-400" aria-hidden="true" />
+                    <span>ATL <span className="hidden xs:inline">({tauFatigue}j)</span></span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setBanisterCurves(p => ({ ...p, ctl: !p.ctl }))}
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    aria-pressed={banisterCurves.ctl}
+                    className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
                       banisterCurves.ctl 
                         ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
                     }`}
                     title="Cliquer pour afficher/masquer la courbe de condition CTL"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                    CTL <span className="hidden xs:inline">({tauFitness}j)</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-400" aria-hidden="true" />
+                    <span>CTL <span className="hidden xs:inline">({tauFitness}j)</span></span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setBanisterCurves(p => ({ ...p, tsb: !p.tsb }))}
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    aria-pressed={banisterCurves.tsb}
+                    className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                       banisterCurves.tsb 
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
                     }`}
                     title="Cliquer pour afficher/masquer la courbe de forme TSB"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    TSB
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                    <span>TSB</span>
                   </button>
 
                   {isSimulationActive && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    <span className="text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
                       Simu
                     </span>
                   )}
@@ -1922,7 +2154,7 @@ export default function MetricsDashboard({
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart 
                     data={chartData} 
-                    margin={{ top: 5, right: 8, left: -22, bottom: 0 }}
+                    margin={{ top: 5, right: 8, left: -20, bottom: 0 }}
                     onMouseMove={(e) => {
                       if (!isDayPinned && e && e.activePayload && e.activePayload[0]) {
                         setSelectedBanisterDay(e.activePayload[0].payload);
@@ -1946,8 +2178,8 @@ export default function MetricsDashboard({
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9 }} minTickGap={20} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 9 }} width={24} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="day" stroke="#94a3b8" tick={{ fontSize: 11, fill: '#94a3b8' }} minTickGap={20} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" tick={{ fontSize: 11, fill: '#94a3b8' }} width={26} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     
                     {currentInspectedDay && (
@@ -1971,68 +2203,80 @@ export default function MetricsDashboard({
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </section>
 
             {/* GRAPHIQUE 2 : Tendance VFC */}
-            <div className="flex flex-col min-h-[340px] bg-slate-900/60 border border-white/10 rounded-2xl p-3.5 sm:p-4 relative shadow-xl">
+            <section 
+              aria-labelledby="heading-banister-vfc"
+              className="flex flex-col min-h-[340px] bg-slate-900/60 border border-white/10 rounded-2xl p-3.5 sm:p-4 relative shadow-xl"
+            >
+              <div className="sr-only">
+                Graphique de variabilité de fréquence cardiaque (VFC) et ligne de base. Analyse parasympathique et récupération autonome.
+              </div>
+
               <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-1.5 sm:gap-2">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <Activity size={13} className="text-emerald-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Variabilité Cardiaque (VFC)</span>
+                  <h4 id="heading-banister-vfc" className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
+                    Variabilité Cardiaque (VFC)
+                  </h4>
                 </div>
 
-                {/* Légendes interactives compactes cliquables */}
-                <div className="flex items-center gap-1 sm:gap-1.5">
+                {/* Légendes interactives avec cibles tactiles de 44px et aria-pressed */}
+                <div className="flex items-center gap-1.5 flex-wrap" role="toolbar" aria-label="Affichage des courbes VFC">
                   <button
                     type="button"
                     onClick={() => setVfcCurves(p => ({ ...p, vfc: !p.vfc }))}
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    aria-pressed={vfcCurves.vfc}
+                    className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                       vfcCurves.vfc 
                         ? 'bg-white/10 text-slate-200 border-white/20 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
                     }`}
                     title="Cliquer pour afficher/masquer la VFC quotidienne nette"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
-                    Nette
+                    <span className="w-2.5 h-2.5 rounded-full bg-white/70" aria-hidden="true" />
+                    <span>Nette</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setVfcCurves(p => ({ ...p, ema3: !p.ema3 }))}
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    aria-pressed={vfcCurves.ema3}
+                    className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                       vfcCurves.ema3 
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
                     }`}
                     title="Cliquer pour afficher/masquer la VFC EMA 3j"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    EMA 3j
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                    <span>EMA 3j</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setVfcCurves(p => ({ ...p, ema7: !p.ema7 }))}
-                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    aria-pressed={vfcCurves.ema7}
+                    className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 ${
                       vfcCurves.ema7 
                         ? 'bg-pink-500/20 text-pink-300 border-pink-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
                     }`}
                     title="Cliquer pour afficher/masquer la VFC Ligne de Base EMA 7j"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />
-                    Base 7j
+                    <span className="w-2.5 h-2.5 rounded-full bg-pink-400" aria-hidden="true" />
+                    <span>Base 7j</span>
                   </button>
                 </div>
               </div>
 
               <div className="h-[210px] sm:h-[240px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 5, right: 8, left: -22, bottom: 0 }}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9 }} minTickGap={20} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 9 }} width={24} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="day" stroke="#94a3b8" tick={{ fontSize: 11, fill: '#94a3b8' }} minTickGap={20} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" domain={['auto', 'auto']} tick={{ fontSize: 11, fill: '#94a3b8' }} width={26} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     
                     {vfcCurves.vfc && (
@@ -2100,13 +2344,17 @@ export default function MetricsDashboard({
                   )}
                 </div>
               )}
-            </div>
+            </section>
 
           </div>
 
           {/* POINT 4 : PANNEAU D'INSPECTION & DIAGNOSTIC DYNAMIQUE DE CHARGE BANISTER */}
           {currentInspectedDay && banisterInterpretation && (
-            <div className="bg-slate-900/70 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
+            <div 
+              id="banister-day-inspector"
+              aria-live="polite"
+              className="bg-slate-900/70 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl"
+            >
               {/* En-tête avec date inspectée, badge temporel, état épinglé et bouton retour aujourd'hui */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -2133,18 +2381,18 @@ export default function MetricsDashboard({
                       )}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5 mb-0 hidden sm:block">
-                      Cliquez sur la courbe Banister pour figer une date et inspecter l'impact de chaque entraînement
+                      Cliquez sur la courbe Banister pour figer une date ou naviguez via la barre chronologique
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   {isDayPinned ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-xl">
-                      <Pin size={12} className="text-amber-400" /> Date Épinglée
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl">
+                      <Pin size={13} className="text-amber-400" /> Date Épinglée
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl font-mono">
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl font-mono">
                       Survol interactif
                     </span>
                   )}
@@ -2157,10 +2405,10 @@ export default function MetricsDashboard({
                         setSelectedBanisterDay(todayItem || null);
                         setIsDayPinned(false);
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-blue-300 hover:text-blue-200 border border-white/10 transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-blue-300 hover:text-blue-200 border border-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                       title="Réinitialiser l'inspection sur la date d'aujourd'hui"
                     >
-                      <RotateCcw size={12} />
+                      <RotateCcw size={13} />
                       <span>Aujourd'hui</span>
                     </button>
                   )}
@@ -2248,27 +2496,30 @@ export default function MetricsDashboard({
                 <p className="text-xs text-slate-200 leading-relaxed m-0">
                   {banisterInterpretation.summary}
                 </p>
-                <p className="text-xs text-emerald-300 font-medium bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg m-0">
-                  🎯 <strong>Conseil d'entraînement :</strong> {banisterInterpretation.prescription}
-                </p>
+                <div className="text-xs text-emerald-300 font-medium bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg flex items-start gap-2">
+                  <Target size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-emerald-200">Conseil d'entraînement :</strong> {banisterInterpretation.prescription}
+                  </div>
+                </div>
 
                 {/* Triptyque Biométrique du Réveil (Readiness, VFC, FC de Repos) */}
                 {(currentInspectedDay.readiness || currentInspectedDay.vfc || currentInspectedDay.hrRest) && (
-                  <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-1.5 sm:gap-3 text-[11px] sm:text-xs font-mono">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Biométrie du Réveil :</span>
+                  <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Biométrie du Réveil :</span>
                     {currentInspectedDay.readiness && (
-                      <span className="inline-flex items-center gap-1 text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
-                        ⚡ Readiness : <strong>{currentInspectedDay.readiness}/10</strong>
+                      <span className="inline-flex items-center gap-1.5 text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+                        <Zap size={12} className="text-blue-400 shrink-0" /> Readiness : <strong>{currentInspectedDay.readiness}/10</strong>
                       </span>
                     )}
                     {currentInspectedDay.vfc && (
-                      <span className="inline-flex items-center gap-1 text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                        🫀 VFC : <strong>{currentInspectedDay.vfc} ms</strong>
+                      <span className="inline-flex items-center gap-1.5 text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                        <Activity size={12} className="text-emerald-400 shrink-0" /> VFC : <strong>{currentInspectedDay.vfc} ms</strong>
                       </span>
                     )}
                     {currentInspectedDay.hrRest && (
-                      <span className="inline-flex items-center gap-1 text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
-                        💓 FC Repos : <strong>{currentInspectedDay.hrRest} bpm</strong>
+                      <span className="inline-flex items-center gap-1.5 text-rose-300 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20">
+                        <Heart size={12} className="text-rose-400 shrink-0" /> FC Repos : <strong>{currentInspectedDay.hrRest} bpm</strong>
                       </span>
                     )}
                   </div>
@@ -2278,8 +2529,8 @@ export default function MetricsDashboard({
               {/* Séances Enregistrées Réalisées Ce Jour-Là */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] uppercase tracking-wider font-bold text-slate-300 flex items-center gap-1.5">
-                    <Dumbbell size={13} className="text-blue-400" />
+                  <span className="text-xs uppercase tracking-wider font-bold text-slate-200 flex items-center gap-1.5">
+                    <Dumbbell size={14} className="text-blue-400" />
                     Séances Réalisées Ce Jour ({currentInspectedDay.sessions?.length || 0})
                   </span>
                 </div>
@@ -2296,12 +2547,14 @@ export default function MetricsDashboard({
                             {s.load} pts
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-1">
-                          <span>⏱️ {s.duration} min</span>
+                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-1">
+                          <span className="flex items-center gap-1">
+                            <Clock size={11} className="text-slate-400 shrink-0" /> {s.duration} min
+                          </span>
                           <span>RPE C:{s.rpeC} · M:{s.rpeM}{s.fatigue ? ` · Fat:${s.fatigue}/10` : ''}</span>
                         </div>
                         {s.notes && (
-                          <p className="text-[10px] text-slate-400 italic line-clamp-1 m-0 pt-1 border-t border-white/5">
+                          <p className="text-[11px] text-slate-400 italic line-clamp-1 m-0 pt-1 border-t border-white/5">
                             « {s.notes} »
                           </p>
                         )}
@@ -2309,8 +2562,9 @@ export default function MetricsDashboard({
                     ))}
                   </div>
                 ) : (
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-xs text-slate-400 text-center">
-                    🌿 Journée de repos (0 point de charge) — Favorable à l'abaissement de la fatigue aiguë ATL et au relèvement du TSB.
+                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-xs text-slate-300 flex items-center justify-center gap-2">
+                    <Calendar size={14} className="text-emerald-400 shrink-0" />
+                    <span>Journée de repos (0 point de charge) — Favorable à l'abaissement de la fatigue aiguë ATL et au relèvement du TSB.</span>
                   </div>
                 )}
               </div>
@@ -2499,18 +2753,20 @@ export default function MetricsDashboard({
               </div>
 
               {/* Rapprochement des filtres temporels directement à côté de la filière active */}
-              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]">
-                <span className="text-[#94A3B8] px-1 text-[10px] font-semibold flex items-center gap-1">
-                  <Gauge size={11} className="text-blue-400" />
+              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]" role="radiogroup" aria-label="Base de comparaison temporelle">
+                <span className="text-slate-300 px-1 text-[10px] font-semibold flex items-center gap-1">
+                  <Gauge size={11} className="text-blue-400" aria-hidden="true" />
                   vs :
                 </span>
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={trendBasis === 'period'}
                   onClick={() => setTrendBasis('period')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 min-h-[32px] rounded-lg font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     trendBasis === 'period'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                   title="Compare chaque EMA à sa fenêtre d'oscillation (3j/7j/21j)"
                 >
@@ -2518,11 +2774,13 @@ export default function MetricsDashboard({
                 </button>
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={trendBasis === 'daily'}
                   onClick={() => setTrendBasis('daily')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 min-h-[32px] rounded-lg font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     trendBasis === 'daily'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                   title="Compare l'EMA d'aujourd'hui à celle d'hier (J-1)"
                 >
@@ -2530,11 +2788,13 @@ export default function MetricsDashboard({
                 </button>
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={trendBasis === 'week'}
                   onClick={() => setTrendBasis('week')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 min-h-[32px] rounded-lg font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     trendBasis === 'week'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                   title="Compare l'EMA d'aujourd'hui à celle de la semaine passée (J-7)"
                 >
@@ -2559,7 +2819,7 @@ export default function MetricsDashboard({
           <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               {/* Onglets de filtrage par catégorie physiologique */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap" role="radiogroup" aria-label="Filtrer les qualités par catégorie">
                 {[
                   { id: 'all', label: 'Toutes' },
                   { id: 'cardio', label: '🫀 Cardio' },
@@ -2569,11 +2829,13 @@ export default function MetricsDashboard({
                   <button
                     key={cat.id}
                     type="button"
+                    role="radio"
+                    aria-checked={selectedCategory === cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                    className={`px-3 py-1.5 min-h-[34px] rounded-xl text-xs font-semibold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                       selectedCategory === cat.id
-                        ? 'bg-blue-600/30 text-blue-300 border-blue-500/40 font-bold shadow-sm'
-                        : 'bg-white/5 text-slate-400 hover:text-white border-white/5'
+                        ? 'bg-blue-600/40 text-blue-200 border-blue-400 font-bold shadow-sm'
+                        : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
                     }`}
                   >
                     {cat.label}
@@ -2583,39 +2845,45 @@ export default function MetricsDashboard({
                 {/* Bouton de bascule pour masquer les qualités à zéro */}
                 <button
                   type="button"
+                  aria-pressed={hideZeroOnly}
                   onClick={() => setHideZeroOnly(!hideZeroOnly)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[34px] rounded-xl text-xs font-semibold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     hideZeroOnly
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
-                      : 'bg-white/5 text-slate-400 hover:text-white border-white/5'
+                      ? 'bg-amber-500/20 text-amber-200 border-amber-500/40 shadow-sm font-bold'
+                      : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
                   }`}
                   title="Masquer les qualités dont les valeurs EMA sont toutes à zéro"
                 >
                   <span>🔥 Actives uniquement</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${hideZeroOnly ? 'bg-amber-400/20 text-amber-200' : 'bg-white/10 text-slate-400'}`}>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${hideZeroOnly ? 'bg-amber-400/25 text-amber-100 font-bold' : 'bg-white/10 text-slate-300'}`}>
                     {activeQualitiesCount}/{qualities.length}
                   </span>
                 </button>
               </div>
 
               {/* Barre de recherche fine */}
-              <div className="relative flex items-center min-w-[200px] sm:w-64">
-                <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+              <div className="relative flex items-center min-w-[200px] sm:w-64" role="search">
+                <label htmlFor="quality-search-field" className="sr-only">
+                  Rechercher une qualité physique
+                </label>
+                <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" aria-hidden="true" />
                 <input
-                  type="text"
+                  id="quality-search-field"
+                  type="search"
                   value={qualitySearch}
                   onChange={(e) => setQualitySearch(e.target.value)}
                   placeholder="Rechercher une qualité (VO2, seuil...)"
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-950/70 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-900 transition-all shadow-inner"
+                  className="w-full pl-8 pr-8 py-1.5 text-xs bg-slate-950/70 border border-white/15 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-slate-900 transition-all shadow-inner"
                 />
                 {qualitySearch && (
                   <button
                     type="button"
+                    aria-label="Effacer la recherche de qualité"
                     onClick={() => setQualitySearch('')}
-                    className="absolute right-2.5 text-slate-400 hover:text-white cursor-pointer"
+                    className="absolute right-2 text-slate-400 hover:text-white p-1 rounded-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     title="Effacer la recherche"
                   >
-                    <X size={12} />
+                    <X size={14} aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -2872,14 +3140,17 @@ export default function MetricsDashboard({
 
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left text-xs border-collapse">
+                <caption className="sr-only">
+                  Tableau comparatif des dynamiques EMA 3j, 7j, 21j et ratio ACWR pour chaque qualité d'entraînement
+                </caption>
                 <thead>
-                  <tr className="bg-white/[0.02] text-[10px] uppercase text-slate-400 border-b border-white/5 font-semibold">
-                    <th className="p-2.5 pl-3">Rang & Qualité</th>
-                    <th className="p-2.5 text-center">EMA 3j (Aiguë)</th>
-                    <th className="p-2.5 text-center hidden sm:table-cell">EMA 7j (Récente)</th>
-                    <th className="p-2.5 text-center">EMA 21j (Chronique)</th>
-                    <th className="p-2.5 text-center">ACWR</th>
-                    <th className="p-2.5 pr-3 text-right">Tendance</th>
+                  <tr className="bg-white/[0.04] text-[10px] uppercase text-slate-300 border-b border-white/10 font-semibold">
+                    <th scope="col" className="p-2.5 pl-3">Rang & Qualité</th>
+                    <th scope="col" className="p-2.5 text-center">EMA 3j (Aiguë)</th>
+                    <th scope="col" className="p-2.5 text-center hidden sm:table-cell">EMA 7j (Récente)</th>
+                    <th scope="col" className="p-2.5 text-center">EMA 21j (Chronique)</th>
+                    <th scope="col" className="p-2.5 text-center">ACWR</th>
+                    <th scope="col" className="p-2.5 pr-3 text-right">Tendance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
