@@ -101,6 +101,18 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     return found ? found.id : (qualities[0]?.id || 'push');
   });
 
+  // Détection de la filière active et de sa catégorie anatomique (ex: 'upper_pull' pour Pull)
+  const targetSessionCategory = useMemo(() => {
+    const qId = selectedQualityId.toLowerCase();
+    if (qId.includes('pull')) return 'upper_pull';
+    if (qId.includes('push')) return 'upper_push';
+    if (qId.includes('leg')) return 'lower';
+    if (qId.includes('abdo') || qId.includes('core')) return 'core';
+    return null;
+  }, [selectedQualityId]);
+
+  const isPullSession = targetSessionCategory === 'upper_pull';
+
   // Draft en cours
   const [draftExists, setDraftExists] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -1080,13 +1092,15 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
                     {/* TABLEAU / CARTES DES SÉRIES TACTILES */}
                     <div className="space-y-2">
-                      <div className="grid grid-cols-12 gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
+                      <div className="grid grid-cols-12 gap-1 sm:gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
                         <div className="col-span-1 text-center">Set</div>
-                        <div className="col-span-4 sm:col-span-3 text-center">Charge (kg)</div>
-                        <div className="col-span-3 sm:col-span-2 text-center">Reps</div>
+                        <div className="col-span-5 sm:col-span-3 text-center">Charge (kg)</div>
+                        <div className="col-span-4 sm:col-span-2 text-center">Reps</div>
                         <div className="hidden sm:block sm:col-span-2 text-center">RIR</div>
                         <div className="hidden sm:block sm:col-span-2 text-center">Repos</div>
-                        <div className="col-span-4 sm:col-span-2 text-center">Validation</div>
+                        <div className="col-span-2 sm:col-span-2 text-center flex items-center justify-center" title="Validation de série">
+                          <Check size={14} className="text-emerald-400" />
+                        </div>
                       </div>
 
                       {ex.sets.map((set, sIdx) => {
@@ -1095,7 +1109,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                         return (
                           <div 
                             key={set.id}
-                            className={`grid grid-cols-12 gap-1.5 items-center p-2 rounded-xl border transition-all ${
+                            className={`grid grid-cols-12 gap-1 sm:gap-1.5 items-center p-2 rounded-xl border transition-all ${
                               isSetDone
                                 ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-100 shadow-sm'
                                 : 'bg-slate-900/60 border-slate-700/60 text-slate-200'
@@ -1110,13 +1124,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                               </span>
                             </div>
 
-                            {/* Charge (kg) avec boutons tactiles +/- */}
-                            <div className="col-span-4 sm:col-span-3 flex items-center justify-center gap-1">
+                            {/* Charge (kg) avec boutons tactiles +/- agrandis */}
+                            <div className="col-span-5 sm:col-span-3 flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustWeight(exIdx, sIdx, -2.5)}
-                                className="w-7 sm:w-6 h-8 sm:h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 text-slate-300 text-sm sm:text-xs font-black flex items-center justify-center shrink-0 touch-manipulation select-none"
+                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="-2.5 kg"
                               >
                                 -
@@ -1129,26 +1143,26 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 value={set.weightKg === 0 ? '' : set.weightKg}
                                 onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'weightKg', Number(e.target.value) || 0)}
                                 placeholder="0"
-                                className="w-14 sm:w-16 h-8 text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                className="w-13 sm:w-16 h-9 sm:h-8 text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                               />
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustWeight(exIdx, sIdx, 2.5)}
-                                className="w-7 sm:w-6 h-8 sm:h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 text-slate-300 text-sm sm:text-xs font-black flex items-center justify-center shrink-0 touch-manipulation select-none"
+                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="+2.5 kg"
                               >
                                 +
                               </button>
                             </div>
 
-                            {/* Répétitions avec boutons tactiles +/- */}
-                            <div className="col-span-3 sm:col-span-2 flex items-center justify-center gap-1">
+                            {/* Répétitions avec boutons tactiles +/- agrandis */}
+                            <div className="col-span-4 sm:col-span-2 flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustReps(exIdx, sIdx, -1)}
-                                className="w-7 sm:w-6 h-8 sm:h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 text-slate-300 text-sm sm:text-xs font-black flex items-center justify-center shrink-0 touch-manipulation select-none"
+                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="-1 rep"
                               >
                                 -
@@ -1160,13 +1174,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 value={set.reps || ''}
                                 onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'reps', Math.max(1, Number(e.target.value) || 1))}
                                 placeholder="10"
-                                className="w-11 sm:w-12 h-8 text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                className="w-10 sm:w-12 h-9 sm:h-8 text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                               />
                               <button
                                 type="button"
                                 disabled={isSetDone}
                                 onClick={() => handleQuickAdjustReps(exIdx, sIdx, 1)}
-                                className="w-7 sm:w-6 h-8 sm:h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 disabled:opacity-30 text-slate-300 text-sm sm:text-xs font-black flex items-center justify-center shrink-0 touch-manipulation select-none"
+                                className="w-8 sm:w-7 h-9 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base sm:text-sm font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
                                 title="+1 rep"
                               >
                                 +
@@ -1205,19 +1219,20 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                               </select>
                             </div>
 
-                            {/* BOUTON TACTILE DE VALIDATION */}
-                            <div className="col-span-4 sm:col-span-2 flex items-center justify-center gap-1">
+                            {/* BOUTON TACTILE DE VALIDATION RÉDUIT (SVG CHECK VERT) */}
+                            <div className="col-span-2 sm:col-span-2 flex items-center justify-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => handleValidateSet(exIdx, sIdx)}
-                                className={`w-full h-8.5 py-1.5 px-2 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm touch-manipulation ${
+                                className={`w-9 sm:w-8.5 h-9 sm:h-8.5 rounded-xl flex items-center justify-center transition-all shadow-sm touch-manipulation active:scale-90 ${
                                   isSetDone
-                                    ? 'bg-emerald-500/30 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/40'
-                                    : 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-300 text-slate-950 shadow-emerald-500/20 active:scale-95'
+                                    ? 'bg-emerald-500/25 hover:bg-emerald-500/35 border-2 border-emerald-400 text-emerald-400 shadow-emerald-500/20'
+                                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 active:bg-emerald-500/35 border border-emerald-500/40 text-emerald-400'
                                 }`}
+                                title={isSetDone ? 'Série validée (cliquer pour annuler)' : 'Valider la série'}
+                                aria-label={isSetDone ? 'Série validée' : 'Valider la série'}
                               >
-                                <Check size={15} className={isSetDone ? 'text-emerald-400' : 'text-slate-950 stroke-[3]'} />
-                                <span>{isSetDone ? 'Fait' : 'Valider'}</span>
+                                <Check size={18} className="text-emerald-400 stroke-[3]" />
                               </button>
 
                               {/* Supprimer la série si plus d'une */}
@@ -1225,10 +1240,10 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveSet(exIdx, sIdx)}
-                                  className="w-7 h-8 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 flex items-center justify-center transition-colors touch-manipulation"
+                                  className="w-6 sm:w-7 h-8 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 flex items-center justify-center transition-colors touch-manipulation"
                                   title="Retirer cette série"
                                 >
-                                  <X size={15} />
+                                  <X size={14} />
                                 </button>
                               )}
                             </div>
@@ -1466,25 +1481,33 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                   {[
                     ...(frequentExercises.length > 0 ? [{ id: 'frequent', label: '🔥 Récents & Fréquents' }] : []),
-                    { id: 'all', label: 'Tous' },
+                    { id: 'all', label: isPullSession ? 'Tous (Pull en 1er)' : 'Tous' },
+                    { id: 'upper_pull', label: isPullSession ? '🎯 Pull (Séance)' : 'Pull (Dos/Biceps)' },
                     { id: 'upper_push', label: 'Push (Pecs/Épaules/Triceps)' },
-                    { id: 'upper_pull', label: 'Pull (Dos/Biceps)' },
                     { id: 'lower', label: 'Jambes' },
                     { id: 'core', label: 'Abdos/Core' }
-                  ].map(cat => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setSelectedCategoryFilter(cat.id)}
-                      className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-bold text-[11px] transition-colors ${
-                        selectedCategoryFilter === cat.id
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
+                  ].map(cat => {
+                    const isSelected = selectedCategoryFilter === cat.id;
+                    const isSessionCat = isPullSession && cat.id === 'upper_pull';
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategoryFilter(cat.id)}
+                        className={`px-2.5 py-1 rounded-lg whitespace-nowrap font-bold text-[11px] transition-all flex items-center gap-1 ${
+                          isSelected
+                            ? isSessionCat
+                              ? 'bg-emerald-500 text-slate-950 font-black shadow-md shadow-emerald-500/20'
+                              : 'bg-blue-600 text-white'
+                            : isSessionCat
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1500,15 +1523,32 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                     return matchCategory && matchSearch;
                   })
                   .sort((a, b) => {
-                    // Les exercices les plus souvent utilisés récemment en début de liste
+                    // Priorité 1 : Si séance Pull, les exercices Pull (upper_pull) viennent EN PREMIER
+                    if (isPullSession) {
+                      const aIsPull = a.category === 'upper_pull';
+                      const bIsPull = b.category === 'upper_pull';
+                      if (aIsPull && !bIsPull) return -1;
+                      if (!aIsPull && bIsPull) return 1;
+                    } else if (targetSessionCategory) {
+                      const aIsTarget = a.category === targetSessionCategory;
+                      const bIsTarget = b.category === targetSessionCategory;
+                      if (aIsTarget && !bIsTarget) return -1;
+                      if (!aIsTarget && bIsTarget) return 1;
+                    }
+
+                    // Priorité 2 : Les exercices les plus souvent utilisés récemment
                     const aCount = frequentMap.get(a.id) || 0;
                     const bCount = frequentMap.get(b.id) || 0;
                     if (aCount !== bCount) {
                       return bCount - aCount;
                     }
-                    return 0;
+
+                    // Priorité 3 : Ordre alphabétique
+                    return a.name.localeCompare(b.name, 'fr');
                   })
                   .map(catalogEx => {
+                    const isPullEx = catalogEx.category === 'upper_pull';
+                    const isTargetSessionEx = isPullSession && isPullEx;
                     const isFrequent = frequentMap.has(catalogEx.id);
                     const usageCount = frequentMap.get(catalogEx.id);
 
@@ -1518,24 +1558,48 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                         type="button"
                         onClick={() => handleAddExerciseFromCatalog(catalogEx)}
                         className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between group pt-3 ${
-                          isFrequent
+                          isTargetSessionEx
+                            ? 'bg-gradient-to-r from-emerald-950/45 via-slate-800/90 to-slate-800/80 border-2 border-emerald-500/60 hover:border-emerald-400 hover:bg-emerald-950/50 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/30'
+                            : isFrequent
                             ? 'bg-slate-800/90 border border-amber-500/35 hover:border-amber-400 hover:bg-slate-800 shadow-sm'
                             : 'hover:bg-slate-800/80'
                         }`}
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {isFrequent && (
+                            {isTargetSessionEx && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1">
+                                🎯 Cible Séance (Pull)
+                              </span>
+                            )}
+                            {isFrequent && !isTargetSessionEx && (
                               <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1">
                                 🔥 Fréquent ({usageCount}×)
                               </span>
                             )}
-                            <span className={`block ${isFrequent ? 'font-black text-sm text-white' : 'font-bold text-sm text-slate-200 group-hover:text-white'}`}>
+                            {isFrequent && isTargetSessionEx && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-300/90 border border-amber-500/30 inline-flex items-center gap-1">
+                                🔥 ({usageCount}×)
+                              </span>
+                            )}
+                            <span className={`block ${
+                              isTargetSessionEx 
+                                ? 'font-black text-sm text-white group-hover:text-emerald-200' 
+                                : isFrequent 
+                                ? 'font-black text-sm text-white' 
+                                : 'font-bold text-sm text-slate-200 group-hover:text-white'
+                            }`}>
                               {catalogEx.name}
                             </span>
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${catalogEx.isCompound ? 'bg-blue-500/15 text-blue-300' : 'bg-emerald-500/15 text-emerald-300'}`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                              isTargetSessionEx
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : catalogEx.isCompound 
+                                ? 'bg-blue-500/15 text-blue-300' 
+                                : 'bg-emerald-500/15 text-emerald-300'
+                            }`}>
                               {catalogEx.isCompound ? 'Polyarticulaire' : 'Isolation'}
                             </span>
                             <span>·</span>
@@ -1548,7 +1612,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                             </span>
                           </div>
                         </div>
-                        <Plus size={16} className={`${isFrequent ? 'text-amber-400' : 'text-blue-400'} group-hover:scale-125 transition-transform shrink-0 ml-2`} />
+                        <Plus size={18} className={`${isTargetSessionEx ? 'text-emerald-400' : isFrequent ? 'text-amber-400' : 'text-blue-400'} group-hover:scale-125 transition-transform shrink-0 ml-2`} />
                       </button>
                     );
                   })}
