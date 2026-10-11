@@ -30,6 +30,7 @@ async function startServer() {
 
   app.use((_req, res, next) => {
     res.setHeader('Content-Security-Policy', CSP_POLICY);
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');

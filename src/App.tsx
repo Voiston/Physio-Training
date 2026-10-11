@@ -30,7 +30,8 @@ import {
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
   Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
-  PanelLeftClose, PanelLeftOpen, BarChart3, Dumbbell, Cloud
+  PanelLeftClose, PanelLeftOpen, BarChart3, Dumbbell, Cloud,
+  MoreVertical, X
 } from 'lucide-react';
 
 function AppContent() {
@@ -102,6 +103,10 @@ function AppContent() {
     }
   });
 
+  // États dédiés à l'ergonomie mobile
+  const [showMobileTools, setShowMobileTools] = useState<boolean>(false);
+  const [mobileGridTab, setMobileGridTab] = useState<'grid' | 'athlete'>('grid');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const todayStr = useMemo(() => getLocalYYYYMMDD(new Date()), []);
@@ -131,7 +136,7 @@ function AppContent() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-slate-100 font-sans p-3 sm:p-4 md:p-6 overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#0a0a0c] text-slate-100 font-sans p-2 sm:p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden relative">
       {/* Background Mesh Gradients */}
       <div className="fixed top-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-900/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[150px] pointer-events-none"></div>
@@ -158,7 +163,8 @@ function AppContent() {
             </div>
           </div>
           
-          <div className="flex flex-wrap items-center gap-2">
+          {/* BOUTONS D'ACTIONS DESKTOP (Inchangés, masqués sur mobile) */}
+          <div className="hidden md:flex items-center gap-2">
             {/* Bouton PWA Install */}
             <PWAInstallButton />
 
@@ -213,29 +219,27 @@ function AppContent() {
               title="Tester des séances prévisionnelles et anticiper la forme (TSB) future"
             >
               <Sparkles size={14} className={isSimulationActive ? 'text-purple-200' : 'text-purple-400'} />
-              <span className="hidden sm:inline">{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
-              <span className="sm:hidden">Simu</span>
+              <span>{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
             </button>
 
             {/* Bouton Calibrage Constantes Physiologiques */}
             <button
               onClick={() => setShowPhysioSettingsModal(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
               title="Calibrer les constantes de rémanence Banister (tau fatigue 5-12j, tau condition 21-45j)"
             >
               <Sliders size={14} className="text-blue-400 shrink-0" />
-              <span className="hidden md:inline font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</span>
-              <span className="md:hidden">τ</span>
+              <span className="font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</span>
             </button>
 
             {/* Bouton Export Bilan PDF */}
             <button
               onClick={() => setShowReportModal(true)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
               title="Générer un bilan hebdomadaire ou mensuel PDF pour votre entraîneur"
             >
               <FileText size={14} className="text-blue-400 shrink-0" />
-              <span className="hidden sm:inline">Bilan PDF</span>
+              <span>Bilan PDF</span>
             </button>
 
             {/* Import / Export JSON */}
@@ -246,31 +250,6 @@ function AppContent() {
             >
               <FileUp size={14} />
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={(e) => {
-                importData(
-                  e,
-                  () => {
-                    showToast({
-                      type: 'success',
-                      title: 'Importation effectuée',
-                      message: 'Données et historique restaurés.'
-                    });
-                  },
-                  (errorMsg) => {
-                    showToast({
-                      type: 'error',
-                      title: "Échec de l'importation",
-                      message: errorMsg
-                    });
-                  }
-                );
-              }} 
-              accept=".json,application/json" 
-              className="hidden" 
-            />
             <button 
               onClick={() => {
                 exportData();
@@ -286,10 +265,204 @@ function AppContent() {
               <FileDown size={14} />
             </button>
           </div>
+
+          {/* ACTIONS RAPIDES MOBILE (Compact, épuré, sans surcharge) */}
+          <div className="flex md:hidden items-center gap-1.5">
+            {/* Synchro Cloud Mobile */}
+            <button
+              onClick={() => setShowCloudSyncModal(true)}
+              className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                cloudSync.syncStatus === 'synced'
+                  ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                  : cloudSync.syncStatus === 'syncing'
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                  : 'bg-white/5 text-slate-300 border-white/10'
+              }`}
+              title="Synchronisation Cloud"
+            >
+              <Cloud size={16} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} />
+              {cloudSync.syncStatus === 'synced' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+              )}
+            </button>
+
+            {/* Bouton Mode Salle Mobile */}
+            <button
+              onClick={() => setShowLiveGymModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 active:scale-95 transition-transform"
+              title="Lancer le Mode Salle"
+            >
+              <Dumbbell size={15} className="text-emerald-400" />
+              <span>Salle ⏱️</span>
+              {hasGymDraft && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              )}
+            </button>
+
+            {/* Bouton Menu Outils Mobile */}
+            <button
+              onClick={() => setShowMobileTools(prev => !prev)}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 active:scale-95 transition-transform"
+              title="Outils et réglages"
+            >
+              <MoreVertical size={16} />
+            </button>
+          </div>
+
+          {/* Input file caché pour Import JSON */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={(e) => {
+              importData(
+                e,
+                () => {
+                  showToast({
+                    type: 'success',
+                    title: 'Importation effectuée',
+                    message: 'Données et historique restaurés.'
+                  });
+                },
+                (errorMsg) => {
+                  showToast({
+                    type: 'error',
+                    title: "Échec de l'importation",
+                    message: errorMsg
+                  });
+                }
+              );
+            }} 
+            accept=".json,application/json" 
+            className="hidden" 
+          />
         </header>
 
-        {/* BARRE D'ONGLETS PRINCIPALE */}
-        <nav className="flex items-center gap-1.5 p-1.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md overflow-x-auto custom-scrollbar shadow-lg">
+        {/* TIROIR D'OUTILS ET PARAMÈTRES POUR MOBILE */}
+        {showMobileTools && (
+          <div 
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm md:hidden animate-fadeIn"
+            onClick={() => setShowMobileTools(false)}
+          >
+            <div 
+              className="w-full bg-[#121217] border-t border-white/15 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-3.5 pb-[max(env(safe-area-inset-bottom,0px),20px)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                    <Sliders size={15} />
+                  </div>
+                  <span className="font-bold text-sm text-white">Outils & Actions Rapides</span>
+                </div>
+                <button 
+                  onClick={() => setShowMobileTools(false)}
+                  className="p-1.5 rounded-xl bg-white/5 text-slate-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                {/* Simulation What-If */}
+                <button
+                  onClick={() => {
+                    setShowMobileTools(false);
+                    toggleSimulation();
+                    showToast({
+                      type: 'info',
+                      title: isSimulationActive ? 'Simulation désactivée' : 'Mode simulation activé',
+                      message: isSimulationActive ? 'Retour aux charges réelles.' : 'Testez des séances prévisionnelles sur 14 jours.'
+                    });
+                  }}
+                  className={`flex items-center gap-2 p-3 rounded-xl text-xs font-semibold border transition-all text-left ${
+                    isSimulationActive 
+                      ? 'bg-purple-600/30 border-purple-400 text-purple-200' 
+                      : 'bg-white/5 border-white/10 text-slate-200'
+                  }`}
+                >
+                  <Sparkles size={16} className="text-purple-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Simulation</div>
+                    <div className="text-[10px] text-slate-400">{isSimulationActive ? 'Désactiver' : 'What-If (14j)'}</div>
+                  </div>
+                </button>
+
+                {/* Bilan PDF */}
+                <button
+                  onClick={() => {
+                    setShowMobileTools(false);
+                    setShowReportModal(true);
+                  }}
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 text-left"
+                >
+                  <FileText size={16} className="text-blue-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Bilan PDF</div>
+                    <div className="text-[10px] text-slate-400">Export rapport</div>
+                  </div>
+                </button>
+
+                {/* Calibrage Banister */}
+                <button
+                  onClick={() => {
+                    setShowMobileTools(false);
+                    setShowPhysioSettingsModal(true);
+                  }}
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 text-left"
+                >
+                  <Sliders size={16} className="text-blue-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Constantes τ</div>
+                    <div className="text-[10px] text-slate-400 font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</div>
+                  </div>
+                </button>
+
+                {/* Bouton PWA Install */}
+                <div className="flex items-center p-2.5 rounded-xl bg-white/5 border border-white/10">
+                  <PWAInstallButton />
+                </div>
+
+                {/* Import JSON */}
+                <button
+                  onClick={() => {
+                    setShowMobileTools(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 text-left"
+                >
+                  <FileUp size={16} className="text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Importer JSON</div>
+                    <div className="text-[10px] text-slate-400">Restaurer fichier</div>
+                  </div>
+                </button>
+
+                {/* Export JSON */}
+                <button
+                  onClick={() => {
+                    setShowMobileTools(false);
+                    exportData();
+                    showToast({
+                      type: 'success',
+                      title: 'Données exportées',
+                      message: 'Fichier de sauvegarde JSON téléchargé.'
+                    });
+                  }}
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-blue-500/10 border border-blue-500/20 text-blue-300 text-left"
+                >
+                  <FileDown size={16} className="text-blue-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Exporter JSON</div>
+                    <div className="text-[10px] text-slate-400">Sauvegarde locale</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BARRE D'ONGLETS PRINCIPALE (Visible sur desktop et tablettes, gérée en bas sur smartphone) */}
+        <nav className="hidden md:flex items-center gap-1.5 p-1.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md overflow-x-auto custom-scrollbar shadow-lg">
           <button
             onClick={() => setActiveTab('grid')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
@@ -398,8 +571,36 @@ function AppContent() {
         {/* ONGLET 1 : GRILLE & PLANIFICATION */}
         {activeTab === 'grid' && (
           <div className="flex flex-col gap-4 animate-fadeIn">
-            {/* Barre d'outils secondaire : Masquer / Afficher le volet athlète latéral */}
-            <div className="flex items-center justify-between px-1">
+            {/* Bascule Mobile : Grille vs Profil Athlète (évite de scroller 900px sur téléphone avant d'atteindre la grille) */}
+            <div className="flex xl:hidden items-center p-1 bg-white/5 border border-white/10 rounded-2xl shadow-sm">
+              <button
+                type="button"
+                onClick={() => setMobileGridTab('grid')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  mobileGridTab === 'grid'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar size={14} />
+                <span>Grille des Séances</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileGridTab('athlete')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  mobileGridTab === 'athlete'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Activity size={14} />
+                <span>Profil Athlète & Cycle</span>
+              </button>
+            </div>
+
+            {/* Barre d'outils secondaire Desktop : Masquer / Afficher le volet athlète latéral */}
+            <div className="hidden xl:flex items-center justify-between px-1">
               <button
                 onClick={() => setIsSidebarOpen(prev => !prev)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
@@ -414,7 +615,7 @@ function AppContent() {
               </button>
 
               <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-                <span className="hidden sm:inline">Matrice d'entraînement :</span>
+                <span>Matrice d'entraînement :</span>
                 <span className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-slate-300">
                   {qualities.length} qualités · -14j à +14j
                 </span>
@@ -422,9 +623,9 @@ function AppContent() {
             </div>
 
             <div className="flex flex-col xl:flex-row gap-6 min-h-0">
-              {/* Left Sidebar (escamotable) */}
-              {isSidebarOpen && (
-                <aside className="w-full xl:w-80 flex flex-col gap-5 shrink-0 transition-all">
+              {/* Left Sidebar (escamotable sur desktop, contrôlée par bascule sur mobile) */}
+              {(isSidebarOpen || mobileGridTab === 'athlete') && (
+                <aside className={`${mobileGridTab === 'athlete' ? 'flex' : 'hidden'} xl:flex xl:w-80 flex-col gap-5 shrink-0 transition-all`}>
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
                     <RadarChart 
                       qualities={qualities} 
@@ -566,7 +767,7 @@ function AppContent() {
               )}
 
               {/* Center Content */}
-              <main className="flex-1 min-w-0 flex flex-col gap-5">
+              <main className={`${mobileGridTab === 'grid' ? 'flex' : 'hidden'} xl:flex flex-1 min-w-0 flex-col gap-5`}>
                 {/* Suggestions & Priorités d'entraînement algorithmiques */}
                 <SmartSuggestions 
                   recommendations={trainingRecommendations}
@@ -933,6 +1134,74 @@ function AppContent() {
           });
         }}
       />
+
+      {/* BARRE DE NAVIGATION INFÉRIEURE MOBILE (Sticky bottom tactile avec bouton central Mode Salle) */}
+      <nav 
+        aria-label="Navigation principale mobile"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d12]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[max(env(safe-area-inset-bottom,0px),8px)]"
+      >
+        {/* Onglet 1: Grille */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('grid')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
+            activeTab === 'grid' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Calendar size={18} className={activeTab === 'grid' ? 'text-blue-400 scale-110' : ''} />
+          <span className="text-[10px]">Grille</span>
+        </button>
+
+        {/* Onglet 2: Semaines */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('weeks')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
+            activeTab === 'weeks' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <BarChart3 size={18} className={activeTab === 'weeks' ? 'text-blue-400 scale-110' : ''} />
+          <span className="text-[10px]">Semaines</span>
+        </button>
+
+        {/* Bouton central surélevé Mode Salle (accès instantané en 1 clic pour la séance gym) */}
+        <button
+          type="button"
+          onClick={() => setShowLiveGymModal(true)}
+          className="relative -mt-6 mx-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-600/35 border border-emerald-400/50 active:scale-95 transition-transform cursor-pointer"
+          title="Lancer le Mode Salle"
+        >
+          <Dumbbell size={20} className={hasGymDraft ? 'animate-pulse' : ''} />
+          <span className="text-[9px] font-extrabold mt-0.5 tracking-tight whitespace-nowrap">Salle ⏱️</span>
+          {hasGymDraft && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+          )}
+        </button>
+
+        {/* Onglet 4: Banister */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('physiology')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
+            activeTab === 'physiology' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <TrendingUp size={18} className={activeTab === 'physiology' ? 'text-blue-400 scale-110' : ''} />
+          <span className="text-[10px]">Banister</span>
+        </button>
+
+        {/* Onglet 5: Cycles */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('periodization')}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
+            activeTab === 'periodization' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Target size={18} className={activeTab === 'periodization' ? 'text-blue-400 scale-110' : ''} />
+          <span className="text-[10px]">Cycles</span>
+        </button>
+      </nav>
     </div>
   );
 }

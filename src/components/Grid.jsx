@@ -207,7 +207,7 @@ export default function Grid({
   return (
     <div className="w-full flex flex-col">
       {/* BARRE DE CONTRÔLE DE NAVIGATION HORIZONTALE DE LA TIMELINE */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#161619] border-b border-white/10 rounded-t-2xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-[#161619] border-b border-white/10 rounded-t-2xl">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-blue-500/10 rounded-lg border border-blue-500/20 text-blue-400">
             <ArrowLeftRight size={14} />
@@ -253,41 +253,45 @@ export default function Grid({
                 title="Consulter le bilan hebdomadaire complet, les graphiques et le comparateur"
               >
                 <BarChart3 size={13} />
-                <span>Bilan & Comparateur Hebdo</span>
+                <span className="hidden sm:inline">Bilan & Comparateur Hebdo</span>
+                <span className="sm:hidden">Bilan Hebdo</span>
               </button>
             )}
           </div>
         )}
 
         {/* Boutons de navigation rapide Passé / Aujourd'hui / Futur */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 self-center sm:self-auto">
           <button
             type="button"
             onClick={() => scrollHorizontally(-400)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
             title="Glisser vers le passé (-7 jours)"
           >
             <ChevronLeft size={14} className="text-sky-400" />
-            <span>Passé (-7j)</span>
+            <span className="hidden sm:inline">Passé (-7j)</span>
+            <span className="sm:hidden">-7j</span>
           </button>
 
           <button
             type="button"
             onClick={scrollToToday}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer border border-blue-400/40"
+            className="flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer border border-blue-400/40"
             title="Recentrer immédiatement la vue sur le jour d'aujourd'hui"
           >
             <Calendar size={13} />
-            <span>Aujourd'hui (J+0)</span>
+            <span>Aujourd'hui</span>
+            <span className="hidden sm:inline">(J+0)</span>
           </button>
 
           <button
             type="button"
             onClick={() => scrollHorizontally(400)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
             title="Glisser vers le futur (+7 jours)"
           >
-            <span>Futur (+7j)</span>
+            <span className="hidden sm:inline">Futur (+7j)</span>
+            <span className="sm:hidden">+7j</span>
             <ChevronRight size={14} className="text-sky-400" />
           </button>
         </div>
@@ -305,11 +309,11 @@ export default function Grid({
         }`}
         style={{ scrollBehavior: 'smooth' }}
       >
-        <table className="w-full text-left border-collapse table-fixed min-w-[1300px]">
+        <table className="w-full text-left border-collapse table-fixed min-w-[850px] sm:min-w-[1300px]">
           <thead>
             <tr className="bg-[#161619] text-[10px] uppercase text-slate-400 border-b border-white/10">
-              {/* Colonne 1 : Qualité Physique (Largeur augmentée à w-72 min-w-[280px] pour éviter toute troncature) */}
-              <th className="p-3 w-72 min-w-[280px] sticky left-0 bg-[#161619] z-20 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10">
+              {/* Colonne 1 : Qualité Physique (Responsive mobile w-40 min-w-[150px], Desktop w-72 min-w-[280px]) */}
+              <th className="p-2 sm:p-3 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px] sticky left-0 bg-[#161619] z-20 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-200 font-bold tracking-wider flex items-center gap-1.5 text-xs" title="Glisser-déposer les qualités pour réorganiser l'ordre de priorité">
                     <GripVertical size={13} className="text-slate-400" />
@@ -323,8 +327,8 @@ export default function Grid({
                 </div>
               </th>
 
-              {/* Colonne 2 : Courbes EMA 3/7/21j */}
-              <th className="p-2 w-64 min-w-[250px] border-r border-white/10 bg-[#161619] z-10 text-center shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
+              {/* Colonne 2 : Courbes EMA 3/7/21j (Cachée sur petit écran mobile pour libérer l'espace aux jours, visible dès sm) */}
+              <th className="hidden sm:table-cell p-2 w-64 min-w-[250px] border-r border-white/10 bg-[#161619] z-10 text-center shadow-[2px_0_5px_rgba(0,0,0,0.2)]">
                 <div className="flex flex-col items-center justify-center">
                   <span className="text-slate-200 font-bold tracking-wider text-[10px]">Courbes EMA (3j / 7j / 21j)</span>
                   <div className="flex items-center gap-2 mt-0.5 text-[9px] font-semibold">
@@ -380,13 +384,13 @@ export default function Grid({
           <tbody className="text-xs">
             {/* LIGNE SPECIALE : READINESS */}
             <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-blue-400">
+              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-blue-400 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span>Readiness (1-10)</span>
-                  <span className="text-[10px] text-slate-500 font-normal">Auto-évaluation</span>
+                  <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">Auto-évaluation</span>
                 </div>
               </td>
-              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
+              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
                 Modulateur de récupération
               </td>
               {timeline.map((day) => {
@@ -415,13 +419,13 @@ export default function Grid({
 
             {/* LIGNE SPECIALE : VFC */}
             <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-emerald-400">
+              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-emerald-400 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span>VFC Matinale (ms)</span>
-                  <span className="text-[10px] text-slate-500 font-normal">RMSSD</span>
+                  <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">RMSSD</span>
                 </div>
               </td>
-              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
+              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
                 Indicateur parasympathique
               </td>
               {timeline.map((day) => {
@@ -466,15 +470,15 @@ export default function Grid({
 
             {/* LIGNE SPECIALE : FC DE REPOS (BPM) */}
             <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-rose-400">
+              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-rose-400 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <span>FC de Repos (bpm)</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">Basal / Réveil</span>
+                  <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">Basal / Réveil</span>
                 </div>
               </td>
-              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
+              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-400 text-[11px] font-medium bg-[#161619]/60">
                 Tonus cardiaque au réveil
               </td>
               {timeline.map((day) => {
@@ -550,9 +554,9 @@ export default function Grid({
                         : 'border-white/5 hover:bg-white/[0.02]'
                     }`}
                   >
-                    {/* Colonne Nom de la Qualité (Non tronqué avec largeur confortable w-72) */}
+                    {/* Colonne Nom de la Qualité (Responsive mobile w-40 min-w-[150px], Desktop w-72 min-w-[280px]) */}
                     <td 
-                      className="p-2.5 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-slate-200 cursor-pointer hover:text-blue-400 transition-colors group"
+                      className="p-2 sm:p-2.5 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-slate-200 cursor-pointer hover:text-blue-400 transition-colors group w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]"
                       onClick={() => onQualityClick(q)}
                       title={`Cliquer pour analyser ${q.name} en détail (Priorité #${index + 1})`}
                     >
@@ -616,9 +620,9 @@ export default function Grid({
                       </div>
                     </td>
 
-                    {/* Colonne Courbes EMA (3j / 7j / 21j) */}
+                    {/* Colonne Courbes EMA (3j / 7j / 21j) (Cachée sur petit écran mobile) */}
                     <td 
-                      className="p-1.5 border-r border-white/10 bg-[#161619]/70 hover:bg-white/[0.04] cursor-pointer transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.2)]"
+                      className="hidden sm:table-cell p-1.5 border-r border-white/10 bg-[#161619]/70 hover:bg-white/[0.04] cursor-pointer transition-colors shadow-[2px_0_5px_rgba(0,0,0,0.2)]"
                       onClick={() => onQualityClick(q)}
                       title="Cliquer pour ouvrir l'analyse graphique complète"
                     >
@@ -782,16 +786,16 @@ export default function Grid({
 
             {/* LIGNE DE SYNTHÈSE QUOTIDIENNE : TOTAL CHARGE (UA) */}
             <tr className="bg-[#161619] border-t-2 border-white/20 font-mono text-xs">
-              <td className="p-3 sticky left-0 bg-[#161619] z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 font-bold text-amber-300 font-sans">
+              <td className="p-2 sm:p-3 sticky left-0 bg-[#161619] z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 font-bold text-amber-300 font-sans w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Zap size={13} className="text-amber-400" />
                     <span>Charge Totale / Jour</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">Somme UA</span>
+                  <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">Somme UA</span>
                 </div>
               </td>
-              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[10px] font-sans bg-[#161619]/80">
+              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-400 text-[10px] font-sans bg-[#161619]/80">
                 Charge réelle cumulée
               </td>
               {timeline.map((day) => {
@@ -822,16 +826,16 @@ export default function Grid({
 
             {/* LIGNE DE SYNTHÈSE QUOTIDIENNE : TEMPS D'ENTRAÎNEMENT */}
             <tr className="bg-[#161619] border-t border-white/10 font-mono text-xs">
-              <td className="p-3 sticky left-0 bg-[#161619] z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 font-bold text-sky-300 font-sans">
+              <td className="p-2 sm:p-3 sticky left-0 bg-[#161619] z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 font-bold text-sky-300 font-sans w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Clock size={13} className="text-sky-400" />
                     <span>Temps d'Entraînement</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-normal">Durée</span>
+                  <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">Durée</span>
                 </div>
               </td>
-              <td className="p-2 border-r border-white/10 text-center text-slate-400 text-[10px] font-sans bg-[#161619]/80">
+              <td className="hidden sm:table-cell p-2 border-r border-white/10 text-center text-slate-400 text-[10px] font-sans bg-[#161619]/80">
                 Volume en min / heures
               </td>
               {timeline.map((day) => {
