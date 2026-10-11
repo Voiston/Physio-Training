@@ -250,14 +250,25 @@ function AppContent() {
               type="file" 
               ref={fileInputRef} 
               onChange={(e) => {
-                importData(e);
-                showToast({
-                  type: 'success',
-                  title: 'Importation effectuée',
-                  message: 'Données et historique restaurés.'
-                });
+                importData(
+                  e,
+                  () => {
+                    showToast({
+                      type: 'success',
+                      title: 'Importation effectuée',
+                      message: 'Données et historique restaurés.'
+                    });
+                  },
+                  (errorMsg) => {
+                    showToast({
+                      type: 'error',
+                      title: "Échec de l'importation",
+                      message: errorMsg
+                    });
+                  }
+                );
               }} 
-              accept=".json" 
+              accept=".json,application/json" 
               className="hidden" 
             />
             <button 

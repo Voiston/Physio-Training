@@ -794,14 +794,54 @@ export function useData() {
     URL.revokeObjectURL(url);
   };
 
-  const importData = (event: ChangeEvent<HTMLInputElement>) => {
+  const importData = (
+    event: ChangeEvent<HTMLInputElement>,
+    onSuccess?: () => void,
+    onError?: (errorMsg: string) => void
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const inputElement = event.target;
+
+    // 1. Validation de la taille maximale (max 5 Mo pour prévenir tout déni de service / gel du navigateur)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      inputElement.value = '';
+      const msg = `Fichier trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Limite autorisée : 5 Mo.`;
+      console.warn('[Import Security]', msg);
+      if (onError) onError(msg);
+      return;
+    }
+
+    // 2. Validation du type de fichier
+    if (!file.name.toLowerCase().endsWith('.json') && file.type && !file.type.includes('json')) {
+      inputElement.value = '';
+      const msg = 'Format invalide : seuls les fichiers de sauvegarde .json sont acceptés.';
+      console.warn('[Import Security]', msg);
+      if (onError) onError(msg);
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      inputElement.value = '';
+      const msg = 'Impossible de lire le fichier sélectionné.';
+      if (onError) onError(msg);
+    };
+
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
+        if (!content || typeof content !== 'string') {
+          throw new Error('Fichier vide ou illisible');
+        }
+
         const rawImported = JSON.parse(content);
+        if (!rawImported || typeof rawImported !== 'object') {
+          throw new Error('Structure JSON non valide');
+        }
+
         const imported = migrateData(rawImported);
         if (imported.events) {
           localStorage.clear();
@@ -832,10 +872,20 @@ export function useData() {
           if (imported.physioSettings) {
             localStorage.setItem('physio_settings', JSON.stringify(imported.physioSettings));
           }
+          if (Array.isArray(imported.customExercises)) {
+            localStorage.setItem('physio_custom_exercises', JSON.stringify(imported.customExercises));
+          }
+
+          if (onSuccess) onSuccess();
           window.location.reload();
+        } else {
+          throw new Error('Aucune donnée valide trouvée dans la sauvegarde');
         }
-      } catch (err) {
-        alert("Erreur lors de l'import du fichier.");
+      } catch (err: any) {
+        inputElement.value = '';
+        const msg = err?.message || 'Erreur lors du décodage du fichier JSON';
+        console.error('Import error:', err);
+        if (onError) onError(msg);
       }
     };
     reader.readAsText(file);
