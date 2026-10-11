@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Cloud,
   CheckCircle2,
@@ -12,7 +12,8 @@ import {
   WifiOff,
   Zap,
   Lock,
-  ArrowRight
+  X,
+  AlertTriangle
 } from 'lucide-react';
 import type { SyncStatus, UserAccount } from '../hooks/useCloudSync';
 
@@ -44,6 +45,20 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   onPullFromCloud,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
+  // Fermeture accessible sur touche Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -64,36 +79,49 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cloud-sync-title"
+        aria-describedby="cloud-sync-desc"
         className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-slate-100 p-6 flex flex-col gap-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400">
+            <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400" aria-hidden="true">
               <Cloud className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white tracking-wide">
+              <h2 id="cloud-sync-title" className="text-xl font-bold text-white tracking-wide">
                 Synchronisation Sécurisée Google Cloud
               </h2>
-              <p className="text-xs text-slate-400">
+              <p id="cloud-sync-desc" className="text-xs text-slate-300">
                 Vos séances et métriques synchronisées automatiquement entre Smartphone et PC
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            aria-label="Fermer la synchronisation cloud"
+            className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors cursor-pointer"
           >
-            ✕
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         {/* Live Status Badge */}
-        <div className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl">
+        <div 
+          role="status"
+          aria-live="polite"
+          className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl"
+        >
           <div className="flex items-center gap-3">
             <div className="relative">
               {syncStatus === 'synced' ? (
@@ -110,7 +138,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
               )}
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-200 flex items-center gap-2">
                 <span>
                   {syncStatus === 'synced'
                     ? 'Synchronisation temps réel active'
@@ -126,9 +154,9 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
                   </span>
                 )}
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-slate-300">
                 {userAccount ? (
-                  <>Dernière synchro : <span className="text-slate-200 font-medium">{formatLastSync(lastSyncedAt)}</span></>
+                  <>Dernière synchro : <span className="text-slate-100 font-medium">{formatLastSync(lastSyncedAt)}</span></>
                 ) : (
                   <span>Connectez votre compte Google pour activer le Cloud</span>
                 )}
@@ -139,11 +167,13 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
           {userAccount && (
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={onPushToCloud}
+                aria-label="Forcer la synchronisation immédiate vers Google Cloud"
                 title="Envoyer manuellement les données vers le cloud"
-                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                className="min-h-[44px] px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                 <span className="hidden sm:inline">Forcer sync</span>
               </button>
             </div>
@@ -153,16 +183,16 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
         {/* Google Authentication Box */}
         <div className="p-4 bg-slate-950/40 border border-slate-800 rounded-xl flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" aria-hidden="true" />
               Authentification Chiffrée Google
             </span>
             {userAccount ? (
-              <span className="text-[11px] px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Connecté
+              <span className="text-[11px] px-2.5 py-1 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded-full font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Connecté
               </span>
             ) : (
-              <span className="text-[11px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full font-medium">
+              <span className="text-[11px] px-2.5 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-full font-medium">
                 Hors-ligne / Local
               </span>
             )}
@@ -174,36 +204,66 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
                 {userAccount.avatar ? (
                   <img
                     src={userAccount.avatar}
-                    alt={userAccount.name || 'Avatar'}
+                    alt={`Avatar de ${userAccount.name || userAccount.email}`}
                     className="w-10 h-10 rounded-full border border-blue-500/30 object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-sm">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-sm" aria-hidden="true">
                     {userAccount.name ? userAccount.name.charAt(0).toUpperCase() : 'G'}
                   </div>
                 )}
                 <div>
                   <div className="text-sm font-semibold text-white">{userAccount.name || userAccount.email}</div>
-                  <div className="text-xs text-slate-400 font-mono">{userAccount.email}</div>
+                  <div className="text-xs text-slate-300 font-mono">{userAccount.email}</div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={onPullFromCloud}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                  aria-label="Recharger les données depuis Google Cloud"
+                  className="min-h-[44px] px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title="Recharger depuis le Cloud"
                 >
-                  <RefreshCw className="w-3 h-3" />
+                  <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>Recharger</span>
                 </button>
-                <button
-                  onClick={onLogout}
-                  className="px-3 py-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg text-xs flex items-center gap-1 transition-colors border border-rose-500/20 cursor-pointer"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Déconnexion</span>
-                </button>
+
+                {confirmLogout ? (
+                  <div className="flex items-center gap-1.5 animate-fade-in">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmLogout(false);
+                        onLogout();
+                      }}
+                      className="min-h-[44px] px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 shadow-sm"
+                      aria-label="Confirmer la déconnexion du compte Google"
+                    >
+                      <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Confirmer ?</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmLogout(false)}
+                      className="min-h-[44px] px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                      aria-label="Annuler la déconnexion"
+                    >
+                      Non
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmLogout(true)}
+                    className="min-h-[44px] px-3 text-rose-400 hover:bg-rose-500/10 rounded-lg text-xs flex items-center gap-1.5 transition-colors border border-rose-500/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+                    aria-label="Déconnecter votre compte Google"
+                  >
+                    <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Déconnexion</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -215,9 +275,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
               <button
                 type="button"
                 onClick={onLoginWithGoogle}
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                aria-label="Se connecter avec Google en 1 clic pour activer la synchronisation"
+                className="w-full min-h-[48px] py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     fill="currentColor"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -244,8 +305,8 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
         {/* Smartphone QR Code Section */}
         <div className="p-4 bg-slate-950/40 border border-slate-800 rounded-xl flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+              <Smartphone className="w-4 h-4 text-blue-400" aria-hidden="true" />
               Ouvrir sur votre Smartphone
             </span>
           </div>
@@ -255,13 +316,16 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
               <div className="p-2.5 bg-slate-950 border border-blue-500/30 rounded-xl shadow-lg shrink-0">
                 <img
                   src={qrCodeUrl}
-                  alt="QR Code d'ouverture sur smartphone"
+                  alt="Code QR pour appairer et ouvrir l'application sur smartphone"
                   className="w-32 h-32 rounded-lg object-contain"
                 />
               </div>
             ) : (
-              <div className="w-32 h-32 bg-slate-950 rounded-xl flex items-center justify-center">
-                <QrCode className="w-8 h-8 text-slate-600 animate-pulse" />
+              <div 
+                className="w-32 h-32 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-800"
+                aria-label="Génération du code QR en cours"
+              >
+                <QrCode className="w-8 h-8 text-slate-500 animate-pulse" aria-hidden="true" />
               </div>
             )}
 
@@ -269,17 +333,25 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
               <h4 className="text-sm font-semibold text-white flex items-center justify-center sm:justify-start gap-1.5">
                 <span>1. Scannez le QR Code avec votre téléphone</span>
               </h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 2. Connectez-vous avec le <strong>même compte Google</strong> sur votre mobile : vos données seront automatiquement en miroir parfait.
               </p>
 
               <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
                 <button
+                  type="button"
                   onClick={handleCopyLink}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer"
+                  aria-label="Copier l'adresse de l'application mobile dans le presse-papier"
+                  className="min-h-[44px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-2 transition-colors border border-slate-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                 >
-                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedLink ? 'Lien copié !' : 'Copier l\'adresse'}</span>
+                  {copiedLink ? (
+                    <Check className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                  )}
+                  <span role="status" aria-live="polite">
+                    {copiedLink ? 'Lien copié dans le presse-papier !' : 'Copier l\'adresse'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -287,38 +359,38 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
         </div>
 
         {/* Offline & Security Guarantee */}
-        <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl flex flex-col gap-2.5 text-xs text-slate-400">
+        <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl flex flex-col gap-2.5 text-xs text-slate-300">
           <div className="flex items-center gap-2 text-slate-200 font-semibold uppercase tracking-wider text-[11px]">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
             <span>Périmètre de synchronisation intégrale (100% de l'application) :</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
-            <div className="p-2 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-300 flex items-center gap-1.5">
-              <span>📅</span> <span>Grille & Toutes séances</span>
+            <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-200 flex items-center gap-2">
+              <span aria-hidden="true">📅</span> <span>Grille & Toutes séances</span>
             </div>
-            <div className="p-2 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-300 flex items-center gap-1.5">
-              <span>💓</span> <span>VFC & Forme / Readiness</span>
+            <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-200 flex items-center gap-2">
+              <span aria-hidden="true">💓</span> <span>VFC & Forme / Readiness</span>
             </div>
-            <div className="p-2 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-300 flex items-center gap-1.5">
-              <span>🧱</span> <span>Blocs de préparation</span>
+            <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-200 flex items-center gap-2">
+              <span aria-hidden="true">🧱</span> <span>Blocs de préparation</span>
             </div>
-            <div className="p-2 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-300 flex items-center gap-1.5">
-              <span>🎯</span> <span>Compétition & Tapering</span>
+            <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-200 flex items-center gap-2">
+              <span aria-hidden="true">🎯</span> <span>Compétition & Tapering</span>
             </div>
-            <div className="p-2 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-300 flex items-center gap-1.5">
-              <span>🧬</span> <span>Modèle Banister (τ₁ / τ₂)</span>
+            <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-200 flex items-center gap-2">
+              <span aria-hidden="true">🧬</span> <span>Modèle Banister (τ₁ / τ₂)</span>
             </div>
-            <div className="p-2 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-300 flex items-center gap-1.5">
-              <span>🏋️</span> <span>Mode Salle & Exercices</span>
+            <div className="p-2.5 bg-slate-900/80 rounded-lg border border-slate-800/80 text-slate-200 flex items-center gap-2">
+              <span aria-hidden="true">🏋️</span> <span>Mode Salle & Exercices</span>
             </div>
           </div>
         </div>
 
         {/* Guarantee */}
-        <div className="p-3 bg-blue-950/20 border border-blue-900/30 rounded-xl flex items-start gap-3 text-xs text-slate-400">
-          <Zap className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+        <div className="p-3.5 bg-blue-950/20 border border-blue-900/30 rounded-xl flex items-start gap-3 text-xs text-slate-300">
+          <Zap className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" aria-hidden="true" />
           <p>
-            <strong className="text-slate-200">Garantie Hors-Ligne & Zéro-Fuite : </strong>
+            <strong className="text-slate-100 font-semibold">Garantie Hors-Ligne & Zéro-Fuite : </strong>
             Vos données sont isolées sur Firestore sous votre identifiant Google chiffré unique (UID). À la salle de sport sans réseau, tout est sauvegardé en local puis synchronisé dès que le Wi-Fi ou la 4G/5G revient.
           </p>
         </div>
@@ -326,8 +398,9 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
         {/* Footer */}
         <div className="flex justify-end pt-2 border-t border-slate-800">
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+            className="min-h-[44px] px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
           >
             Fermer
           </button>

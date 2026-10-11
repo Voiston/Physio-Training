@@ -85,20 +85,24 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
   }, [activeBlock]);
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-6 w-full">
+    <section 
+      role="region" 
+      aria-label="Vue Périodisation et Planification par Blocs" 
+      className="p-4 md:p-6 flex flex-col gap-6 w-full"
+    >
       {/* 1. HEADER SECTION DE LA PÉRIODISATION AVEC BOUTONS HARMONISÉS */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 shadow-lg">
+      <header className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 shadow-lg">
         <div>
           <div className="flex items-center gap-2.5">
             <span className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              <Calendar size={18} />
+              <Calendar size={18} aria-hidden="true" />
             </span>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight m-0">
                 Périodisation & Objectifs Athlétiques
               </h2>
-              <p className="text-xs text-slate-400 m-0 mt-0.5">
-                Cycles de développement par blocs, affûtage pré-course et calibrage
+              <p className="text-xs text-slate-300 m-0 mt-0.5">
+                Cycles de développement par blocs, affûtage pré-course et calibrage physiologique
               </p>
             </div>
           </div>
@@ -121,7 +125,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
             type="button"
             onClick={onOpenCompetitionModal}
             aria-label={targetCompetition ? `Course objectif : ${targetCompetition.name}. Modifier l'objectif` : "Configurer une course objectif"}
-            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             title="Configurer la course objectif et le protocole d'affûtage"
           >
             <Trophy size={16} className={targetCompetition ? "text-amber-400" : "text-slate-400"} aria-hidden="true" />
@@ -132,7 +136,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
             type="button"
             onClick={onOpenPhysioSettingsModal}
             aria-label={`Calibrage Banister : fatigue ${physioSettings?.tauFatigue || 7} jours, fitness ${physioSettings?.tauFitness || 28} jours`}
-            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             title="Ajuster les constantes de temps de Banister (Fatigue et Fitness)"
           >
             <Sliders size={16} className="text-slate-400" aria-hidden="true" />
@@ -143,25 +147,28 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
             type="button"
             onClick={onOpenReportModal}
             aria-label="Générer un bilan synthétique imprimable en PDF"
-            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-200 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             title="Générer un bilan synthétique imprimable"
           >
             <FileText size={16} className="text-slate-400" aria-hidden="true" />
             <span>Bilan PDF</span>
           </button>
         </div>
-      </div>
+      </header>
 
       {/* GRILLE CENTRALE 2 COLONNES : BLOC ACTIF VS AFFÛTAGE COMPÉTITION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* CARTE 1 : BLOC DE PRÉPARATION ACTIF */}
-        <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 hover:border-blue-500/30 flex flex-col justify-between shadow-xl transition-all">
+        <article 
+          aria-label="Cycle d'entraînement en cours" 
+          className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 hover:border-blue-500/30 flex flex-col justify-between shadow-xl transition-all"
+        >
           <div>
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  <Zap size={18} />
+                  <Zap size={18} aria-hidden="true" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider m-0">
@@ -174,8 +181,8 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
               </div>
 
               {activeBlock && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true"></span>
                   En cours
                 </span>
               )}
@@ -187,12 +194,12 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2">
-                      <Calendar size={13} className="text-blue-400 shrink-0" />
+                      <Calendar size={14} className="text-blue-400 shrink-0" aria-hidden="true" />
                       <span className="text-slate-200 font-medium">
                         {formatDateRange(activeBlock.startDate, activeBlock.endDate)}
                       </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold font-mono text-[11px]">
+                    <span className="px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-200 border border-blue-500/30 font-bold font-mono text-xs">
                       {activeBlock.durationWeeks} semaines
                     </span>
                   </div>
@@ -203,14 +210,14 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                       <div className="flex items-center justify-between text-xs font-mono">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-white flex items-center gap-1.5">
-                            <Clock size={12} className="text-blue-400" />
+                            <Clock size={13} className="text-blue-400" aria-hidden="true" />
                             Semaine {progress.currentWeek} / {progress.totalWeeks}
                           </span>
-                          <span className="px-2 py-0.2 rounded-md bg-blue-500/20 text-blue-300 font-bold text-[11px] border border-blue-500/30">
+                          <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-200 font-bold text-xs border border-blue-500/30">
                             {progress.percent}%
                           </span>
                         </div>
-                        <span className="text-slate-400 text-[11px]">
+                        <span className="text-slate-300 text-xs">
                           {progress.remainingDays > 0 
                             ? `${progress.remainingDays} j restants (Jour ${progress.currentDay}/${progress.totalDays})` 
                             : 'Cycle achevé'}
@@ -238,7 +245,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 {/* 3. QUALITÉS CIBLÉES : BADGES À CONTRASTE ÉLEVÉ & FOND ADOUCI */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
-                    <Zap size={13} className="text-rose-400 shrink-0" />
+                    <Zap size={14} className="text-rose-400 shrink-0" aria-hidden="true" />
                     <span className="hidden sm:inline">Qualités ciblées en développement prioritaire (délais raccourcis x0.45) :</span>
                     <span className="sm:hidden">Développement prioritaire (x0.45) :</span>
                   </div>
@@ -250,7 +257,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                           key={id} 
                           className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-100 border border-rose-400/40 shadow-sm flex items-center gap-1.5"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" aria-hidden="true" />
                           {qName}
                         </span>
                       );
@@ -260,11 +267,11 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
 
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300">
-                    <Shield size={13} className="text-sky-400 shrink-0" />
+                    <Shield size={14} className="text-sky-400 shrink-0" aria-hidden="true" />
                     <span className="hidden sm:inline">Qualités en Maintien (délais nominaux pleins) :</span>
                     <span className="sm:hidden">Qualités en Maintien :</span>
                   </div>
-                  <p className="text-xs text-slate-300 pl-4 leading-relaxed m-0 hidden sm:block">
+                  <p className="text-xs text-slate-300 pl-4 leading-relaxed m-0 block">
                     Les autres filières conservent leur délai nominal de maintien pour préserver les adaptations sans surcharger la semaine.
                   </p>
                 </div>
@@ -272,14 +279,16 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
             ) : (
               <div className="text-center py-8 space-y-3 bg-white/[0.02] border border-dashed border-white/10 rounded-xl p-4">
                 <p className="text-sm font-semibold text-slate-200">Aucun bloc de périodisation sélectionné</p>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
                   Structurez vos prochaines semaines en choisissant un cycle spécifique (Force Max 4 sem., Seuil 3 sem., Volume 6 sem.) pour ordonner vos séances.
                 </p>
                 <button
+                  type="button"
                   onClick={onOpenBlocksModal}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-2"
+                  className="px-4 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer inline-flex items-center gap-2 shadow-md shadow-blue-600/25 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                 >
-                  <Plus size={14} /> Choisir ou Créer un Bloc
+                  <Plus size={16} aria-hidden="true" /> 
+                  <span>Choisir ou Créer un Bloc</span>
                 </button>
               </div>
             )}
@@ -287,27 +296,31 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
 
           {activeBlock && (
             <div className="pt-4 border-t border-white/10 mt-4 flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-mono">
+              <span className="text-xs text-slate-300 font-mono">
                 {blocks.length} bloc(s) programmés au total
               </span>
               <button
+                type="button"
                 onClick={onOpenBlocksModal}
-                className="text-xs font-bold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 cursor-pointer"
+                className="min-h-[44px] px-2 py-1 text-xs font-bold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1.5 cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
                 <span>Gérer les blocs</span>
-                <ArrowRight size={13} />
+                <ArrowRight size={14} aria-hidden="true" />
               </button>
             </div>
           )}
-        </div>
+        </article>
 
         {/* 4. CARTE 2 : OBJECTIF & PIC DE FORME REHAUSSÉE */}
-        <div className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 hover:border-amber-500/30 flex flex-col justify-between shadow-xl transition-all">
+        <article 
+          aria-label="Objectif et pic de forme pré-compétition" 
+          className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 hover:border-amber-500/30 flex flex-col justify-between shadow-xl transition-all"
+        >
           <div>
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  <Trophy size={18} />
+                  <Trophy size={18} aria-hidden="true" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider m-0">
@@ -320,7 +333,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
               </div>
 
               {targetCompetition && (
-                <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm">
+                <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-amber-500/20 text-amber-200 border border-amber-500/40 shadow-sm">
                   {taperingAnalysis?.daysRemaining >= 0 ? `J-${taperingAnalysis.daysRemaining}` : 'Terminé'}
                 </span>
               )}
@@ -332,20 +345,20 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 <div className="grid grid-cols-3 gap-3">
                   {/* Date Course */}
                   <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Date Course</span>
+                    <span className="text-xs uppercase font-bold text-slate-300 tracking-wider">Date Course</span>
                     <div className="my-1">
                       <span className="text-sm sm:text-base font-black font-mono text-white block">
                         {formatLiteralDate(targetCompetition.date)}
                       </span>
                     </div>
-                    <span className="text-[10px] text-amber-300 font-mono font-semibold">
+                    <span className="text-xs text-amber-300 font-mono font-semibold">
                       {taperingAnalysis?.daysRemaining >= 0 ? `J-${taperingAnalysis.daysRemaining}` : 'Terminé'}
                     </span>
                   </div>
 
                   {/* TSB Projeté Jour J */}
                   <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">TSB Projeté Jour J</span>
+                    <span className="text-xs uppercase font-bold text-slate-300 tracking-wider">TSB Jour J</span>
                     <div className="my-1">
                       <span className={`text-xl sm:text-2xl font-black font-mono tracking-tight block ${
                         taperingAnalysis.projectedTsbPercent !== null
@@ -361,7 +374,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                           : (taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb} pts` : `${taperingAnalysis.projectedTsb} pts`)}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono">
+                    <span className="text-xs text-slate-300 font-mono">
                       {taperingAnalysis.projectedTsbPercent !== null
                         ? (taperingAnalysis.projectedTsbPercent >= 5 && taperingAnalysis.projectedTsbPercent <= 25
                             ? '✅ Pic Optimal'
@@ -374,13 +387,13 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
 
                   {/* Cible Idéale */}
                   <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Cible Idéale</span>
+                    <span className="text-xs uppercase font-bold text-slate-300 tracking-wider">Cible Idéale</span>
                     <div className="my-1">
                       <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-blue-300 block">
                         +{taperingAnalysis.targetTsb}{taperingAnalysis.targetTsbUnit === 'percent' ? '% CTL' : ' pts'}
                       </span>
                     </div>
-                    <span className="text-[10px] text-blue-400 font-mono font-semibold">
+                    <span className="text-xs text-blue-300 font-mono font-semibold">
                       {taperingAnalysis.targetTsbUnit === 'percent' ? 'Fraîcheur relative' : 'Balance TSB'}
                     </span>
                   </div>
@@ -390,18 +403,19 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 <div className="border-t border-white/10 my-1" />
 
                 {/* Protocole d'affûtage aéré */}
-                <div className="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-amber-500/20 space-y-2">
+                <div 
+                  role="region" 
+                  aria-label="Protocole d'affûtage scientifique pour la compétition"
+                  className="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-amber-500/20 space-y-2"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Activity size={14} className="text-amber-400 shrink-0" />
-                      <span className="text-xs font-bold text-white uppercase tracking-wider hidden sm:inline">
+                      <Activity size={14} className="text-amber-400 shrink-0" aria-hidden="true" />
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider m-0">
                         Protocole d'Affûtage Scientifique
-                      </span>
-                      <span className="text-xs font-bold text-white uppercase tracking-wider sm:hidden">
-                        Protocole d'Affûtage
-                      </span>
+                      </h4>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
                       {taperingAnalysis.statusBadge}
                     </span>
                   </div>
@@ -413,7 +427,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
                 {targetCompetition.targetTime && (
                   <div className="p-3 rounded-xl bg-black/30 border border-white/5 flex items-center justify-between text-xs">
                     <span className="text-slate-300 flex items-center gap-1.5">
-                      <Clock size={13} className="text-amber-400" /> Chrono visé :
+                      <Clock size={13} className="text-amber-400" aria-hidden="true" /> Chrono visé :
                     </span>
                     <span className="font-mono font-bold text-amber-300">{targetCompetition.targetTime}</span>
                   </div>
@@ -422,14 +436,16 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
             ) : (
               <div className="text-center py-8 space-y-3 bg-white/[0.02] border border-dashed border-white/10 rounded-xl p-4">
                 <p className="text-sm font-semibold text-slate-200">Aucun objectif de course défini</p>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed">
                   Renseignez la date de votre objectif clé (Marathon, Trail, Cyclosportive) pour modéliser votre courbe de décroissance et le pic TSB.
                 </p>
                 <button
+                  type="button"
                   onClick={onOpenCompetitionModal}
-                  className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl transition-all cursor-pointer inline-flex items-center gap-2"
+                  className="px-4 py-2.5 min-h-[44px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer inline-flex items-center gap-2 shadow-md active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                 >
-                  <Trophy size={14} /> Définir une Compétition
+                  <Trophy size={16} aria-hidden="true" /> 
+                  <span>Définir une Compétition</span>
                 </button>
               </div>
             )}
@@ -437,82 +453,91 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
 
           {targetCompetition && (
             <div className="pt-4 border-t border-white/10 mt-4 flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-mono">
+              <span className="text-xs text-slate-300 font-mono">
                 Modèle Banister Tapering actif
               </span>
               <button
+                type="button"
                 onClick={onOpenCompetitionModal}
-                className="text-xs font-bold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1 cursor-pointer"
+                className="min-h-[44px] px-2 py-1 text-xs font-bold text-amber-300 hover:text-amber-200 inline-flex items-center gap-1.5 cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
               >
                 <span>Ajuster l'objectif</span>
-                <ArrowRight size={13} />
+                <ArrowRight size={14} aria-hidden="true" />
               </button>
             </div>
           )}
-        </div>
+        </article>
 
       </div>
 
       {/* 5. SECTION BIBLIOTHÈQUE DE MODÈLES DE BLOCS STANDARDS (TEMPLATES) */}
-      <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+      <section 
+        aria-label="Bibliothèque de modèles de blocs standards"
+        className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-purple-400" />
+            <Sparkles size={16} className="text-purple-400" aria-hidden="true" />
             <h3 className="text-sm font-bold text-white uppercase tracking-wider m-0">
               Modèles de Blocs Prédéfinis & Protocoles Clés
             </h3>
           </div>
           <button
+            type="button"
             onClick={onOpenBlocksModal}
-            className="text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer"
+            className="min-h-[44px] px-2.5 py-1 text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 inline-flex items-center gap-1"
           >
-            Voir tous les modèles ({templates.length}) &rarr;
+            <span>Voir tous les modèles ({templates.length})</span>
+            <span aria-hidden="true">&rarr;</span>
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {templates.slice(0, 4).map(tmpl => (
-            <button
-              key={tmpl.id}
-              type="button"
-              onClick={onOpenBlocksModal}
-              aria-label={`Modèle ${tmpl.name}, durée ${tmpl.durationWeeks} semaines. Cliquer pour ouvrir la gestion des blocs.`}
-              className="p-4 rounded-xl bg-black/40 border border-white/10 hover:border-blue-500/40 hover:bg-slate-800/30 transition-all cursor-pointer flex flex-col justify-between group shadow-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-            >
-              <div className="w-full">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
-                    {tmpl.name}
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-slate-200 border border-white/5 font-semibold">
-                    {tmpl.durationWeeks} sem.
-                  </span>
-                </div>
-                {/* Description en texte clair et contrasté */}
-                <p className="text-xs text-slate-300 line-clamp-2 mb-3 leading-relaxed">
-                  {tmpl.description}
-                </p>
-              </div>
-
-              {/* Badges de filières aérés avec gap et contraste élevé */}
-              <div className="flex flex-wrap gap-2 pt-2.5 border-t border-white/10 w-full">
-                {tmpl.focusQualities.map(id => {
-                  const qName = qualities.find(q => q.id === id)?.name || id;
-                  return (
-                    <span 
-                      key={id} 
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-200 border border-blue-400/25"
-                    >
-                      {qName}
+          {templates.slice(0, 4).map(tmpl => {
+            const focusNames = tmpl.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ');
+            return (
+              <button
+                key={tmpl.id}
+                type="button"
+                onClick={onOpenBlocksModal}
+                aria-label={`Modèle ${tmpl.name}, durée ${tmpl.durationWeeks} semaines. Description : ${tmpl.description}. Filières ciblées : ${focusNames}. Cliquer pour charger dans la programmation.`}
+                className="p-4 rounded-xl bg-black/40 border border-white/10 hover:border-blue-500/40 hover:bg-slate-800/30 transition-all cursor-pointer flex flex-col justify-between group shadow-md text-left min-h-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+              >
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
+                      {tmpl.name}
                     </span>
-                  );
-                })}
-              </div>
-            </button>
-          ))}
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-white/10 text-slate-100 border border-white/10 font-semibold">
+                      {tmpl.durationWeeks} sem.
+                    </span>
+                  </div>
+                  {/* Description en texte clair et contrasté */}
+                  <p className="text-xs text-slate-300 line-clamp-2 mb-3 leading-relaxed">
+                    {tmpl.description}
+                  </p>
+                </div>
+
+                {/* Badges de filières aérés avec gap et contraste élevé */}
+                <div className="flex flex-wrap gap-2 pt-2.5 border-t border-white/10 w-full">
+                  {tmpl.focusQualities.map(id => {
+                    const qName = qualities.find(q => q.id === id)?.name || id;
+                    return (
+                      <span 
+                        key={id} 
+                        className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-100 border border-blue-400/30"
+                      >
+                        {qName}
+                      </span>
+                    );
+                  })}
+                </div>
+              </button>
+            );
+          })}
         </div>
-      </div>
-    </div>
+      </section>
+    </section>
   );
 };
 

@@ -187,52 +187,59 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   }, [activeWeek, comparisonTargetWeek]);
 
   return (
-    <div className="flex flex-col gap-6 animate-fadeIn pb-12">
+    <main 
+      role="region" 
+      aria-label="Synthèse et analyse hebdomadaire de la charge" 
+      className="flex flex-col gap-6 animate-fadeIn pb-12"
+    >
       {/* BANDEAU SUPÉRIEUR : TITRE, RÉSUMÉ RAPIDE ET ACTIONS */}
-      <div className="bg-gradient-to-r from-blue-950/40 via-slate-900/60 to-indigo-950/30 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+      <header className="bg-gradient-to-r from-blue-950/40 via-slate-900/60 to-indigo-950/30 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-md">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white shrink-0">
-              <Scale size={24} />
+              <Scale size={24} aria-hidden="true" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
                   Synthèse Hebdomadaire & Comparateur
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   {activeWeek.relativeLabel}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">
+              <p className="text-xs text-slate-300 mt-0.5 hidden sm:block">
                 Volumes totaux de charge, heures d'entraînement, comparaison à S-1 et ventilation par qualité physique.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto" role="toolbar" aria-label="Actions de synthèse">
             {/* Bouton bascule mode Comparateur */}
             <button
+              type="button"
               onClick={() => setIsCompareMode(prev => !prev)}
-              className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              aria-pressed={isCompareMode}
+              className={`flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
                 isCompareMode
                   ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
-                  : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border-white/10'
               }`}
               title="Comparer côte à côte deux semaines au choix"
             >
-              <ArrowUpDown size={13} />
-              <span>{isCompareMode ? 'Fermer' : 'Comparer'}</span>
+              <ArrowUpDown size={15} aria-hidden="true" />
+              <span>{isCompareMode ? 'Fermer le comparateur' : 'Comparer deux semaines'}</span>
             </button>
 
             {/* Bouton Copier Résumé */}
             <button
+              type="button"
               onClick={handleCopySummary}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/10 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               title="Copier le bilan de la semaine pour votre coach ou carnet"
             >
-              {copiedSummary ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-              <span>{copiedSummary ? 'Copié !' : 'Copier'}</span>
+              {copiedSummary ? <Check size={15} className="text-emerald-400" aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+              <span>{copiedSummary ? 'Bilan copié !' : 'Copier le résumé'}</span>
             </button>
           </div>
         </div>
@@ -241,12 +248,12 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
           {/* KPI 1 : Charge Totale */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 relative overflow-hidden group hover:border-blue-500/40 transition-all">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span className="flex items-center gap-1 font-medium">
-                <Zap size={13} className="text-amber-400" /> Charge Totale
+            <div className="flex items-center justify-between text-slate-300 text-xs mb-1">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Zap size={14} className="text-amber-400" aria-hidden="true" /> Charge Totale
               </span>
               {activeWeek.comparison.percentLoadChange !== null && (
-                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded border ${
                   activeWeek.comparison.percentLoadChange > 15 
                     ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                     : activeWeek.comparison.percentLoadChange > 5
@@ -260,22 +267,22 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               )}
             </div>
             <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">
-              {activeWeek.totalLoad} <span className="text-xs font-normal text-slate-400">UA</span>
+              {activeWeek.totalLoad} <span className="text-xs font-normal text-slate-300">UA</span>
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <div className="text-xs text-slate-300 mt-1 flex items-center justify-between">
               <span>Moyenne/jour : {activeWeek.meanDailyLoad} UA</span>
-              <span className="text-[10px] text-slate-500">{activeWeek.comparison.statusBadge}</span>
+              <span className="text-xs text-slate-400 font-medium">{activeWeek.comparison.statusBadge}</span>
             </div>
           </div>
 
           {/* KPI 2 : Temps d'Entraînement */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 relative overflow-hidden group hover:border-blue-500/40 transition-all">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span className="flex items-center gap-1 font-medium">
-                <Clock size={13} className="text-sky-400" /> Temps Total
+            <div className="flex items-center justify-between text-slate-300 text-xs mb-1">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Clock size={14} className="text-sky-400" aria-hidden="true" /> Temps Total
               </span>
               {activeWeek.comparison.percentDurationChange !== null && (
-                <span className="text-[10px] font-mono font-semibold text-slate-300">
+                <span className="text-xs font-mono font-semibold text-slate-300">
                   {activeWeek.comparison.percentDurationChange >= 0 ? `+${activeWeek.comparison.percentDurationChange}%` : `${activeWeek.comparison.percentDurationChange}%`}
                 </span>
               )}
@@ -283,45 +290,45 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">
               {activeWeek.totalDurationFormatted}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">
+            <div className="text-xs text-slate-300 mt-1">
               {activeWeek.totalDurationMinutes} minutes enregistrées
             </div>
           </div>
 
           {/* KPI 3 : Nombre de Séances */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 relative overflow-hidden group hover:border-blue-500/40 transition-all">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span className="flex items-center gap-1 font-medium">
-                <Calendar size={13} className="text-emerald-400" /> Séances
+            <div className="flex items-center justify-between text-slate-300 text-xs mb-1">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Calendar size={14} className="text-emerald-400" aria-hidden="true" /> Séances
               </span>
-              <span className="text-[10px] font-mono text-slate-400">
+              <span className="text-xs font-mono text-slate-300 font-semibold">
                 {activeWeek.comparison.deltaSessions >= 0 ? `+${activeWeek.comparison.deltaSessions}` : activeWeek.comparison.deltaSessions} vs S-1
               </span>
             </div>
             <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">
-              {activeWeek.sessionCount} <span className="text-xs font-normal text-slate-400">séances</span>
+              {activeWeek.sessionCount} <span className="text-xs font-normal text-slate-300">séances</span>
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
-              <span className="flex items-center gap-0.5"><Bike size={11} className="text-blue-400" /> {activeWeek.sports.bike.sessionCount}</span>
-              <span className="flex items-center gap-0.5"><Footprints size={11} className="text-amber-400" /> {activeWeek.sports.run.sessionCount}</span>
-              <span className="flex items-center gap-0.5"><Dumbbell size={11} className="text-emerald-400" /> {activeWeek.sports.other.sessionCount}</span>
+            <div className="text-xs text-slate-300 mt-1 flex items-center gap-2">
+              <span className="flex items-center gap-1"><Bike size={13} className="text-blue-400" aria-hidden="true" /> {activeWeek.sports.bike.sessionCount}</span>
+              <span className="flex items-center gap-1"><Footprints size={13} className="text-amber-400" aria-hidden="true" /> {activeWeek.sports.run.sessionCount}</span>
+              <span className="flex items-center gap-1"><Dumbbell size={13} className="text-emerald-400" aria-hidden="true" /> {activeWeek.sports.other.sessionCount}</span>
             </div>
           </div>
 
           {/* KPI 4 : ACWR & Monotonie (Charge Aiguë/Chronique & Foster) */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 relative overflow-hidden group hover:border-blue-500/40 transition-all">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span className="flex items-center gap-1 font-medium">
-                <Sparkles size={13} className="text-purple-400" /> Aigu/Chronique & Foster
+            <div className="flex items-center justify-between text-slate-300 text-xs mb-1">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Sparkles size={14} className="text-purple-400" aria-hidden="true" /> Aigu/Chronique & Foster
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Ratio Aigu:Chronique</span>
+              <span className="text-xs font-mono text-slate-300">Ratio Aigu:Chronique</span>
             </div>
             <div className="flex items-baseline gap-2">
               <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">
                 {activeWeek.acwr !== null ? activeWeek.acwr : '—'}
               </div>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                activeWeek.acwr === null ? 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${
+                activeWeek.acwr === null ? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
                 : activeWeek.acwr >= 0.8 && activeWeek.acwr <= 1.3
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                 : activeWeek.acwr > 1.5
@@ -333,22 +340,22 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 : activeWeek.acwr > 1.5 ? 'Risque Surcharge' : 'Vigilance'}
               </span>
             </div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <div className="text-xs text-slate-300 mt-1 flex items-center justify-between">
               <span>Monotonie : {activeWeek.monotony}</span>
               <span>Strain : {activeWeek.strain}</span>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* SÉLECTEUR HORIZONTAL DES SEMAINES (TIMELINE DES CARTES SEMAINE) */}
-      <div className="flex flex-col gap-2">
+      <section aria-labelledby="timeline-weeks-heading" className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <Calendar size={14} className="text-sky-400" />
+          <h3 id="timeline-weeks-heading" className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 m-0">
+            <Calendar size={14} className="text-sky-400" aria-hidden="true" />
             <span>Sélectionner une Semaine pour Inspection</span>
-          </span>
-          <span className="text-[11px] text-slate-400">
+          </h3>
+          <span className="text-xs text-slate-300">
             {allWeeks.length} semaines calculées (du {allWeeks[0]?.startDate} au {allWeeks[allWeeks.length - 1]?.endDate})
           </span>
         </div>
@@ -365,6 +372,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             return (
               <button
                 key={week.weekId}
+                type="button"
                 role="tab"
                 aria-selected={isSelected}
                 aria-current={isCurrent ? 'date' : undefined}
@@ -382,7 +390,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                     if (prevWeek) setSelectedWeekId(prevWeek.weekId);
                   }
                 }}
-                className={`flex flex-col p-3 min-h-[92px] rounded-xl border text-left touch-press active:scale-95 transition-all cursor-pointer relative shrink-0 w-36 sm:w-auto snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                className={`flex flex-col p-3 min-h-[96px] rounded-xl border text-left touch-press active:scale-95 transition-all cursor-pointer relative shrink-0 w-36 sm:w-auto snap-start focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
                   isSelected
                     ? 'bg-blue-600/30 border-blue-400 shadow-md shadow-blue-500/20 text-white'
                     : isCurrent
@@ -391,7 +399,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 }`}
               >
                 {isCurrent && (
-                  <span className="absolute -top-1.5 -right-1 px-1.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-tight bg-blue-500 text-white shadow-sm">
+                  <span className="absolute -top-1.5 -right-1 px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-tight bg-blue-500 text-white shadow-sm border border-blue-400">
                     Auj.
                   </span>
                 )}
@@ -399,21 +407,21 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                   <span className="text-xs font-mono font-bold tracking-tight text-white">
                     {week.shortLabel}
                   </span>
-                  <span className="text-[10px] text-slate-300 font-mono">
+                  <span className="text-xs text-slate-300 font-mono">
                     {week.relativeLabel}
                   </span>
                 </div>
 
                 <div className="text-sm font-mono font-extrabold text-white">
-                  {week.totalLoad} <span className="text-[10px] font-normal text-slate-400">UA</span>
+                  {week.totalLoad} <span className="text-xs font-normal text-slate-300">UA</span>
                 </div>
 
-                <div className="text-[11px] font-mono text-slate-200 mt-0.5">
+                <div className="text-xs font-mono text-slate-200 mt-0.5">
                   ⏱️ {week.totalDurationFormatted}
                 </div>
 
                 {/* Badge Delta vs S-1 */}
-                <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px]">
+                <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-xs">
                   <span className="text-slate-300">{week.sessionCount} séanc.</span>
                   {week.comparison.percentLoadChange !== null ? (
                     <span className={`font-mono font-bold ${
@@ -432,28 +440,30 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             );
           })}
         </div>
-      </div>
+      </section>
 
       {/* COMPARATEUR DIRECT CÔTE-À-CÔTE (SI ACTIVÉ) */}
       {isCompareMode && (
-        <div className="bg-[#121216] border-2 border-indigo-500/40 rounded-2xl p-5 shadow-2xl animate-fadeIn">
+        <section aria-labelledby="comparator-heading" className="bg-[#121216] border-2 border-indigo-500/40 rounded-2xl p-5 shadow-2xl animate-fadeIn">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-4 mb-4">
             <div className="flex items-center gap-2">
-              <Scale size={20} className="text-indigo-400" />
-              <h3 className="text-base font-bold text-white">
+              <Scale size={20} className="text-indigo-400" aria-hidden="true" />
+              <h3 id="comparator-heading" className="text-base font-bold text-white m-0">
                 Comparateur Direct : Semaine A vs Semaine B
               </h3>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-400">Comparer</span>
-              <span className="font-mono font-bold text-blue-400 px-2 py-0.5 bg-blue-500/20 rounded border border-blue-500/30">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-300 font-medium">Comparer</span>
+              <span className="font-mono font-bold text-blue-300 px-2.5 py-1 bg-blue-500/20 rounded-lg border border-blue-500/30">
                 {activeWeek.shortLabel} ({activeWeek.label})
               </span>
-              <span className="text-slate-400">avec :</span>
+              <label htmlFor="compare-week-select" className="text-slate-300 font-medium">avec :</label>
               <select
+                id="compare-week-select"
+                aria-label="Sélectionner la semaine à comparer avec la semaine active"
                 value={compareWeekId}
                 onChange={(e) => setCompareWeekId(e.target.value)}
-                className="bg-white/10 border border-white/20 rounded-lg px-2.5 py-1 text-white font-mono text-xs focus:outline-none focus:border-indigo-400"
+                className="min-h-[44px] bg-slate-800 border border-white/20 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer"
               >
                 {allWeeks.map(w => (
                   <option key={w.weekId} value={w.weekId} className="bg-slate-900 text-white">
@@ -469,7 +479,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               {/* Carte des deltas globaux */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
-                  <div className="text-xs text-slate-400 mb-1">Différence de Charge Totale</div>
+                  <div className="text-xs text-slate-300 mb-1 font-medium">Différence de Charge Totale</div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-mono font-extrabold text-white">
                       {diffMetrics.deltaLoad >= 0 ? `+${diffMetrics.deltaLoad}` : diffMetrics.deltaLoad} UA
@@ -482,14 +492,14 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1 flex justify-between font-mono">
+                  <div className="text-xs text-slate-300 mt-1 flex justify-between font-mono">
                     <span>{activeWeek.shortLabel}: {activeWeek.totalLoad} UA</span>
                     <span>vs {comparisonTargetWeek.shortLabel}: {comparisonTargetWeek.totalLoad} UA</span>
                   </div>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
-                  <div className="text-xs text-slate-400 mb-1">Différence de Volume Horaire</div>
+                  <div className="text-xs text-slate-300 mb-1 font-medium">Différence de Volume Horaire</div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-mono font-extrabold text-white">
                       {diffMetrics.deltaDuration >= 0 ? `+${formatMinutes(diffMetrics.deltaDuration)}` : `-${formatMinutes(Math.abs(diffMetrics.deltaDuration))}`}
@@ -500,18 +510,18 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1 flex justify-between font-mono">
+                  <div className="text-xs text-slate-300 mt-1 flex justify-between font-mono">
                     <span>{activeWeek.shortLabel}: {activeWeek.totalDurationFormatted}</span>
                     <span>vs {comparisonTargetWeek.shortLabel}: {comparisonTargetWeek.totalDurationFormatted}</span>
                   </div>
                 </div>
 
                 <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
-                  <div className="text-xs text-slate-400 mb-1">Différence de Séances</div>
+                  <div className="text-xs text-slate-300 mb-1 font-medium">Différence de Séances</div>
                   <div className="text-2xl font-mono font-extrabold text-white">
                     {diffMetrics.deltaSessions >= 0 ? `+${diffMetrics.deltaSessions}` : diffMetrics.deltaSessions} séance{Math.abs(diffMetrics.deltaSessions) > 1 ? 's' : ''}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1 flex justify-between font-mono">
+                  <div className="text-xs text-slate-300 mt-1 flex justify-between font-mono">
                     <span>{activeWeek.shortLabel}: {activeWeek.sessionCount} séanc.</span>
                     <span>vs {comparisonTargetWeek.shortLabel}: {comparisonTargetWeek.sessionCount} séanc.</span>
                   </div>
@@ -524,14 +534,14 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                   <span className="text-xs font-bold text-slate-300">
                     Ventilation Comparative par Qualité Physique
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
+                  <span className="text-xs text-slate-300 font-mono">
                     {activeWeek.shortLabel} vs {comparisonTargetWeek.shortLabel}
                   </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] uppercase text-slate-400 font-mono">
+                      <tr className="bg-white/[0.02] border-b border-white/5 text-xs uppercase text-slate-300 font-mono">
                         <th className="p-2.5">Qualité Physique</th>
                         <th className="p-2.5 text-right">{activeWeek.shortLabel} (Charge / Temps)</th>
                         <th className="p-2.5 text-right">{comparisonTargetWeek.shortLabel} (Charge / Temps)</th>
@@ -557,29 +567,29 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                             </td>
                             <td className="p-2.5 text-right">
                               <span className="font-bold text-blue-300">{aLoad} UA</span>
-                              <span className="text-slate-400 text-[10px] ml-2 font-normal font-sans">({formatMinutes(aStat?.durationMinutes || 0)})</span>
+                              <span className="text-slate-300 text-xs ml-2 font-normal font-sans">({formatMinutes(aStat?.durationMinutes || 0)})</span>
                             </td>
                             <td className="p-2.5 text-right">
                               <span className="font-bold text-slate-300">{bLoad} UA</span>
-                              <span className="text-slate-500 text-[10px] ml-2 font-normal font-sans">({formatMinutes(bStat?.durationMinutes || 0)})</span>
+                              <span className="text-slate-300 text-xs ml-2 font-normal font-sans">({formatMinutes(bStat?.durationMinutes || 0)})</span>
                             </td>
                             <td className="p-2.5 text-right font-bold">
-                              <span className={delta > 0 ? 'text-amber-400' : delta < 0 ? 'text-sky-400' : 'text-slate-400'}>
+                              <span className={delta > 0 ? 'text-amber-400' : delta < 0 ? 'text-sky-400' : 'text-slate-300'}>
                                 {delta >= 0 ? `+${delta}` : delta} UA
-                                {pct !== null && <span className="text-[10px] font-normal ml-1">({pct >= 0 ? `+${pct}%` : `${pct}%`})</span>}
+                                {pct !== null && <span className="text-xs font-normal ml-1">({pct >= 0 ? `+${pct}%` : `${pct}%`})</span>}
                               </span>
                             </td>
                             <td className="p-2.5 text-center">
                               {delta > 10 ? (
-                                <span className="inline-flex items-center text-amber-400 text-[10px]">
-                                  <ArrowUpRight size={14} /> Augmentation
+                                <span className="inline-flex items-center text-amber-400 text-xs font-semibold">
+                                  <ArrowUpRight size={14} aria-hidden="true" /> Augmentation
                                 </span>
                               ) : delta < -10 ? (
-                                <span className="inline-flex items-center text-sky-400 text-[10px]">
-                                  <ArrowDownRight size={14} /> Décharge
+                                <span className="inline-flex items-center text-sky-400 text-xs font-semibold">
+                                  <ArrowDownRight size={14} aria-hidden="true" /> Décharge
                                 </span>
                               ) : (
-                                <span className="text-slate-500 text-[10px]">≈ Équivalent</span>
+                                <span className="text-slate-400 text-xs font-semibold">≈ Équivalent</span>
                               )}
                             </td>
                           </tr>
@@ -591,7 +601,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               </div>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* GRAPHIQUE INTERACTIF DE PROGRESSION HEBDOMADAIRE (RECHARTS) */}
@@ -612,14 +622,15 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
           {/* Filtre rapide de qualité directement sur le graphique */}
           <div className="flex items-center gap-2">
-            <label htmlFor="quick-quality-filter" className="text-xs text-slate-400 flex items-center gap-1 cursor-pointer">
-              <Filter size={12} /> Qualité :
+            <label htmlFor="quick-quality-filter" className="text-xs text-slate-300 font-medium flex items-center gap-1.5 cursor-pointer">
+              <Filter size={14} className="text-slate-400" aria-hidden="true" /> Qualité :
             </label>
             <select
               id="quick-quality-filter"
+              aria-label="Filtrer le graphique par qualité physique spécifique"
               value={selectedQualityFilter}
               onChange={(e) => setSelectedQualityFilter(e.target.value)}
-              className="bg-white/10 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="min-h-[44px] bg-slate-800 border border-white/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
             >
               <option value="all" className="bg-slate-900 text-white">Toutes les qualités cumulées</option>
               {qualities.map(q => (
@@ -730,7 +741,10 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
       </section>
 
       {/* SECTION DU BAS : VENTILATION DÉTAILLÉE PAR QUALITÉ PHYSIQUE OU PAR GROUPE MUSCULAIRE (OPTION A) */}
-      <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+      <section 
+        aria-label="Ventilation analytique de la charge"
+        className="bg-slate-900/60 border border-white/10 rounded-2xl p-5 shadow-xl backdrop-blur-md"
+      >
         
         {/* ONGLET DE BASCULE QUALITÉS GLOBALES vs GROUPES MUSCULAIRES */}
         <div 
@@ -751,9 +765,9 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 : 'text-slate-300 hover:text-white hover:bg-white/5 border border-white/5'
             }`}
           >
-            <Layers size={15} aria-hidden="true" />
+            <Layers size={16} aria-hidden="true" />
             <span>Filières & Qualités Physiques</span>
-            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-white/20 text-white">
+            <span className="px-2 py-0.5 rounded font-mono text-xs bg-white/20 text-white font-bold">
               {qualities.length}
             </span>
           </button>
@@ -771,14 +785,14 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 : 'text-slate-300 hover:text-white hover:bg-white/5 border border-white/5'
             }`}
           >
-            <Dumbbell size={15} aria-hidden="true" />
+            <Dumbbell size={16} aria-hidden="true" />
             <span>Charge par Groupe Musculaire</span>
             {weeklyMuscularSummary.totalSets > 0 ? (
-              <span className="px-1.5 py-0.5 rounded-full font-mono text-[10px] bg-emerald-500/25 text-emerald-200 border border-emerald-500/40 font-bold">
+              <span className="px-2 py-0.5 rounded-full font-mono text-xs bg-emerald-500/25 text-emerald-200 border border-emerald-500/40 font-bold">
                 {weeklyMuscularSummary.totalSets} séries
               </span>
             ) : (
-              <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-white/10 text-slate-300">
+              <span className="px-2 py-0.5 rounded font-mono text-xs bg-white/10 text-slate-300">
                 Séries effectives
               </span>
             )}
@@ -786,29 +800,31 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
         </div>
 
         {breakdownTab === 'qualities' ? (
-          <>
+          <div id="panel-qualities" role="tabpanel" aria-labelledby="tab-qualities">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <Layers size={18} className="text-blue-400" />
-                  <h3 className="text-base font-bold text-white">
+                  <Layers size={18} className="text-blue-400" aria-hidden="true" />
+                  <h3 className="text-base font-bold text-white m-0">
                     Ventilation par Qualité Physique : {activeWeek.label}
                   </h3>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-300 mt-0.5">
                   Classement et détails pour chaque filière d'entraînement sur la semaine sélectionnée.
                 </p>
               </div>
 
               {/* BARRE D'OUTILS DE TRI ET DE FILTRE (DEMANDE UTILISATEUR) */}
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto" role="toolbar" aria-label="Outils de filtrage et de tri des qualités">
                 {/* Filtre qualité */}
-                <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
-                  <Filter size={13} className="text-slate-400" />
+                <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-slate-300 min-h-[44px]">
+                  <Filter size={14} className="text-slate-400" aria-hidden="true" />
                   <select
+                    id="quality-table-filter"
+                    aria-label="Filtrer les qualités physiques affichées"
                     value={selectedQualityFilter}
                     onChange={(e) => setSelectedQualityFilter(e.target.value)}
-                    className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                    className="bg-transparent text-white font-medium focus:outline-none cursor-pointer py-1.5"
                   >
                     <option value="all" className="bg-slate-900 text-white">Toutes les qualités ({qualities.length})</option>
                     {qualities.map(q => (
@@ -820,13 +836,15 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 </div>
 
                 {/* Tri par critère */}
-                <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-slate-300">
-                  <ArrowUpDown size={13} className="text-slate-400" />
-                  <span className="text-slate-400">Trier par :</span>
+                <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1 text-xs text-slate-300 min-h-[44px]">
+                  <ArrowUpDown size={14} className="text-slate-400" aria-hidden="true" />
+                  <span className="text-slate-300 font-medium">Trier par :</span>
                   <select
+                    id="quality-table-sort"
+                    aria-label="Critère de tri du tableau des qualités"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as QualitySortField)}
-                    className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                    className="bg-transparent text-white font-medium focus:outline-none cursor-pointer py-1.5"
                   >
                     <option value="load" className="bg-slate-900 text-white">⚡ Charge décroissante</option>
                     <option value="duration" className="bg-slate-900 text-white">⏱️ Temps d'entraînement</option>
@@ -838,11 +856,13 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
                 {/* Inverser ordre ascendant / descendant */}
                 <button
+                  type="button"
                   onClick={() => setSortDescending(prev => !prev)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title={sortDescending ? "Tri décroissant (du plus grand au plus petit)" : "Tri croissant (du plus petit au plus grand)"}
+                  aria-label={sortDescending ? "Passer en ordre croissant" : "Passer en ordre décroissant"}
                 >
-                  {sortDescending ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                  {sortDescending ? <TrendingDown size={16} aria-hidden="true" /> : <TrendingUp size={16} aria-hidden="true" />}
                 </button>
               </div>
             </div>
@@ -854,7 +874,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                   Ventilation détaillée des charges et durées d'entraînement par qualité physique pour la semaine {activeWeek.label}
                 </caption>
                 <thead>
-                  <tr className="bg-white/5 border-y border-white/10 text-[10px] uppercase text-slate-300 font-mono tracking-wider">
+                  <tr className="bg-white/5 border-y border-white/10 text-xs uppercase text-slate-300 font-mono tracking-wider">
                     <th scope="col" className="p-3">Qualité Physique</th>
                     <th scope="col" className="p-3 text-right">Charge Hebdo</th>
                     <th scope="col" className="p-3 w-48 hidden sm:table-cell">% de la Charge Semaine</th>
@@ -881,7 +901,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                               {item.qualityName}
                             </span>
                             {item.secondaryLoad > 0 && (
-                              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                              <span className="text-xs text-slate-400 font-mono hidden sm:inline">
                                 Direct: {item.directLoad} UA • Impact indirect: {item.secondaryLoad} UA
                               </span>
                             )}
@@ -890,8 +910,8 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
                         {/* Charge totale */}
                         <td className="p-3 text-right font-mono font-bold text-xs sm:text-sm">
-                          <span className={item.totalLoad > 0 ? 'text-amber-300' : 'text-slate-500'}>
-                            {item.totalLoad} <span className="text-[10px] font-normal text-slate-400">UA</span>
+                          <span className={item.totalLoad > 0 ? 'text-amber-300' : 'text-slate-400'}>
+                            {item.totalLoad} <span className="text-xs font-normal text-slate-400">UA</span>
                           </span>
                         </td>
 
@@ -904,23 +924,23 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                                 style={{ width: `${Math.min(100, item.percentOfTotalLoad)}%` }}
                               />
                             </div>
-                            <span className="font-mono text-[10px] text-slate-400 w-10 text-right">
+                            <span className="font-mono text-xs text-slate-300 w-12 text-right font-semibold">
                               {item.percentOfTotalLoad}%
                             </span>
                           </div>
                         </td>
 
                         {/* Temps */}
-                        <td className="p-3 text-right font-mono text-slate-300">
+                        <td className="p-3 text-right font-mono text-slate-200 font-medium">
                           {formatMinutes(item.durationMinutes)}
                         </td>
 
                         {/* Séances */}
                         <td className="p-3 text-center font-mono">
-                          <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
                             item.sessionCount > 0 
-                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
-                              : 'text-slate-600'
+                              ? 'bg-blue-500/20 text-blue-200 border border-blue-500/30' 
+                              : 'text-slate-500'
                           }`}>
                             {item.sessionCount}
                           </span>
@@ -932,18 +952,18 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                             <span className={`inline-flex items-center gap-1 ${
                               item.percentChangeVsPrevWeek > 0 ? 'text-emerald-400'
                               : item.percentChangeVsPrevWeek < 0 ? 'text-sky-400'
-                              : 'text-slate-400'
+                              : 'text-slate-300'
                             }`}>
-                              {item.percentChangeVsPrevWeek > 0 ? <ArrowUpRight size={13} /> : item.percentChangeVsPrevWeek < 0 ? <ArrowDownRight size={13} /> : null}
+                              {item.percentChangeVsPrevWeek > 0 ? <ArrowUpRight size={14} aria-hidden="true" /> : item.percentChangeVsPrevWeek < 0 ? <ArrowDownRight size={14} aria-hidden="true" /> : null}
                               {item.percentChangeVsPrevWeek >= 0 ? `+${item.percentChangeVsPrevWeek}%` : `${item.percentChangeVsPrevWeek}%`}
-                              <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">
+                              <span className="text-xs text-slate-400 font-normal hidden sm:inline">
                                 ({item.deltaLoadVsPrevWeek >= 0 ? `+${item.deltaLoadVsPrevWeek}` : item.deltaLoadVsPrevWeek} UA)
                               </span>
                             </span>
                           ) : item.totalLoad > 0 ? (
-                            <span className="text-emerald-400 text-[11px]">+ Nouveau</span>
+                            <span className="text-emerald-400 text-xs font-semibold">+ Nouveau</span>
                           ) : (
-                            <span className="text-slate-600">—</span>
+                            <span className="text-slate-500">—</span>
                           )}
                         </td>
                       </tr>
@@ -952,64 +972,64 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 </tbody>
               </table>
             </div>
-          </>
+          </div>
         ) : (
           /* VUE PAR GROUPE MUSCULAIRE (OPTION A) */
-          <div className="space-y-5 animate-fadeIn">
+          <div id="panel-muscles" role="tabpanel" aria-labelledby="tab-muscles" className="space-y-5 animate-fadeIn">
             <div>
               <div className="flex items-center gap-2">
-                <Dumbbell size={18} className="text-red-400" />
-                <h3 className="text-base font-bold text-white">
+                <Dumbbell size={18} className="text-red-400" aria-hidden="true" />
+                <h3 className="text-base font-bold text-white m-0">
                   Volume Hebdomadaire par Groupe Musculaire : {activeWeek.label}
                 </h3>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-300 mt-0.5">
                 Comptabilisation des séries effectives (Hard Sets) et équilibre fonctionnel selon les standards en sciences du sport.
               </p>
             </div>
 
             {/* 4 KPI MUSCULAIRES & ÉQUILIBRES */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-xs uppercase font-bold text-slate-300 block mb-1">
                   Séries Effectives
                 </span>
                 <div className="text-xl font-mono font-extrabold text-white">
-                  {weeklyMuscularSummary.totalSets} <span className="text-xs font-normal text-slate-400">séries</span>
+                  {weeklyMuscularSummary.totalSets} <span className="text-xs font-normal text-slate-300">séries</span>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <span className="text-xs text-slate-300 mt-0.5 block">
                   {weeklyMuscularSummary.totalSessionsWithExercises} séance{weeklyMuscularSummary.totalSessionsWithExercises > 1 ? 's' : ''} détaillée{weeklyMuscularSummary.totalSessionsWithExercises > 1 ? 's' : ''}
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-xs uppercase font-bold text-slate-300 block mb-1">
                   Répétitions Totales
                 </span>
                 <div className="text-xl font-mono font-extrabold text-white">
-                  {weeklyMuscularSummary.totalReps} <span className="text-xs font-normal text-slate-400">reps</span>
+                  {weeklyMuscularSummary.totalReps} <span className="text-xs font-normal text-slate-300">reps</span>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                <span className="text-xs text-slate-300 mt-0.5 block">
                   Volume-stimulus cumulé
                 </span>
               </div>
 
               {/* Ratio H:Q (Ischios / Quadriceps) */}
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">
-                    Ratio Ischios / Quad (H:Q)
+                  <span className="text-xs uppercase font-bold text-slate-300">
+                    Ratio Ischios/Quad (H:Q)
                   </span>
-                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/10 text-slate-300">
-                    Visée ≥ 0.60
+                  <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-200 font-semibold">
+                    ≥ 0.60
                   </span>
                 </div>
                 <div className="text-xl font-mono font-extrabold text-white">
                   {weeklyMuscularSummary.hqRatio !== null ? weeklyMuscularSummary.hqRatio : '—'}
                 </div>
-                <span className={`text-[10px] font-semibold mt-0.5 block ${
+                <span className={`text-xs font-semibold mt-0.5 block ${
                   weeklyMuscularSummary.hqRatio === null
-                    ? 'text-slate-500'
+                    ? 'text-slate-400'
                     : weeklyMuscularSummary.hqRatio >= 0.60
                     ? 'text-emerald-400'
                     : 'text-amber-400'
@@ -1023,21 +1043,21 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               </div>
 
               {/* Ratio Pull / Push */}
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">
-                    Ratio Tirage / Poussée
+                  <span className="text-xs uppercase font-bold text-slate-300">
+                    Ratio Tirage/Poussée
                   </span>
-                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/10 text-slate-300">
-                    Visée ≥ 1.00
+                  <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-white/10 text-slate-200 font-semibold">
+                    ≥ 1.00
                   </span>
                 </div>
                 <div className="text-xl font-mono font-extrabold text-white">
                   {weeklyMuscularSummary.pushPullRatio !== null ? weeklyMuscularSummary.pushPullRatio : '—'}
                 </div>
-                <span className={`text-[10px] font-semibold mt-0.5 block ${
+                <span className={`text-xs font-semibold mt-0.5 block ${
                   weeklyMuscularSummary.pushPullRatio === null
-                    ? 'text-slate-500'
+                    ? 'text-slate-400'
                     : weeklyMuscularSummary.pushPullRatio >= 1.0
                     ? 'text-emerald-400'
                     : 'text-amber-400'
@@ -1052,31 +1072,31 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             </div>
 
             {/* REPÈRES SCIENTIFIQUES DE VOLUME (ISRAETEL & SCHOENFELD) */}
-            <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="p-3.5 rounded-xl bg-black/40 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center justify-between w-full sm:w-auto">
-                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                  <Info size={13} className="text-blue-400" />
-                  Repères de séries :
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Info size={14} className="text-blue-400" aria-hidden="true" />
+                  Repères de séries (Israetel) :
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowVolumeGuide(prev => !prev)}
-                  className="sm:hidden text-[10px] text-blue-400 font-semibold px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20"
+                  className="sm:hidden min-h-[44px] text-xs text-blue-300 font-semibold px-3 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 cursor-pointer active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                 >
-                  {showVolumeGuide ? 'Masquer' : 'Afficher détails (MV/MAV)'}
+                  {showVolumeGuide ? 'Masquer repères' : 'Afficher repères (MV/MAV)'}
                 </button>
               </div>
               <div className={`${showVolumeGuide ? 'flex' : 'hidden'} sm:flex flex-wrap items-center gap-2 pt-1 sm:pt-0`}>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-slate-800 text-slate-300 border-slate-700">
+                <span className="px-2.5 py-1 rounded-md text-xs font-mono border bg-slate-800 text-slate-200 border-slate-700">
                   MV &lt; 6 : Maintien
                 </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-blue-500/20 text-blue-300 border-blue-500/30">
+                <span className="px-2.5 py-1 rounded-md text-xs font-mono border bg-blue-500/20 text-blue-200 border-blue-500/30">
                   MEV 6-10 : Stimulus Min
                 </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold">
+                <span className="px-2.5 py-1 rounded-md text-xs font-mono border bg-emerald-500/20 text-emerald-200 border-emerald-500/30 font-bold">
                   MAV 10-20 : Optimal
                 </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-amber-500/20 text-amber-300 border-amber-500/30">
+                <span className="px-2.5 py-1 rounded-md text-xs font-mono border bg-amber-500/20 text-amber-200 border-amber-500/30">
                   MRV &gt; 20 : Plafond Max
                 </span>
               </div>
@@ -1104,15 +1124,15 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
             {/* Indicateur de filtre/sélection active */}
             {selectedMuscleId && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs animate-fadeIn">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs animate-fadeIn">
                 <div className="flex items-center gap-2 text-white">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: MUSCLE_GROUPS[selectedMuscleId]?.color || '#38bdf8' }} />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: MUSCLE_GROUPS[selectedMuscleId]?.color || '#38bdf8' }} aria-hidden="true" />
                   <span>Groupe musculaire inspecté : <strong className="text-blue-300">{MUSCLE_GROUPS[selectedMuscleId]?.name || selectedMuscleId}</strong> ({weeklyMuscularSummary.muscles[selectedMuscleId]?.effectiveSets || 0} séries effectives)</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedMuscleId(null)}
-                  className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                  className="min-h-[44px] px-2 py-1 text-xs text-blue-300 hover:text-white underline cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                 >
                   Afficher tous les groupes
                 </button>
@@ -1128,20 +1148,13 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                   const isSelected = selectedMuscleId === m.muscleId;
 
                   return (
-                    <div
+                    <button
                       key={m.muscleId}
-                      role="button"
-                      tabIndex={0}
+                      type="button"
                       aria-pressed={isSelected}
                       aria-label={`${m.name}, ${m.categoryLabel}, ${m.effectiveSets} séries effectives sur cible ${targetMav}, statut ${m.statusLabel}`}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelectedMuscleId(prev => prev === m.muscleId ? null : m.muscleId);
-                        }
-                      }}
                       onClick={() => setSelectedMuscleId(prev => prev === m.muscleId ? null : m.muscleId)}
-                      className={`p-3.5 rounded-xl transition-all space-y-2.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                      className={`p-3.5 rounded-xl transition-all space-y-2.5 cursor-pointer text-left w-full min-h-[96px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                         isSelected 
                           ? 'bg-blue-950/40 border-2 border-blue-400 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10' 
                           : 'bg-white/[0.04] border border-white/10 hover:border-white/20 hover:bg-white/[0.07]'
@@ -1152,7 +1165,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} aria-hidden="true" />
                             <h4 className="text-sm font-bold text-white m-0">{m.name}</h4>
-                            <span className="text-[10px] font-medium text-slate-300 bg-white/10 px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-medium text-slate-200 bg-white/10 px-2 py-0.5 rounded">
                               {m.categoryLabel}
                             </span>
                           </div>
@@ -1167,8 +1180,8 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
                       {/* Barre de jauge du volume */}
                       <div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-300 mb-1">
-                          <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${m.statusBadgeColor}`}>
+                        <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
+                          <span className={`px-2 py-0.5 rounded-md border text-xs font-bold ${m.statusBadgeColor}`}>
                             {m.statusLabel}
                           </span>
                           <span className="font-mono text-slate-300">
@@ -1196,32 +1209,32 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
                       {/* Exercices ayant contribué à ce muscle */}
                       {m.exercises.length > 0 && (
-                        <div className="pt-1.5 border-t border-white/5 flex flex-wrap gap-1 items-center">
-                          <span className="text-[10px] text-slate-500 font-medium mr-1">Exercices :</span>
+                        <div className="pt-1.5 border-t border-white/5 flex flex-wrap gap-1.5 items-center">
+                          <span className="text-xs text-slate-400 font-medium mr-1">Exercices :</span>
                           {Array.from(new Set(m.exercises.map(e => `${e.name} (${e.sets}s)`))).map((exStr, idx) => (
                             <span
                               key={idx}
-                              className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-[10px] font-mono text-slate-300"
+                              className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-xs font-mono text-slate-200"
                             >
                               {exStr}
                             </span>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
             ) : (
               <div className="p-8 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto text-slate-400">
-                  <Dumbbell size={24} />
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mx-auto text-slate-300">
+                  <Dumbbell size={24} aria-hidden="true" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-white mb-1">
                     Aucun exercice de musculation renseigné sur cette semaine
                   </h4>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto m-0 leading-relaxed">
+                  <p className="text-xs text-slate-300 max-w-md mx-auto m-0 leading-relaxed">
                     Pour activer la ventilation automatique par muscle, ouvrez une séance de musculation 
                     (<em>Push, Pull, Leg, Abdos...</em>) dans la grille et complétez la section 
                     <strong>« Détail Musculation & Exercices »</strong>.
@@ -1231,7 +1244,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             )}
           </div>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
