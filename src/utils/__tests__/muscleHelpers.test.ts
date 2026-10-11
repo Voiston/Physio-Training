@@ -6,7 +6,9 @@ import {
   EXERCISE_CATALOG,
   MUSCLE_GROUPS,
   findLastExercisePerformance,
-  computeAdaptiveProgression
+  computeAdaptiveProgression,
+  getFrequentRecentExercises,
+  recordExerciseUsage
 } from '../muscleHelpers';
 
 describe('Muscle Helpers & Physiological Modeling', () => {
@@ -270,6 +272,101 @@ describe('Muscle Helpers & Physiological Modeling', () => {
       expect(suggestion.status).toBe('increase');
       expect(suggestion.suggestedWeightKg).toBeUndefined();
       expect(suggestion.suggestedReps).toBe(9); // +1 rep
+    });
+  });
+
+  describe('Enriched Exercise Catalog Integrity', () => {
+    it('contains comprehensive exercise coverage with unique IDs', () => {
+      expect(EXERCISE_CATALOG.length).toBeGreaterThanOrEqual(50);
+      const ids = EXERCISE_CATALOG.map(e => e.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(ids.length);
+    });
+
+    it('ensures all exercise definitions map to valid MUSCLE_GROUPS with realistic ratios', () => {
+      const validMuscleKeys = Object.keys(MUSCLE_GROUPS);
+      const validCategories = ['lower', 'upper_push', 'upper_pull', 'core'];
+
+      EXERCISE_CATALOG.forEach(ex => {
+        expect(ex.id).toBeTruthy();
+        expect(ex.name).toBeTruthy();
+        expect(validCategories).toContain(ex.category);
+        expect(ex.defaultReps).toBeGreaterThan(0);
+
+        const ratios = Object.entries(ex.muscleRatios);
+        expect(ratios.length).toBeGreaterThan(0);
+
+        ratios.forEach(([muscleId, ratio]) => {
+          expect(validMuscleKeys).toContain(muscleId);
+          expect(ratio).toBeGreaterThan(0);
+          expect(ratio).toBeLessThanOrEqual(1.0);
+        });
+      });
+    });
+  });
+
+  describe('Frequent & Recent Exercises Intelligence', () => {
+    it('returns empty array when events has no logged exercises and no local usage', () => {
+      const stats = getFrequentRecentExercises({});
+      expect(stats).toEqual([]);
+    });
+
+    it('extracts exercises from past events and sorts by frequency and recency', () => {
+      const events = {
+        push: {
+          '2026-10-09': {
+            exercises: [
+              { id: 'bench_press', name: 'Développé couché', sets: 4, reps: 8 },
+              { id: 'dips', name: 'Dips aux barres parallèles', sets: 3, reps: 10 }
+            ]
+          },
+          '2026-10-05': {
+            exercises: [
+              { id: 'bench_press', name: 'Développé couché', sets: 4, reps: 8 }
+            ]
+          },
+          '2026-10-01': {
+            exercises: [
+              { id: 'bench_press', name: 'Développé couché', sets: 5, reps: 5 }
+            ]
+          }
+        },
+        lower: {
+          '2026-10-08': {
+            exercises: [
+              { id: 'squat', name: 'Squat', sets: 5, reps: 5 }
+            ]
+          },
+          '2026-10-02': {
+            exercises: [
+              { id: 'squat', name: 'Squat', sets: 4, reps: 6 }
+            ]
+          }
+        }
+      };
+
+      const topExercises = getFrequentRecentExercises(events, EXERCISE_CATALOG, 5, '2026-10-10');
+      
+      expect(topExercises.length).toBeGreaterThanOrEqual(3);
+      // bench_press has 3 recent sessions -> should rank #1
+      expect(topExercises[0].exerciseId).toBe('bench_press');
+      expect(topExercises[0].count).toBe(3);
+      expect(topExercises[0].lastDate).toBe('2026-10-09');
+
+      // squat has 2 sessions -> should rank #2
+      expect(topExercises[1].exerciseId).toBe('squat');
+      expect(topExercises[1].count).toBe(2);
+      expect(topExercises[1].lastDate).toBe('2026-10-08');
+
+      // dips has 1 session -> should rank #3
+      expect(topExercises[2].exerciseId).toBe('dips');
+      expect(topExercises[2].count).toBe(1);
+    });
+
+    it('supports recordExerciseUsage to register instant usage in local storage', () => {
+      recordExerciseUsage('pull_ups');
+      const stats = getFrequentRecentExercises({}, EXERCISE_CATALOG, 5);
+      expect(stats.some(s => s.exerciseId === 'pull_ups')).toBe(true);
     });
   });
 });

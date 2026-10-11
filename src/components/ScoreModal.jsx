@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2, Clock, RotateCcw,
   Plus, Trash2, ChevronDown, ChevronUp, Layers, Sparkles, Scale, Info,
   BookmarkCheck, BookmarkPlus, Eye, Copy, Check, TrendingUp, ArrowUpRight,
-  ArrowDownRight, Minus
+  ArrowDownRight, Minus, Search
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { getQualityImpacts } from '../utils/physiology';
@@ -17,7 +17,9 @@ import {
   deleteCustomExercise,
   getAllExerciseCatalog,
   findLastExercisePerformance,
-  computeAdaptiveProgression
+  computeAdaptiveProgression,
+  getFrequentRecentExercises,
+  recordExerciseUsage
 } from '../utils/muscleHelpers';
 import { MuscleBodyMap } from './MuscleBodyMap';
 import { haptics } from '../utils/haptics';
@@ -148,6 +150,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const [customExercises, setCustomExercises] = useState(() => getSavedCustomExercises());
   const [selectedExId, setSelectedExId] = useState(defaultExForQuality);
+  const [exerciseSearchFilter, setExerciseSearchFilter] = useState('');
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
   const [newExName, setNewExName] = useState('');
   const [newExCategory, setNewExCategory] = useState('lower');
@@ -200,6 +203,15 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const allAvailableExercises = useMemo(() => {
     return getAllExerciseCatalog(customExercises);
   }, [customExercises]);
+
+  // Exercices les plus souvent utilisés récemment (en tête de liste et en gras)
+  const frequentExercises = useMemo(() => {
+    return getFrequentRecentExercises(events, allAvailableExercises, 8, selectedDate);
+  }, [events, allAvailableExercises, selectedDate]);
+
+  const frequentIds = useMemo(() => {
+    return new Set(frequentExercises.map(f => f.exerciseId));
+  }, [frequentExercises]);
 
   const handleSaveNewCustomExercise = () => {
     if (!newExName.trim()) return;
@@ -261,6 +273,8 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         ...(w !== undefined ? { weightKg: w } : {})
       }
     ]);
+
+    recordExerciseUsage(exId);
 
     setCustomExName('');
     setAppliedFeedback(false);
@@ -1102,6 +1116,26 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         </button>
                       </div>
                     </div>
+                    <div className="relative mb-1.5">
+                      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={exerciseSearchFilter}
+                        onChange={(e) => setExerciseSearchFilter(e.target.value)}
+                        placeholder="Recherche rapide (ex: squat, fentes, dips...)"
+                        className="w-full bg-slate-900/90 border border-white/10 rounded-lg pl-7 pr-7 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                      />
+                      {exerciseSearchFilter && (
+                        <button
+                          type="button"
+                          onClick={() => setExerciseSearchFilter('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-[11px] px-1"
+                          title="Effacer le filtre"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                     <select
                       value={selectedExId}
                       onChange={(e) => {
@@ -1114,39 +1148,135 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       }}
                       className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400 cursor-pointer"
                     >
-                      {customExercises.length > 0 && (
-                        <optgroup label="⭐ Mes Exercices Personnalisés">
-                          {customExercises.map(e => (
-                            <option key={e.id} value={e.id}>⭐ {e.name}</option>
-                          ))}
+                      {/* --- EN DÉBUT DE LISTE : EXERCICES LES PLUS SOUVENT UTILISÉS RÉCEMMENT --- */}
+                      {frequentExercises.length > 0 && (
+                        <optgroup label="🔥 Fréquents & Récents (Vos favoris)">
+                          {frequentExercises
+                            .filter(f => !exerciseSearchFilter.trim() || f.name.toLowerCase().includes(exerciseSearchFilter.toLowerCase().trim()))
+                            .map(f => (
+                              <option 
+                                key={`frequent_${f.exerciseId}`} 
+                                value={f.exerciseId}
+                                style={{ fontWeight: 'bold' }}
+                                className="font-extrabold text-amber-300 bg-slate-900"
+                              >
+                                🔥 {f.name} ({f.count}× récents)
+                              </option>
+                            ))}
                         </optgroup>
                       )}
+
+                      {customExercises.length > 0 && (
+                        <optgroup label="⭐ Mes Exercices Personnalisés">
+                          {customExercises
+                            .filter(e => !exerciseSearchFilter.trim() || e.name.toLowerCase().includes(exerciseSearchFilter.toLowerCase().trim()))
+                            .sort((a, b) => (frequentIds.has(b.id) ? 1 : 0) - (frequentIds.has(a.id) ? 1 : 0))
+                            .map(e => {
+                              const isFreq = frequentIds.has(e.id);
+                              return (
+                                <option 
+                                  key={e.id} 
+                                  value={e.id}
+                                  style={{ fontWeight: isFreq ? 'bold' : 'normal' }}
+                                  className={isFreq ? "font-bold text-amber-200" : "text-slate-200"}
+                                >
+                                  {isFreq ? `🔥 ${e.name} (Fréquent)` : `⭐ ${e.name}`}
+                                </option>
+                              );
+                            })}
+                        </optgroup>
+                      )}
+
                       <optgroup label="Bas du corps (Lower)">
-                        {EXERCISE_CATALOG.filter(e => e.category === 'lower').map(e => (
-                          <option key={e.id} value={e.id}>{e.name}</option>
-                        ))}
+                        {EXERCISE_CATALOG
+                          .filter(e => e.category === 'lower')
+                          .filter(e => !exerciseSearchFilter.trim() || e.name.toLowerCase().includes(exerciseSearchFilter.toLowerCase().trim()))
+                          .sort((a, b) => (frequentIds.has(b.id) ? 1 : 0) - (frequentIds.has(a.id) ? 1 : 0))
+                          .map(e => {
+                            const isFreq = frequentIds.has(e.id);
+                            return (
+                              <option 
+                                key={e.id} 
+                                value={e.id}
+                                style={{ fontWeight: isFreq ? 'bold' : 'normal' }}
+                                className={isFreq ? "font-bold text-amber-200" : "text-slate-200"}
+                              >
+                                {isFreq ? `🔥 ${e.name}` : e.name}
+                              </option>
+                            );
+                          })}
                       </optgroup>
+
                       <optgroup label="Haut du corps - Poussée (Push)">
-                        {EXERCISE_CATALOG.filter(e => e.category === 'upper_push').map(e => (
-                          <option key={e.id} value={e.id}>{e.name}</option>
-                        ))}
+                        {EXERCISE_CATALOG
+                          .filter(e => e.category === 'upper_push')
+                          .filter(e => !exerciseSearchFilter.trim() || e.name.toLowerCase().includes(exerciseSearchFilter.toLowerCase().trim()))
+                          .sort((a, b) => (frequentIds.has(b.id) ? 1 : 0) - (frequentIds.has(a.id) ? 1 : 0))
+                          .map(e => {
+                            const isFreq = frequentIds.has(e.id);
+                            return (
+                              <option 
+                                key={e.id} 
+                                value={e.id}
+                                style={{ fontWeight: isFreq ? 'bold' : 'normal' }}
+                                className={isFreq ? "font-bold text-amber-200" : "text-slate-200"}
+                              >
+                                {isFreq ? `🔥 ${e.name}` : e.name}
+                              </option>
+                            );
+                          })}
                       </optgroup>
+
                       <optgroup label="Haut du corps - Tirage (Pull)">
-                        {EXERCISE_CATALOG.filter(e => e.category === 'upper_pull').map(e => (
-                          <option key={e.id} value={e.id}>{e.name}</option>
-                        ))}
+                        {EXERCISE_CATALOG
+                          .filter(e => e.category === 'upper_pull')
+                          .filter(e => !exerciseSearchFilter.trim() || e.name.toLowerCase().includes(exerciseSearchFilter.toLowerCase().trim()))
+                          .sort((a, b) => (frequentIds.has(b.id) ? 1 : 0) - (frequentIds.has(a.id) ? 1 : 0))
+                          .map(e => {
+                            const isFreq = frequentIds.has(e.id);
+                            return (
+                              <option 
+                                key={e.id} 
+                                value={e.id}
+                                style={{ fontWeight: isFreq ? 'bold' : 'normal' }}
+                                className={isFreq ? "font-bold text-amber-200" : "text-slate-200"}
+                              >
+                                {isFreq ? `🔥 ${e.name}` : e.name}
+                              </option>
+                            );
+                          })}
                       </optgroup>
+
                       <optgroup label="Tronc & Core">
-                        {EXERCISE_CATALOG.filter(e => e.category === 'core').map(e => (
-                          <option key={e.id} value={e.id}>{e.name}</option>
-                        ))}
+                        {EXERCISE_CATALOG
+                          .filter(e => e.category === 'core')
+                          .filter(e => !exerciseSearchFilter.trim() || e.name.toLowerCase().includes(exerciseSearchFilter.toLowerCase().trim()))
+                          .sort((a, b) => (frequentIds.has(b.id) ? 1 : 0) - (frequentIds.has(a.id) ? 1 : 0))
+                          .map(e => {
+                            const isFreq = frequentIds.has(e.id);
+                            return (
+                              <option 
+                                key={e.id} 
+                                value={e.id}
+                                style={{ fontWeight: isFreq ? 'bold' : 'normal' }}
+                                className={isFreq ? "font-bold text-amber-200" : "text-slate-200"}
+                              >
+                                {isFreq ? `🔥 ${e.name}` : e.name}
+                              </option>
+                            );
+                          })}
                       </optgroup>
                       <option value="__create_new__">➕ Créer un nouvel exercice personnalisé...</option>
                     </select>
                   </div>
 
                   {/* Cibles musculaires de l'exercice sélectionné */}
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 self-end pb-2">
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 self-end pb-2 flex-wrap">
+                    {frequentIds.has(selectedExId) && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-0.5">
+                        🔥 Fréquent ({frequentExercises.find(f => f.exerciseId === selectedExId)?.count || 1}×)
+                      </span>
+                    )}
                     <Info size={13} className="text-blue-400 shrink-0" />
                     <span className="truncate">
                       Cibles : {Object.entries(allAvailableExercises.find(c => c.id === selectedExId)?.muscleRatios || {})

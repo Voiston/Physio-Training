@@ -46,14 +46,40 @@ export interface ExerciseDefinition {
 }
 
 export const EXERCISE_CATALOG: ExerciseDefinition[] = [
+  // =========================================================================
   // --- BAS DU CORPS (LOWER) ---
+  // =========================================================================
   {
     id: 'squat',
-    name: 'Squat (Barre / Goblet / Hack)',
+    name: 'Squat arrière / Back Squat (Barre nuque)',
     category: 'lower',
     isCompound: true,
     defaultReps: 8,
     muscleRatios: { quadriceps: 1.0, glutes: 0.7, lombaires: 0.4, abdos: 0.3 }
+  },
+  {
+    id: 'front_squat',
+    name: 'Front Squat (Squat barre avant)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 6,
+    muscleRatios: { quadriceps: 1.0, glutes: 0.6, abdos: 0.5, lombaires: 0.35, trapezes: 0.3 }
+  },
+  {
+    id: 'hack_squat',
+    name: 'Hack Squat (Machine / Barre)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { quadriceps: 1.0, glutes: 0.6 }
+  },
+  {
+    id: 'goblet_squat',
+    name: 'Goblet Squat (Haltère / Kettlebell)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { quadriceps: 0.9, glutes: 0.65, abdos: 0.4 }
   },
   {
     id: 'presse',
@@ -65,15 +91,47 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   },
   {
     id: 'fentes',
-    name: 'Fentes / Split Squat Bulgare',
+    name: 'Fentes / Split Squat (Haltères / Barre)',
     category: 'lower',
     isCompound: true,
     defaultReps: 10,
     muscleRatios: { quadriceps: 0.85, glutes: 0.9, ischios: 0.3 }
   },
   {
+    id: 'bulgarian_split_squat',
+    name: 'Split Squat Bulgare (Pied surélevé)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { glutes: 1.0, quadriceps: 0.85, ischios: 0.35 }
+  },
+  {
+    id: 'fentes_marchees',
+    name: 'Fentes marchées / Fentes arrière (Walking Lunges)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { glutes: 0.95, quadriceps: 0.8, ischios: 0.4 }
+  },
+  {
+    id: 'step_up',
+    name: 'Step-Up sur banc / caisse (Haltères)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { glutes: 1.0, quadriceps: 0.75, mollets: 0.3 }
+  },
+  {
+    id: 'sissy_squat',
+    name: 'Sissy Squat (Isolation quadriceps)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { quadriceps: 1.0 }
+  },
+  {
     id: 'leg_extension',
-    name: 'Leg Extension (Isolation)',
+    name: 'Leg Extension (Machine quadriceps)',
     category: 'lower',
     isCompound: false,
     defaultReps: 12,
@@ -88,6 +146,22 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     muscleRatios: { ischios: 0.8, glutes: 0.9, lombaires: 0.8, dorsaux: 0.4, trapezes: 0.6 }
   },
   {
+    id: 'deadlift_sumo',
+    name: 'Soulevé de terre Sumo (Sumo Deadlift)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 5,
+    muscleRatios: { glutes: 1.0, quadriceps: 0.75, ischios: 0.65, lombaires: 0.55, trapezes: 0.5 }
+  },
+  {
+    id: 'trap_bar_deadlift',
+    name: 'Trap Bar Deadlift (Barre hexagonale)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 6,
+    muscleRatios: { quadriceps: 0.85, glutes: 0.85, ischios: 0.65, lombaires: 0.5, trapezes: 0.6 }
+  },
+  {
     id: 'rdl',
     name: 'Soulevé de terre roumain (RDL / JT)',
     category: 'lower',
@@ -96,8 +170,40 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     muscleRatios: { ischios: 1.0, glutes: 0.8, lombaires: 0.5 }
   },
   {
+    id: 'stiff_leg_deadlift',
+    name: 'Soulevé de terre jambes tendues (SLDL)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 8,
+    muscleRatios: { ischios: 1.0, glutes: 0.85, lombaires: 0.6 }
+  },
+  {
+    id: 'good_morning',
+    name: 'Good Morning (Barre nuque / Charnière de hanche)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { ischios: 0.9, glutes: 0.8, lombaires: 0.85 }
+  },
+  {
+    id: 'nordic_hamstring',
+    name: 'Nordic Hamstring Curl (Poids du corps / Ischios)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 6,
+    muscleRatios: { ischios: 1.0, glutes: 0.4, mollets: 0.3 }
+  },
+  {
     id: 'leg_curl',
-    name: 'Leg Curl (Assis / Couché)',
+    name: 'Leg Curl couché (Lying Leg Curl)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { ischios: 1.0 }
+  },
+  {
+    id: 'leg_curl_assis',
+    name: 'Leg Curl assis (Seated Leg Curl)',
     category: 'lower',
     isCompound: false,
     defaultReps: 12,
@@ -105,15 +211,63 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   },
   {
     id: 'hip_thrust',
-    name: 'Hip Thrust (Fessiers)',
+    name: 'Hip Thrust (Barre / Machine fessiers)',
     category: 'lower',
     isCompound: true,
     defaultReps: 10,
     muscleRatios: { glutes: 1.0, ischios: 0.4 }
   },
   {
+    id: 'glute_bridge',
+    name: 'Glute Bridge / Pont fessier (Sol / Banc)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { glutes: 1.0, ischios: 0.4 }
+  },
+  {
+    id: 'kickback_poulie',
+    name: 'Kickback fessier à la poulie / Machine',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { glutes: 1.0 }
+  },
+  {
+    id: 'abduction_hanche',
+    name: 'Abductions hanche (Machine / Poulie / Élastique)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { glutes: 1.0 }
+  },
+  {
+    id: 'adduction_hanche',
+    name: 'Adductions hanche (Machine / Câble)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { quadriceps: 0.6, glutes: 0.4 }
+  },
+  {
     id: 'mollets',
-    name: 'Mollets (Debout / Assis)',
+    name: 'Mollets debout (Machine / Barre / Haltères)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { mollets: 1.0 }
+  },
+  {
+    id: 'mollets_assis',
+    name: 'Mollets assis (Soléaire / Machine)',
+    category: 'lower',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { mollets: 1.0 }
+  },
+  {
+    id: 'mollets_presse',
+    name: 'Presse à mollets (Jambes tendues)',
     category: 'lower',
     isCompound: false,
     defaultReps: 15,
@@ -127,23 +281,73 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     defaultReps: 15,
     muscleRatios: { mollets: 1.0 }
   },
+  {
+    id: 'jump_squat',
+    name: 'Jump Squat / Plyo Squat (Puissance bas du corps)',
+    category: 'lower',
+    isCompound: true,
+    defaultReps: 6,
+    muscleRatios: { quadriceps: 0.9, glutes: 0.8, mollets: 0.6 }
+  },
 
+  // =========================================================================
   // --- HAUT DU CORPS - POUSSÉE (UPPER PUSH) ---
+  // =========================================================================
   {
     id: 'bench_press',
-    name: 'Développé couché (Bench Press)',
+    name: 'Développé couché barre (Bench Press)',
     category: 'upper_push',
     isCompound: true,
     defaultReps: 8,
     muscleRatios: { pectoraux: 1.0, triceps: 0.65, deltoides_ant: 0.5 }
   },
   {
+    id: 'db_bench_press',
+    name: 'Développé couché avec haltères (DB Bench)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { pectoraux: 1.0, triceps: 0.6, deltoides_ant: 0.5 }
+  },
+  {
     id: 'incline_bench',
-    name: 'Développé incliné (Barre / Haltères)',
+    name: 'Développé incliné barre (Incline Bench)',
     category: 'upper_push',
     isCompound: true,
     defaultReps: 10,
     muscleRatios: { pectoraux: 0.85, deltoides_ant: 0.8, triceps: 0.5 }
+  },
+  {
+    id: 'db_incline_press',
+    name: 'Développé incliné haltères (Incline DB Press)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { pectoraux: 0.9, deltoides_ant: 0.85, triceps: 0.5 }
+  },
+  {
+    id: 'decline_bench',
+    name: 'Développé décliné (Barre / Haltères)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { pectoraux: 1.0, triceps: 0.6, deltoides_ant: 0.3 }
+  },
+  {
+    id: 'pompes',
+    name: 'Pompes classiques au sol (Push-Ups)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 15,
+    muscleRatios: { pectoraux: 0.85, triceps: 0.65, deltoides_ant: 0.5, abdos: 0.35 }
+  },
+  {
+    id: 'pompes_declinees',
+    name: 'Pompes pieds surélevés / Inclinées',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { pectoraux: 0.85, deltoides_ant: 0.75, triceps: 0.6, abdos: 0.4 }
   },
   {
     id: 'dips',
@@ -155,7 +359,23 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   },
   {
     id: 'ecartes',
-    name: 'Écartés haltères / Câble / Pec Deck',
+    name: 'Écartés haltères sur banc (DB Flyes)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { pectoraux: 1.0 }
+  },
+  {
+    id: 'cable_crossover',
+    name: 'Écartés à la poulie vis-à-vis (Cable Fly / Crossover)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { pectoraux: 1.0, deltoides_ant: 0.3 }
+  },
+  {
+    id: 'pec_deck',
+    name: 'Pec Deck / Butterfly (Machine guidée)',
     category: 'upper_push',
     isCompound: false,
     defaultReps: 12,
@@ -163,23 +383,95 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   },
   {
     id: 'ohp',
-    name: 'Développé militaire (Overhead Press)',
+    name: 'Développé militaire barre (Overhead Press)',
     category: 'upper_push',
     isCompound: true,
     defaultReps: 6,
     muscleRatios: { deltoides_ant: 1.0, triceps: 0.6, trapezes: 0.4, abdos: 0.3 }
   },
   {
+    id: 'db_shoulder_press',
+    name: 'Développé épaules haltères assis (Seated DB Press)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { deltoides_ant: 1.0, triceps: 0.6, trapezes: 0.4 }
+  },
+  {
+    id: 'arnold_press',
+    name: 'Arnold Press (Haltères avec rotation)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { deltoides_ant: 1.0, triceps: 0.55, trapezes: 0.45, pectoraux: 0.2 }
+  },
+  {
     id: 'lateral_raises',
-    name: 'Élévations latérales (Haltères / Poulie)',
+    name: 'Élévations latérales haltères (DB Lateral Raise)',
     category: 'upper_push',
     isCompound: false,
     defaultReps: 15,
     muscleRatios: { deltoides_ant: 1.0, trapezes: 0.3 }
   },
   {
+    id: 'lateral_cable_raise',
+    name: 'Élévations latérales à la poulie (Tension continue)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { deltoides_ant: 1.0, trapezes: 0.25 }
+  },
+  {
+    id: 'front_raise',
+    name: 'Élévations frontales (Barre / Haltères / Câble)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { deltoides_ant: 1.0, pectoraux: 0.25 }
+  },
+  {
+    id: 'landmine_press',
+    name: 'Landmine Press (Debout / À genoux unilatéral)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { deltoides_ant: 0.85, pectoraux: 0.6, triceps: 0.55, abdos: 0.4 }
+  },
+  {
+    id: 'handstand_pushup',
+    name: 'Pike Push-Ups / Pompes en poirier (HSPU)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 6,
+    muscleRatios: { deltoides_ant: 1.0, triceps: 0.7, trapezes: 0.5, abdos: 0.4 }
+  },
+  {
+    id: 'close_grip_bench',
+    name: 'Développé couché prise serrée (Close-Grip Bench)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 8,
+    muscleRatios: { triceps: 1.0, pectoraux: 0.7, deltoides_ant: 0.45 }
+  },
+  {
+    id: 'skull_crushers',
+    name: 'Barre au front / Skullcrushers (EZ Bar)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 10,
+    muscleRatios: { triceps: 1.0 }
+  },
+  {
     id: 'triceps_extension',
-    name: 'Extensions triceps (Poulie / Barre front)',
+    name: 'Extensions triceps poulie haute (Barre droite / V)',
+    category: 'upper_push',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { triceps: 1.0 }
+  },
+  {
+    id: 'triceps_rope_pushdown',
+    name: 'Pushdown triceps à la corde (Poulie haute)',
     category: 'upper_push',
     isCompound: false,
     defaultReps: 12,
@@ -195,21 +487,39 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
   },
   {
     id: 'triceps_kickback',
-    name: 'Kickback triceps (Haltère)',
+    name: 'Kickback triceps (Haltère / Câble)',
     category: 'upper_push',
     isCompound: false,
     defaultReps: 12,
     muscleRatios: { triceps: 1.0 }
   },
+  {
+    id: 'triceps_bench_dips',
+    name: 'Dips entre deux bancs (Bench Dips)',
+    category: 'upper_push',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { triceps: 0.9, pectoraux: 0.5, deltoides_ant: 0.4 }
+  },
 
+  // =========================================================================
   // --- HAUT DU CORPS - TIRAGE (UPPER PULL) ---
+  // =========================================================================
   {
     id: 'pull_ups',
-    name: 'Tractions (Pronation / Supination / Anneaux)',
+    name: 'Tractions pronation (Pull-Ups)',
     category: 'upper_pull',
     isCompound: true,
     defaultReps: 8,
     muscleRatios: { dorsaux: 1.0, biceps: 0.7, trapezes: 0.5 }
+  },
+  {
+    id: 'chin_ups',
+    name: 'Tractions supination (Chin-Ups)',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 8,
+    muscleRatios: { dorsaux: 0.9, biceps: 0.85, trapezes: 0.4 }
   },
   {
     id: 'lat_pulldown',
@@ -220,12 +530,44 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     muscleRatios: { dorsaux: 1.0, biceps: 0.6, trapezes: 0.4 }
   },
   {
+    id: 'close_lat_pulldown',
+    name: 'Tirage vertical prise neutre serrée / Poignée V',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { dorsaux: 1.0, biceps: 0.65, trapezes: 0.4 }
+  },
+  {
+    id: 'straight_arm_pulldown',
+    name: 'Pull-over à la poulie haute (Bras tendus)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { dorsaux: 1.0, trapezes: 0.3, abdos: 0.35 }
+  },
+  {
     id: 'barbell_row',
     name: 'Rowing barre / Buste penché (Bent Row)',
     category: 'upper_pull',
     isCompound: true,
     defaultReps: 8,
     muscleRatios: { dorsaux: 0.85, trapezes: 0.85, biceps: 0.5, lombaires: 0.4 }
+  },
+  {
+    id: 'dumbbell_row',
+    name: 'Rowing bûcheron haltère unilatéral (One-Arm DB Row)',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { dorsaux: 1.0, trapezes: 0.7, biceps: 0.55 }
+  },
+  {
+    id: 'tbar_row',
+    name: 'Rowing barre en T (T-Bar Row)',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 8,
+    muscleRatios: { trapezes: 0.95, dorsaux: 0.85, biceps: 0.55, lombaires: 0.45 }
   },
   {
     id: 'cable_row',
@@ -236,6 +578,30 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     muscleRatios: { dorsaux: 0.8, trapezes: 0.9, biceps: 0.5 }
   },
   {
+    id: 'chest_supported_row',
+    name: 'Rowing poitrine sur banc incliné (Seal Row / DB Row)',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { trapezes: 1.0, dorsaux: 0.75, biceps: 0.5 }
+  },
+  {
+    id: 'inverted_row',
+    name: 'Rowing inversé / Tractions australiennes (Poids du corps)',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { trapezes: 0.9, dorsaux: 0.8, biceps: 0.5, abdos: 0.3 }
+  },
+  {
+    id: 'pullover_db',
+    name: 'Pull-over aux haltères sur banc transversal',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { dorsaux: 0.8, pectoraux: 0.6, triceps: 0.4 }
+  },
+  {
     id: 'face_pull',
     name: 'Face Pull / Oiseau banc incliné',
     category: 'upper_pull',
@@ -244,8 +610,40 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     muscleRatios: { trapezes: 0.85, deltoides_ant: 0.6 }
   },
   {
+    id: 'rear_delt_fly',
+    name: 'Oiseau haltères / Machine deltoïdes postérieurs',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { trapezes: 0.95, deltoides_ant: 0.55 }
+  },
+  {
+    id: 'shrugs',
+    name: 'Shrugs / Haussements d’épaules (Barre / Haltères)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { trapezes: 1.0 }
+  },
+  {
+    id: 'upright_row',
+    name: 'Tirage menton (Barre EZ / Câble)',
+    category: 'upper_pull',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { deltoides_ant: 0.85, trapezes: 0.9, biceps: 0.4 }
+  },
+  {
     id: 'biceps_curl',
     name: 'Curl Biceps (Barre / Haltères / Poulie)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 10,
+    muscleRatios: { biceps: 1.0 }
+  },
+  {
+    id: 'ez_bar_curl',
+    name: 'Curl barre EZ debout (EZ-Bar Biceps Curl)',
     category: 'upper_pull',
     isCompound: false,
     defaultReps: 10,
@@ -275,8 +673,42 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     defaultReps: 10,
     muscleRatios: { biceps: 1.0 }
   },
+  {
+    id: 'preacher_curl',
+    name: 'Curl pupitre Larry Scott (Barre EZ / Machine)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 10,
+    muscleRatios: { biceps: 1.0 }
+  },
+  {
+    id: 'spider_curl',
+    name: 'Spider Curl (Buste appuyé banc incliné)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { biceps: 1.0 }
+  },
+  {
+    id: 'reverse_curl',
+    name: 'Curl inversé en pronation (Avant-bras / Brachioradial)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { biceps: 0.85, trapezes: 0.2 }
+  },
+  {
+    id: 'wrist_curls',
+    name: 'Flexions / Extensions de poignets (Avant-bras)',
+    category: 'upper_pull',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { biceps: 0.7 }
+  },
 
+  // =========================================================================
   // --- TRONC & CORE ---
+  // =========================================================================
   {
     id: 'abdos_crunch',
     name: 'Crunch / Enroulement de bassin',
@@ -284,6 +716,38 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     isCompound: false,
     defaultReps: 15,
     muscleRatios: { abdos: 1.0 }
+  },
+  {
+    id: 'cable_crunch',
+    name: 'Crunch à la poulie haute à genoux (Cable Crunch)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { abdos: 1.0 }
+  },
+  {
+    id: 'hanging_leg_raise',
+    name: 'Relevés de jambes suspendu à la barre',
+    category: 'core',
+    isCompound: true,
+    defaultReps: 12,
+    muscleRatios: { abdos: 1.0, quadriceps: 0.3 }
+  },
+  {
+    id: 'toes_to_bar',
+    name: 'Toes-to-Bar (Pieds à la barre / Gymnastique)',
+    category: 'core',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { abdos: 1.0, dorsaux: 0.4, quadriceps: 0.3 }
+  },
+  {
+    id: 'ab_wheel',
+    name: 'Roulette à abdos (Ab Wheel Rollout)',
+    category: 'core',
+    isCompound: true,
+    defaultReps: 10,
+    muscleRatios: { abdos: 1.0, dorsaux: 0.35, lombaires: 0.35 }
   },
   {
     id: 'plank',
@@ -294,12 +758,76 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     muscleRatios: { abdos: 1.0, lombaires: 0.4 }
   },
   {
+    id: 'side_plank',
+    name: 'Gainage planche latérale (Side Plank)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 1,
+    muscleRatios: { abdos: 1.0, lombaires: 0.5 }
+  },
+  {
+    id: 'pallof_press',
+    name: 'Pallof Press anti-rotation (Poulie / Élastique)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { abdos: 1.0, lombaires: 0.4 }
+  },
+  {
+    id: 'russian_twist',
+    name: 'Russian Twists (Rotations de buste avec charge)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 20,
+    muscleRatios: { abdos: 1.0, lombaires: 0.3 }
+  },
+  {
+    id: 'hollow_body',
+    name: 'Hollow Body Hold / Hollow Rock',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 1,
+    muscleRatios: { abdos: 1.0, quadriceps: 0.3 }
+  },
+  {
+    id: 'dead_bug',
+    name: 'Dead Bug (Gainage dynamique et dissociation)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { abdos: 1.0 }
+  },
+  {
+    id: 'dragon_flag',
+    name: 'Dragon Flag (Gainage avancé sur banc)',
+    category: 'core',
+    isCompound: true,
+    defaultReps: 6,
+    muscleRatios: { abdos: 1.0, dorsaux: 0.4, lombaires: 0.4 }
+  },
+  {
     id: 'hyperextensions',
     name: 'Banc à lombaires / Hyperextensions',
     category: 'core',
     isCompound: true,
     defaultReps: 12,
     muscleRatios: { lombaires: 1.0, glutes: 0.7, ischios: 0.5 }
+  },
+  {
+    id: 'bird_dog',
+    name: 'Bird Dog (Stabilité croisée rachis / lombaires)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 12,
+    muscleRatios: { lombaires: 0.9, glutes: 0.65, abdos: 0.5 }
+  },
+  {
+    id: 'superman',
+    name: 'Superman au sol (Extension dorsale & chaîne postérieure)',
+    category: 'core',
+    isCompound: false,
+    defaultReps: 15,
+    muscleRatios: { lombaires: 1.0, glutes: 0.6, trapezes: 0.4 }
   }
 ];
 
@@ -1069,3 +1597,212 @@ export function computeAdaptiveProgression(
     reason
   };
 }
+
+export interface FrequentExerciseStats {
+  exerciseId: string;
+  name: string;
+  count: number;
+  recentCount: number;
+  lastDate: string;
+  category?: 'lower' | 'upper_push' | 'upper_pull' | 'core' | string;
+  isCompound?: boolean;
+}
+
+export const LOCAL_STORAGE_EXERCISE_USAGE_KEY = 'physio_recent_exercise_usage';
+
+let memoryUsageCache: Record<string, { count: number; lastUsed: string }> = {};
+
+/**
+ * Enregistre une utilisation d'exercice dans le cache rapide pour actualisation instantanée.
+ */
+export function recordExerciseUsage(exerciseId: string): void {
+  if (!exerciseId) return;
+  const today = new Date().toISOString().split('T')[0];
+  const prevMem = memoryUsageCache[exerciseId] || { count: 0, lastUsed: today };
+  memoryUsageCache[exerciseId] = {
+    count: (prevMem.count || 0) + 1,
+    lastUsed: today
+  };
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(LOCAL_STORAGE_EXERCISE_USAGE_KEY);
+      const data: Record<string, { count: number; lastUsed: string }> = raw ? JSON.parse(raw) : {};
+      const prev = data[exerciseId] || { count: 0, lastUsed: today };
+      data[exerciseId] = {
+        count: (prev.count || 0) + 1,
+        lastUsed: today
+      };
+      localStorage.setItem(LOCAL_STORAGE_EXERCISE_USAGE_KEY, JSON.stringify(data));
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+/**
+ * Récupère le dictionnaire des usages d'exercices depuis le cache local rapide.
+ */
+export function getLocalExerciseUsage(): Record<string, { count: number; lastUsed: string }> {
+  let result: Record<string, { count: number; lastUsed: string }> = { ...memoryUsageCache };
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(LOCAL_STORAGE_EXERCISE_USAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        result = { ...result, ...parsed };
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return result;
+}
+
+/**
+ * Calcule la liste ordonnée des exercices les plus souvent utilisés récemment
+ * à partir de l'historique complet des séances (events) et du cache local.
+ * Trié par :
+ * 1. Fréquence d'utilisation récente (derniers 60 jours)
+ * 2. Date de dernière utilisation la plus récente
+ * 3. Nombre total d'utilisations historiques
+ */
+export function getFrequentRecentExercises(
+  events: Record<string, Record<string, any>> | undefined | null,
+  allAvailableExercises: ExerciseDefinition[] = EXERCISE_CATALOG,
+  maxResults: number = 8,
+  referenceDateStr?: string
+): FrequentExerciseStats[] {
+  const map: Map<string, {
+    canonicalId: string;
+    name: string;
+    count: number;
+    recentCount: number;
+    lastDate: string;
+    category?: string;
+    isCompound?: boolean;
+  }> = new Map();
+
+  // Indexation rapide des exercices du catalogue & personnalisés
+  const idToDef = new Map<string, ExerciseDefinition>();
+  const nameToDef = new Map<string, ExerciseDefinition>();
+
+  for (const def of allAvailableExercises) {
+    idToDef.set(def.id, def);
+    nameToDef.set(def.name.toLowerCase().trim(), def);
+  }
+
+  // Calcul du seuil de date récente (60 jours en arrière par rapport à la date de référence ou aujourd'hui)
+  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  const recentThreshold = new Date(refDate.getTime() - (60 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+  // 1. Scanner l'historique de toutes les séances réelles dans events
+  if (events && typeof events === 'object') {
+    for (const [, dateMap] of Object.entries(events)) {
+      if (!dateMap || typeof dateMap !== 'object') continue;
+
+      for (const [dateStr, session] of Object.entries(dateMap)) {
+        if (!session || typeof session !== 'object' || !Array.isArray(session.exercises)) continue;
+
+        for (const ex of session.exercises) {
+          if (!ex) continue;
+          const rawId = ex.exerciseCatalogId || ex.id;
+          const rawName = (ex.name || '').trim();
+
+          // Retrouver la définition canonique
+          let matchedDef: ExerciseDefinition | undefined;
+          if (rawId && idToDef.has(rawId)) {
+            matchedDef = idToDef.get(rawId);
+          } else if (rawName && nameToDef.has(rawName.toLowerCase())) {
+            matchedDef = nameToDef.get(rawName.toLowerCase());
+          }
+
+          const canonicalId = matchedDef ? matchedDef.id : (rawId || rawName);
+          const canonicalName = matchedDef ? matchedDef.name : (rawName || rawId);
+          if (!canonicalId) continue;
+
+          const isRecent = !dateStr || dateStr >= recentThreshold;
+
+          const existing = map.get(canonicalId);
+          if (existing) {
+            existing.count += 1;
+            if (isRecent) existing.recentCount += 1;
+            if (!existing.lastDate || (dateStr && dateStr > existing.lastDate)) {
+              existing.lastDate = dateStr;
+            }
+          } else {
+            map.set(canonicalId, {
+              canonicalId,
+              name: canonicalName,
+              count: 1,
+              recentCount: isRecent ? 1 : 0,
+              lastDate: dateStr || '',
+              category: matchedDef?.category,
+              isCompound: matchedDef?.isCompound
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Fusionner avec le cache local (exercices récemment utilisés dans les sessions de travail de l'app)
+  const localUsage = getLocalExerciseUsage();
+  for (const [exId, stats] of Object.entries(localUsage)) {
+    if (!stats || !stats.count) continue;
+    let matchedDef = idToDef.get(exId);
+    if (!matchedDef) {
+      matchedDef = nameToDef.get(exId.toLowerCase());
+    }
+    const canonicalId = matchedDef ? matchedDef.id : exId;
+    const canonicalName = matchedDef ? matchedDef.name : exId;
+
+    const existing = map.get(canonicalId);
+    if (existing) {
+      existing.count += stats.count;
+      existing.recentCount += stats.count;
+      if (stats.lastUsed && (!existing.lastDate || stats.lastUsed > existing.lastDate)) {
+        existing.lastDate = stats.lastUsed;
+      }
+    } else {
+      map.set(canonicalId, {
+        canonicalId,
+        name: canonicalName,
+        count: stats.count,
+        recentCount: stats.count,
+        lastDate: stats.lastUsed || '',
+        category: matchedDef?.category,
+        isCompound: matchedDef?.isCompound
+      });
+    }
+  }
+
+  // Trier par pertinence (fréquence récente, puis date récente, puis total)
+  const results = Array.from(map.values())
+    .filter(item => item.count > 0)
+    .sort((a, b) => {
+      // 1. Fréquence d'utilisation récente
+      if (b.recentCount !== a.recentCount) {
+        return b.recentCount - a.recentCount;
+      }
+      // 2. Date de dernière séance
+      if (b.lastDate !== a.lastDate) {
+        return b.lastDate.localeCompare(a.lastDate);
+      }
+      // 3. Total historique
+      return b.count - a.count;
+    })
+    .slice(0, maxResults)
+    .map(item => ({
+      exerciseId: item.canonicalId,
+      name: item.name,
+      count: item.count,
+      recentCount: item.recentCount,
+      lastDate: item.lastDate,
+      category: item.category,
+      isCompound: item.isCompound
+    }));
+
+  return results;
+}
+

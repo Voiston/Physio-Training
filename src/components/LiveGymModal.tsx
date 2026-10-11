@@ -12,7 +12,9 @@ import {
   findLastExercisePerformance, 
   computeAdaptiveProgression,
   computeSessionMuscularBreakdown,
-  ExerciseDefinition
+  ExerciseDefinition,
+  getFrequentRecentExercises,
+  recordExerciseUsage
 } from '../utils/muscleHelpers';
 import { 
   playCountdownBeep, 
@@ -133,6 +135,19 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   // Custom exercises catalog
   const customExercises = useMemo(() => getSavedCustomExercises(), []);
   const allExercises = useMemo(() => getAllExerciseCatalog(customExercises), [customExercises]);
+
+  // Exercices les plus souvent utilisés récemment
+  const frequentExercises = useMemo(() => {
+    return getFrequentRecentExercises(events, allExercises, 8, initialDateStr);
+  }, [events, allExercises, initialDateStr]);
+
+  const frequentMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const f of frequentExercises) {
+      map.set(f.exerciseId, f.count);
+    }
+    return map;
+  }, [frequentExercises]);
 
   // Récupération de la dernière séance de la filière sélectionnée
   const lastSessionForQuality = useMemo(() => {
@@ -543,6 +558,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   };
 
   const handleAddExerciseFromCatalog = (catalogEx: ExerciseDefinition) => {
+    recordExerciseUsage(catalogEx.id);
     const newEx: LiveExercise = {
       id: `ex_${Date.now()}`,
       exerciseCatalogId: catalogEx.id,
@@ -1449,6 +1465,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                   {[
+                    ...(frequentExercises.length > 0 ? [{ id: 'frequent', label: '🔥 Récents & Fréquents' }] : []),
                     { id: 'all', label: 'Tous' },
                     { id: 'upper_push', label: 'Push (Pecs/Épaules/Triceps)' },
                     { id: 'upper_pull', label: 'Pull (Dos/Biceps)' },
@@ -1475,30 +1492,66 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               <div className="flex-1 overflow-y-auto p-3 space-y-1.5 divide-y divide-slate-800/40">
                 {allExercises
                   .filter(ex => {
+                    if (selectedCategoryFilter === 'frequent') {
+                      return frequentMap.has(ex.id);
+                    }
                     const matchCategory = selectedCategoryFilter === 'all' || ex.category === selectedCategoryFilter;
                     const matchSearch = !exerciseSearch.trim() || ex.name.toLowerCase().includes(exerciseSearch.toLowerCase());
                     return matchCategory && matchSearch;
                   })
-                  .map(catalogEx => (
-                    <button
-                      key={catalogEx.id}
-                      type="button"
-                      onClick={() => handleAddExerciseFromCatalog(catalogEx)}
-                      className="w-full text-left p-2.5 rounded-xl hover:bg-slate-800/80 transition-colors flex items-center justify-between group pt-3"
-                    >
-                      <div>
-                        <span className="font-bold text-sm text-slate-200 group-hover:text-white block">
-                          {catalogEx.name}
-                        </span>
-                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                          <span>{catalogEx.isCompound ? 'Polyarticulaire' : 'Isolation'}</span>
-                          <span>·</span>
-                          <span>Défaut : {catalogEx.defaultReps} reps</span>
+                  .sort((a, b) => {
+                    // Les exercices les plus souvent utilisés récemment en début de liste
+                    const aCount = frequentMap.get(a.id) || 0;
+                    const bCount = frequentMap.get(b.id) || 0;
+                    if (aCount !== bCount) {
+                      return bCount - aCount;
+                    }
+                    return 0;
+                  })
+                  .map(catalogEx => {
+                    const isFrequent = frequentMap.has(catalogEx.id);
+                    const usageCount = frequentMap.get(catalogEx.id);
+
+                    return (
+                      <button
+                        key={catalogEx.id}
+                        type="button"
+                        onClick={() => handleAddExerciseFromCatalog(catalogEx)}
+                        className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between group pt-3 ${
+                          isFrequent
+                            ? 'bg-slate-800/90 border border-amber-500/35 hover:border-amber-400 hover:bg-slate-800 shadow-sm'
+                            : 'hover:bg-slate-800/80'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isFrequent && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1">
+                                🔥 Fréquent ({usageCount}×)
+                              </span>
+                            )}
+                            <span className={`block ${isFrequent ? 'font-black text-sm text-white' : 'font-bold text-sm text-slate-200 group-hover:text-white'}`}>
+                              {catalogEx.name}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${catalogEx.isCompound ? 'bg-blue-500/15 text-blue-300' : 'bg-emerald-500/15 text-emerald-300'}`}>
+                              {catalogEx.isCompound ? 'Polyarticulaire' : 'Isolation'}
+                            </span>
+                            <span>·</span>
+                            <span className="text-[10px]">Défaut : {catalogEx.defaultReps} reps</span>
+                            <span>·</span>
+                            <span className="text-[10px] text-slate-400">
+                              {Object.entries(catalogEx.muscleRatios || {})
+                                .map(([mId, r]) => `${MUSCLE_GROUPS[mId]?.name || mId} (${Math.round(r * 100)}%)`)
+                                .join(', ')}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <Plus size={16} className="text-blue-400 group-hover:scale-125 transition-transform" />
-                    </button>
-                  ))}
+                        <Plus size={16} className={`${isFrequent ? 'text-amber-400' : 'text-blue-400'} group-hover:scale-125 transition-transform shrink-0 ml-2`} />
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           </div>
