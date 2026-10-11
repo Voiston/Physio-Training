@@ -74,6 +74,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
   const [breakdownTab, setBreakdownTab] = useState<'qualities' | 'muscles'>('qualities');
   const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
+  const [showVolumeGuide, setShowVolumeGuide] = useState<boolean>(false);
 
   // Bibliothèque des exercices personnalisés persistants
   const customExercises = useMemo(() => getSavedCustomExercises(), []);
@@ -352,7 +353,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        <div className="flex overflow-x-auto pb-2 snap-x sm:grid sm:grid-cols-4 lg:grid-cols-8 gap-2 custom-scrollbar">
           {allWeeks.map((week) => {
             const isSelected = week.weekId === activeWeek.weekId;
             const isCurrent = week.isCurrentWeek;
@@ -361,7 +362,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               <button
                 key={week.weekId}
                 onClick={() => setSelectedWeekId(week.weekId)}
-                className={`flex flex-col p-3 rounded-xl border text-left touch-press active:scale-95 active:brightness-110 transition-all cursor-pointer relative ${
+                className={`flex flex-col p-3 rounded-xl border text-left touch-press active:scale-95 active:brightness-110 transition-all cursor-pointer relative shrink-0 w-36 sm:w-auto snap-start ${
                   isSelected
                     ? 'bg-blue-600/20 border-blue-500 shadow-md shadow-blue-500/20 text-white'
                     : isCurrent
@@ -815,7 +816,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                               {item.qualityName}
                             </span>
                             {item.secondaryLoad > 0 && (
-                              <span className="text-[10px] text-slate-400 font-mono">
+                              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
                                 Direct: {item.directLoad} UA • Impact indirect: {item.secondaryLoad} UA
                               </span>
                             )}
@@ -870,7 +871,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                             }`}>
                               {item.percentChangeVsPrevWeek > 0 ? <ArrowUpRight size={13} /> : item.percentChangeVsPrevWeek < 0 ? <ArrowDownRight size={13} /> : null}
                               {item.percentChangeVsPrevWeek >= 0 ? `+${item.percentChangeVsPrevWeek}%` : `${item.percentChangeVsPrevWeek}%`}
-                              <span className="text-[10px] text-slate-500 font-normal">
+                              <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">
                                 ({item.deltaLoadVsPrevWeek >= 0 ? `+${item.deltaLoadVsPrevWeek}` : item.deltaLoadVsPrevWeek} UA)
                               </span>
                             </span>
@@ -986,23 +987,32 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             </div>
 
             {/* REPÈRES SCIENTIFIQUES DE VOLUME (ISRAETEL & SCHOENFELD) */}
-            <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                <Info size={13} className="text-blue-400" />
-                Repères scientifiques de séries par semaine :
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center justify-between w-full sm:w-auto">
+                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                  <Info size={13} className="text-blue-400" />
+                  Repères de séries :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowVolumeGuide(prev => !prev)}
+                  className="sm:hidden text-[10px] text-blue-400 font-semibold px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20"
+                >
+                  {showVolumeGuide ? 'Masquer' : 'Afficher détails (MV/MAV)'}
+                </button>
+              </div>
+              <div className={`${showVolumeGuide ? 'flex' : 'hidden'} sm:flex flex-wrap items-center gap-2 pt-1 sm:pt-0`}>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-slate-800 text-slate-300 border-slate-700">
                   MV &lt; 6 : Maintien
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-blue-500/20 text-blue-300 border-blue-500/30">
-                  MEV 6-10 : Stimulus Minimal
+                  MEV 6-10 : Stimulus Min
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold">
-                  MAV 10-20 : Optimal Progression
+                  MAV 10-20 : Optimal
                 </span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-mono border bg-amber-500/20 text-amber-300 border-amber-500/30">
-                  MRV &gt; 20 : Plafond Récupérable
+                  MRV &gt; 20 : Plafond Max
                 </span>
               </div>
             </div>

@@ -1417,15 +1417,15 @@ export default function MetricsDashboard({
                       />
                     </div>
                     {/* Légende centrée à contraste renforcé */}
-                    <div className="flex items-center justify-between text-xs font-mono px-2.5 py-1 bg-black/40 rounded-xl border border-white/5">
-                      <span className="text-sky-300 flex items-center gap-1.5 font-bold">
-                        <Heart size={12} className="text-sky-400" /> Cardio : {balance.cardioPercent}%
+                    <div className="flex items-center justify-between text-[11px] sm:text-xs font-mono px-2 sm:px-2.5 py-1 bg-black/40 rounded-xl border border-white/5 gap-1">
+                      <span className="text-sky-300 flex items-center gap-1 font-bold truncate">
+                        <Heart size={12} className="text-sky-400 shrink-0" /> Cardio : {balance.cardioPercent}%
                       </span>
-                      <span className="text-slate-300 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10">
+                      <span className="text-slate-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-white/10 shrink-0 hidden xs:inline-block">
                         Équilibre
                       </span>
-                      <span className="text-rose-300 flex items-center gap-1.5 font-bold">
-                        Musculaire : {balance.muscPercent}% <Dumbbell size={12} className="text-rose-400" />
+                      <span className="text-rose-300 flex items-center gap-1 font-bold truncate">
+                        Musc : {balance.muscPercent}% <Dumbbell size={12} className="text-rose-400 shrink-0" />
                       </span>
                     </div>
                   </div>
@@ -1556,7 +1556,7 @@ export default function MetricsDashboard({
                     // Échelle TSB% : -50% à +30% (delta 80)
                     const clampPct = Math.max(-50, Math.min(30, tsbPct ?? tsbVal));
                     gaugePercent = Math.max(4, Math.min(96, ((clampPct + 50) / 80) * 100));
-                    gaugeSubtextLeft = '-35% Surcharge';
+                    gaugeSubtextLeft = '-35% Surch.';
                     gaugeSubtextCenter = '+5% à +25% Pic';
                     gaugeSubtextRight = '>+25% Déclin';
 
@@ -1597,8 +1597,8 @@ export default function MetricsDashboard({
                   const acwrNum = acwrVal !== null ? Number(acwrVal) : 1.0;
                   gaugePercent = Math.max(4, Math.min(96, ((Math.max(0.6, Math.min(1.6, acwrNum)) - 0.6) / 1.0) * 100));
                   gaugeSubtextLeft = '<0.95x Frais';
-                  gaugeSubtextCenter = '1.0x - 1.35x Stimulus';
-                  gaugeSubtextRight = '>1.35x Surcharge';
+                  gaugeSubtextCenter = '1.0-1.35x Stimulus';
+                  gaugeSubtextRight = '>1.35x Surch.';
 
                   // Alignement strict avec la couleur et le diagnostic de la zone TSB pour éliminer toute contradiction
                   if (banisterSummary?.tsbZone?.color === 'rose' || acwrNum > 1.35) {
@@ -1686,22 +1686,22 @@ export default function MetricsDashboard({
                     </div>
 
                     {/* Valeur principale agrandie et sous-formule lisible en gris #94A3B8 */}
-                    <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                      <div className="flex items-baseline gap-1.5 min-w-0">
-                        <span className={`text-4xl sm:text-5xl font-black font-mono tracking-tight ${valueColor}`}>
+                    <div className="flex items-baseline justify-between gap-2 mb-1.5 min-w-0">
+                      <div className="flex items-baseline gap-1.5 min-w-0 flex-wrap">
+                        <span className={`text-3xl sm:text-5xl font-black font-mono tracking-tight ${valueColor}`}>
                           {mainNumber}
                         </span>
                         <span className="text-sm sm:text-base font-bold font-sans text-slate-300 uppercase tracking-wide">
                           {unitLabel}
                         </span>
                         {secondaryDetail && (
-                          <span className="text-xs font-mono font-medium text-slate-400 ml-1 truncate">
+                          <span className="text-xs font-mono font-medium text-slate-400 ml-1 truncate max-w-[130px] sm:max-w-none">
                             {secondaryDetail}
                           </span>
                         )}
                       </div>
                       <div 
-                        className="text-xs font-mono font-semibold text-[#94A3B8] bg-white/5 px-2 py-0.5 rounded-lg border border-white/10 shrink-0"
+                        className="text-[10px] sm:text-xs font-mono font-semibold text-[#94A3B8] bg-white/5 px-1.5 sm:px-2 py-0.5 rounded-lg border border-white/10 shrink-0"
                         title={info.formula}
                       >
                         {shortFormula}
@@ -1746,20 +1746,20 @@ export default function MetricsDashboard({
                         />
                       </div>
                       
-                      {/* Sous-titres de repères de la jauge avec contraste renforcé en #94A3B8 */}
-                      <div className="flex justify-between text-[10px] font-mono text-[#94A3B8] mt-1.5">
-                        <span>{gaugeSubtextLeft}</span>
-                        <span className="text-emerald-400 font-bold">{gaugeSubtextCenter}</span>
-                        <span>{gaugeSubtextRight}</span>
+                      {/* Sous-titres de repères de la jauge sans chevauchement */}
+                      <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono text-[#94A3B8] mt-1.5 gap-1">
+                        <span className="truncate max-w-[32%] text-left" title={gaugeSubtextLeft}>{gaugeSubtextLeft}</span>
+                        <span className="text-emerald-400 font-bold truncate max-w-[36%] text-center shrink-0" title={gaugeSubtextCenter}>{gaugeSubtextCenter}</span>
+                        <span className="truncate max-w-[32%] text-right" title={gaugeSubtextRight}>{gaugeSubtextRight}</span>
                       </div>
                     </div>
 
                     {/* Diagnostic textuel */}
-                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
-                      <span className={`font-semibold truncate ${statusColor}`}>
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] min-w-0 gap-2">
+                      <span className={`font-semibold truncate min-w-0 ${statusColor}`}>
                         {info.currentInterpretation}
                       </span>
-                      <span className="text-[10px] text-blue-400 opacity-80 group-hover:opacity-100 group-hover:underline flex items-center gap-0.5 shrink-0 ml-1">
+                      <span className="text-[10px] text-blue-400 opacity-80 group-hover:opacity-100 group-hover:underline flex items-center gap-0.5 shrink-0">
                         Seuils & Rôle <Info size={10} />
                       </span>
                     </div>
@@ -1853,22 +1853,25 @@ export default function MetricsDashboard({
           </div>
 
           {/* GRAPHIQUES GLOBAUX BANISTER + VFC */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[340px] min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
             
             {/* GRAPHIQUE 1 : Charge Globale (Banister) */}
-            <div className="flex flex-col h-full bg-slate-900/60 border border-white/10 rounded-2xl p-4 min-h-0 relative shadow-xl">
-              <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Activity size={13} className="text-blue-400" />
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Modélisation PMC (Charge & Forme)</span>
+            <div className="flex flex-col h-[340px] sm:h-[380px] bg-slate-900/60 border border-white/10 rounded-2xl p-3.5 sm:p-4 min-h-0 relative shadow-xl">
+              <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Activity size={13} className="text-blue-400 shrink-0" />
+                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    <span className="sm:hidden">Modèle PMC</span>
+                    <span className="hidden sm:inline">Modélisation PMC (Charge & Forme)</span>
+                  </span>
                 </div>
                 
                 {/* Légendes interactives compactes cliquables pour afficher/masquer */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setBanisterCurves(p => ({ ...p, atl: !p.atl }))}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
                       banisterCurves.atl 
                         ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
@@ -1876,13 +1879,13 @@ export default function MetricsDashboard({
                     title="Cliquer pour afficher/masquer la courbe de fatigue ATL"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                    ATL ({tauFatigue}j)
+                    ATL <span className="hidden xs:inline">({tauFatigue}j)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setBanisterCurves(p => ({ ...p, ctl: !p.ctl }))}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
                       banisterCurves.ctl 
                         ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
@@ -1890,13 +1893,13 @@ export default function MetricsDashboard({
                     title="Cliquer pour afficher/masquer la courbe de condition CTL"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                    CTL ({tauFitness}j)
+                    CTL <span className="hidden xs:inline">({tauFitness}j)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setBanisterCurves(p => ({ ...p, tsb: !p.tsb }))}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
                       banisterCurves.tsb 
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
@@ -1909,17 +1912,17 @@ export default function MetricsDashboard({
 
                   {isSimulationActive && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                      +14j Simu
+                      Simu
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="flex-1 w-full min-h-[220px] relative">
+              <div className="flex-1 w-full min-h-[200px] relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart 
                     data={chartData} 
-                    margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                    margin={{ top: 5, right: 8, left: -22, bottom: 0 }}
                     onMouseMove={(e) => {
                       if (!isDayPinned && e && e.activePayload && e.activePayload[0]) {
                         setSelectedBanisterDay(e.activePayload[0].payload);
@@ -1943,8 +1946,8 @@ export default function MetricsDashboard({
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9 }} minTickGap={20} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#64748b" tick={{ fontSize: 9 }} width={24} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     
                     {currentInspectedDay && (
@@ -1971,19 +1974,19 @@ export default function MetricsDashboard({
             </div>
 
             {/* GRAPHIQUE 2 : Tendance VFC */}
-            <div className="flex flex-col h-full bg-slate-900/60 border border-white/10 rounded-2xl p-4 min-h-0 relative shadow-xl">
-              <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Activity size={13} className="text-emerald-400" />
+            <div className="flex flex-col min-h-[340px] bg-slate-900/60 border border-white/10 rounded-2xl p-3.5 sm:p-4 relative shadow-xl">
+              <div className="flex items-center justify-between mb-2 shrink-0 flex-wrap gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Activity size={13} className="text-emerald-400 shrink-0" />
                   <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Variabilité Cardiaque (VFC)</span>
                 </div>
 
                 {/* Légendes interactives compactes cliquables */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 sm:gap-1.5">
                   <button
                     type="button"
                     onClick={() => setVfcCurves(p => ({ ...p, vfc: !p.vfc }))}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
                       vfcCurves.vfc 
                         ? 'bg-white/10 text-slate-200 border-white/20 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
@@ -1997,7 +2000,7 @@ export default function MetricsDashboard({
                   <button
                     type="button"
                     onClick={() => setVfcCurves(p => ({ ...p, ema3: !p.ema3 }))}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
                       vfcCurves.ema3 
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
@@ -2011,7 +2014,7 @@ export default function MetricsDashboard({
                   <button
                     type="button"
                     onClick={() => setVfcCurves(p => ({ ...p, ema7: !p.ema7 }))}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer border ${
+                    className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold font-mono transition-all cursor-pointer border ${
                       vfcCurves.ema7 
                         ? 'bg-pink-500/20 text-pink-300 border-pink-500/40 shadow-sm' 
                         : 'bg-white/5 text-slate-500 border-white/5 line-through opacity-50'
@@ -2024,12 +2027,12 @@ export default function MetricsDashboard({
                 </div>
               </div>
 
-              <div className="flex-1 w-full min-h-[220px] relative">
+              <div className="h-[210px] sm:h-[240px] w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 8, left: -22, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9 }} minTickGap={20} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 9 }} width={24} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     
                     {vfcCurves.vfc && (
@@ -2129,7 +2132,7 @@ export default function MetricsDashboard({
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5 mb-0">
+                    <p className="text-[11px] text-slate-400 mt-0.5 mb-0 hidden sm:block">
                       Cliquez sur la courbe Banister pour figer une date et inspecter l'impact de chaque entraînement
                     </p>
                   </div>
@@ -2165,14 +2168,14 @@ export default function MetricsDashboard({
               </div>
 
               {/* 4 Métriques Clés Instantanées du Jour Inspecté */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {/* Forme TSB */}
-                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
                     Forme (TSB)
                   </span>
                   <div className="flex items-baseline gap-2 my-1">
-                    <span className={`text-2xl font-black font-mono ${
+                    <span className={`text-xl sm:text-2xl font-black font-mono ${
                       currentInspectedDay.tsb >= 10 ? 'text-emerald-400' :
                       currentInspectedDay.tsb >= 0 ? 'text-sky-300' :
                       currentInspectedDay.tsb >= -25 ? 'text-indigo-300' : 'text-rose-400'
@@ -2180,56 +2183,56 @@ export default function MetricsDashboard({
                       {currentInspectedDay.tsb > 0 ? `+${currentInspectedDay.tsb}` : currentInspectedDay.tsb}
                     </span>
                   </div>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block truncate ${banisterInterpretation.zoneBadge}`}>
+                  <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block truncate max-w-full ${banisterInterpretation.zoneBadge}`}>
                     {banisterInterpretation.zoneTitle}
                   </span>
                 </div>
 
                 {/* Fatigue Aiguë ATL */}
-                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                    Fatigue Aiguë (ATL)
+                <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                    Fatigue (ATL)
                   </span>
-                  <div className="flex items-baseline gap-2 my-1">
-                    <span className="text-2xl font-black font-mono text-rose-400">
+                  <div className="flex items-baseline gap-1.5 my-1">
+                    <span className="text-xl sm:text-2xl font-black font-mono text-rose-400">
                       {currentInspectedDay.loadEMA7}
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400">pts</span>
+                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">pts</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">
-                    Moyenne mobile {tauFatigue}j
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+                    Moyenne {tauFatigue}j
                   </span>
                 </div>
 
                 {/* Condition CTL */}
-                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                    Condition Durable (CTL)
+                <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                    Condition (CTL)
                   </span>
-                  <div className="flex items-baseline gap-2 my-1">
-                    <span className="text-2xl font-black font-mono text-sky-400">
+                  <div className="flex items-baseline gap-1.5 my-1">
+                    <span className="text-xl sm:text-2xl font-black font-mono text-sky-400">
                       {currentInspectedDay.loadEMA21}
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400">pts</span>
+                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">pts</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">
-                    Moyenne mobile {tauFitness}j
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+                    Moyenne {tauFitness}j
                   </span>
                 </div>
 
                 {/* Charge Quotidienne */}
-                <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                    Charge Quotidienne
+                <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                    Charge Jour
                   </span>
-                  <div className="flex items-baseline gap-2 my-1">
-                    <span className="text-2xl font-black font-mono text-amber-300">
+                  <div className="flex items-baseline gap-1.5 my-1">
+                    <span className="text-xl sm:text-2xl font-black font-mono text-amber-300">
                       {currentInspectedDay.load}
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400">pts</span>
+                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">pts</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">
-                    {currentInspectedDay.sessions?.length || 0} séance(s) ce jour
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+                    {currentInspectedDay.sessions?.length || 0} séance(s)
                   </span>
                 </div>
               </div>
@@ -2251,7 +2254,7 @@ export default function MetricsDashboard({
 
                 {/* Triptyque Biométrique du Réveil (Readiness, VFC, FC de Repos) */}
                 {(currentInspectedDay.readiness || currentInspectedDay.vfc || currentInspectedDay.hrRest) && (
-                  <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-3 text-xs font-mono">
+                  <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-1.5 sm:gap-3 text-[11px] sm:text-xs font-mono">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Biométrie du Réveil :</span>
                     {currentInspectedDay.readiness && (
                       <span className="inline-flex items-center gap-1 text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
@@ -2873,10 +2876,10 @@ export default function MetricsDashboard({
                   <tr className="bg-white/[0.02] text-[10px] uppercase text-slate-400 border-b border-white/5 font-semibold">
                     <th className="p-2.5 pl-3">Rang & Qualité</th>
                     <th className="p-2.5 text-center">EMA 3j (Aiguë)</th>
-                    <th className="p-2.5 text-center">EMA 7j (Récente)</th>
+                    <th className="p-2.5 text-center hidden sm:table-cell">EMA 7j (Récente)</th>
                     <th className="p-2.5 text-center">EMA 21j (Chronique)</th>
                     <th className="p-2.5 text-center">ACWR</th>
-                    <th className="p-2.5 pr-3 text-right">Tendance Globale & Magnitude</th>
+                    <th className="p-2.5 pr-3 text-right">Tendance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -2942,8 +2945,8 @@ export default function MetricsDashboard({
                           </div>
                         </td>
 
-                        {/* EMA 7j + Flèche & Magnitude côte à côte */}
-                        <td className="p-2.5 text-center">
+                        {/* EMA 7j (masqué sur smartphone pour désengorger le tableau) */}
+                        <td className="p-2.5 text-center hidden sm:table-cell">
                           <div className="flex items-center justify-center gap-1.5 font-mono">
                             <span className="font-bold text-slate-100">{qInfo.ema7}</span>
                             {renderTrendIndicator(rowD7, rowP7, rowPrev7, qInfo.ema7, 'compact', 'EMA 7j')}
@@ -2973,13 +2976,13 @@ export default function MetricsDashboard({
                           </span>
                         </td>
 
-                        {/* Tendance Globale & Magnitude */}
+                        {/* Tendance Globale */}
                         <td className="p-2.5 pr-3 text-right">
                           {isOverallUp ? (
                             <span className="text-[10px] font-bold text-emerald-400 inline-flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
                               <ArrowUp size={11} className="stroke-[3]" />
                               <span>Progression</span>
-                              <span className="text-[9px] opacity-80 font-mono">
+                              <span className="text-[9px] opacity-80 font-mono hidden sm:inline">
                                 ({maxMag >= 25 ? 'Forte' : maxMag >= 10 ? 'Modérée' : 'Légère'})
                               </span>
                             </span>
@@ -2987,7 +2990,7 @@ export default function MetricsDashboard({
                             <span className="text-[10px] font-bold text-red-400 inline-flex items-center gap-1 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
                               <ArrowDown size={11} className="stroke-[3]" />
                               <span>Déclin</span>
-                              <span className="text-[9px] opacity-80 font-mono">
+                              <span className="text-[9px] opacity-80 font-mono hidden sm:inline">
                                 ({maxMag >= 25 ? 'Fort' : maxMag >= 10 ? 'Modéré' : 'Léger'})
                               </span>
                             </span>
@@ -3006,19 +3009,20 @@ export default function MetricsDashboard({
             </div>
           </div>
 
-          {/* CADRE MÉTHODOLOGIQUE & AIDE À LA DÉCISION */}
-          <div className="p-4 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-400 text-xs flex items-start gap-3 mt-6">
-            <Info size={18} className="text-sky-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span className="font-bold text-slate-200 block text-xs">
-                Cadre méthodologique & Indicateurs d'aide à la décision
-              </span>
-              <p className="text-[11px] leading-relaxed text-slate-400 m-0">
-                Les métriques intégrées (Modèle PMC de Coggan avec filtres continus, Monotonie de Foster, RPE Différentiel, VFC en ln(rMSSD) selon Plews &amp; Buchheit, et Répartition Seiler) constituent des <strong>indicateurs d'aide à la décision d'entraînement</strong>. 
-                Elles fournissent un repère quantifié pour piloter les cycles de charge et la fraîcheur. Elles ne constituent ni une prédiction médicale de blessure ni un avis médical. Fiez-vous toujours à vos sensations et consultez un professionnel de santé en cas de douleur persistante ou d'anomalie.
-              </p>
-            </div>
-          </div>
+          {/* CADRE MÉTHODOLOGIQUE & AIDE À LA DÉCISION (REPLIABLE EN ACCORDÉON SUR MOBILE) */}
+          <details className="group p-3.5 sm:p-4 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-400 text-xs mt-6 cursor-pointer">
+            <summary className="flex items-center justify-between font-bold text-slate-200 list-none select-none">
+              <div className="flex items-center gap-2">
+                <Info size={16} className="text-sky-400 shrink-0" />
+                <span>Cadre méthodologique & Indicateurs d'aide à la décision</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <p className="text-[11px] leading-relaxed text-slate-400 mt-2.5 pt-2 border-t border-white/5 m-0">
+              Les métriques intégrées (Modèle PMC de Coggan avec filtres continus, Monotonie de Foster, RPE Différentiel, VFC en ln(rMSSD) selon Plews &amp; Buchheit, et Répartition Seiler) constituent des <strong>indicateurs d'aide à la décision d'entraînement</strong>. 
+              Elles fournissent un repère quantifié pour piloter les cycles de charge et la fraîcheur. Elles ne constituent ni une prédiction médicale de blessure ni un avis médical. Fiez-vous toujours à vos sensations et consultez un professionnel de santé en cas de douleur persistante ou d'anomalie.
+            </p>
+          </details>
 
         </div>
         </div>

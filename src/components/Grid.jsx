@@ -321,18 +321,18 @@ export default function Grid({
         }`}
         style={{ scrollBehavior: 'smooth' }}
       >
-        <table className="w-full text-left border-collapse table-fixed min-w-[850px] sm:min-w-[1300px]">
+        <table className="w-full text-left border-collapse table-fixed min-w-[700px] sm:min-w-[1300px]">
           <thead>
             <tr className="bg-[#161619] text-[10px] uppercase text-slate-400 border-b border-white/10">
-              {/* Colonne 1 : Qualité Physique (Responsive mobile w-40 min-w-[150px], Desktop w-72 min-w-[280px]) */}
-              <th className="p-2 sm:p-3 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px] sticky left-0 bg-[#161619] z-20 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10">
+              {/* Colonne 1 : Qualité Physique (Responsive mobile w-36 min-w-[130px], Desktop w-72 min-w-[280px]) */}
+              <th className="p-2 sm:p-3 w-36 sm:w-72 min-w-[130px] sm:min-w-[280px] sticky left-0 bg-[#161619] z-20 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-200 font-bold tracking-wider flex items-center gap-1.5 text-xs" title="Glisser-déposer les qualités pour réorganiser l'ordre de priorité">
                     <GripVertical size={13} className="text-slate-400" />
                     <span>Qualités Physiques</span>
                   </span>
                   {activeBlockToday && (
-                    <span className="text-[9px] px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                    <span className="hidden sm:inline-block text-[9px] px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30 truncate max-w-[80px]">
                       {activeBlockToday.name}
                     </span>
                   )}
@@ -365,7 +365,7 @@ export default function Grid({
                   <th 
                     key={day.dateStr} 
                     data-today={isToday ? "true" : undefined}
-                    className={`py-2 px-1 w-[64px] min-w-[64px] text-center border-r border-white/5 relative transition-colors ${
+                    className={`py-2 px-1 w-[56px] min-w-[56px] sm:w-[64px] sm:min-w-[64px] text-center border-r border-white/5 relative transition-colors ${
                       isToday 
                         ? 'bg-blue-600/25 text-blue-200 border-x-2 border-x-blue-500/50 shadow-inner today-beacon z-10' 
                         : 'hover:bg-white/[0.02]'
@@ -373,7 +373,7 @@ export default function Grid({
                   >
                     {dayBlock && (
                       <span 
-                        className="block text-[7.5px] font-bold text-amber-300 truncate tracking-tight mb-0.5"
+                        className="hidden sm:block text-[7.5px] font-bold text-amber-300 truncate tracking-tight mb-0.5"
                         title={`Bloc actif : ${dayBlock.name}`}
                       >
                         ⚡ {dayBlock.name.substring(0, 6)}
@@ -396,7 +396,7 @@ export default function Grid({
           <tbody className="text-xs">
             {/* LIGNE SPECIALE : READINESS */}
             <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-blue-400 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
+              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-blue-400 w-36 sm:w-72 min-w-[130px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span>Readiness (1-10)</span>
                   <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">Auto-évaluation</span>
@@ -431,7 +431,7 @@ export default function Grid({
 
             {/* LIGNE SPECIALE : VFC */}
             <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-emerald-400 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
+              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-emerald-400 w-36 sm:w-72 min-w-[130px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span>VFC Matinale (ms)</span>
                   <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">RMSSD</span>
@@ -482,7 +482,7 @@ export default function Grid({
 
             {/* LIGNE SPECIALE : FC DE REPOS (BPM) */}
             <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-rose-400 w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]">
+              <td className="p-2 sm:p-3 font-bold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-rose-400 w-36 sm:w-72 min-w-[130px] sm:min-w-[280px]">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <span>FC de Repos (bpm)</span>
@@ -566,14 +566,14 @@ export default function Grid({
                         : 'border-white/5 hover:bg-white/[0.02]'
                     }`}
                   >
-                    {/* Colonne Nom de la Qualité (Responsive mobile w-40 min-w-[150px], Desktop w-72 min-w-[280px]) */}
+                    {/* Colonne Nom de la Qualité (Responsive mobile w-36 min-w-[130px], Desktop w-72 min-w-[280px]) */}
                     <td 
-                      className="p-2 sm:p-2.5 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-slate-200 cursor-pointer hover:text-blue-400 transition-colors group w-40 sm:w-72 min-w-[150px] sm:min-w-[280px]"
+                      className="p-1.5 sm:p-2.5 font-semibold bg-[#161619] sticky left-0 z-10 shadow-[3px_0_10px_rgba(0,0,0,0.5)] border-r border-white/10 text-slate-200 cursor-pointer hover:text-blue-400 transition-colors group w-36 sm:w-72 min-w-[130px] sm:min-w-[280px]"
                       onClick={() => onQualityClick(q)}
                       title={`Cliquer pour analyser ${q.name} en détail (Priorité #${index + 1})`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1 sm:gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
                           {/* Poignée de Glisser-Déposer */}
                           <div
                             draggable={true}
@@ -594,10 +594,10 @@ export default function Grid({
                                 moveQuality?.(q.id, 'down');
                               }
                             }}
-                            className="flex items-center gap-1 px-1.5 py-1 -my-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 active:bg-blue-600/30 active:text-blue-200 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10 transition-all shrink-0 select-none group/grip"
+                            className="flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 py-1 -my-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 active:bg-blue-600/30 active:text-blue-200 cursor-grab active:cursor-grabbing border border-transparent hover:border-white/10 transition-all shrink-0 select-none group/grip"
                             title={`Glisser-déposer pour changer la priorité de ${q.name} (Rang #${index + 1})`}
                           >
-                            <GripVertical size={13} className="text-slate-500 group-hover/grip:text-blue-400 transition-colors" />
+                            <GripVertical size={12} className="text-slate-500 group-hover/grip:text-blue-400 transition-colors hidden xs:block" />
                             <span className="text-[10px] font-mono font-bold text-slate-400 group-hover/grip:text-blue-300">
                               #{index + 1}
                             </span>
@@ -610,7 +610,7 @@ export default function Grid({
 
                           {activeBlockToday && (
                             <span 
-                              className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0 ${
+                              className={`hidden sm:inline-flex text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0 ${
                                 isFocusInActiveBlock
                                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
                                   : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
