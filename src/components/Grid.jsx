@@ -208,8 +208,8 @@ export default function Grid({
   return (
     <div className="w-full flex flex-col">
       {/* BARRE DE CONTRÔLE DE NAVIGATION HORIZONTALE DE LA TIMELINE */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-[#161619] border-b border-white/10 rounded-t-2xl">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-[#161619] border-b border-white/10 rounded-t-2xl">
+        <div className="hidden sm:flex items-center gap-2">
           <div className="p-1.5 bg-blue-500/10 rounded-lg border border-blue-500/20 text-blue-400">
             <ArrowLeftRight size={14} />
           </div>
@@ -223,9 +223,9 @@ export default function Grid({
           </div>
         </div>
 
-        {/* Résumé de la semaine en cours & Bouton vers la vue hebdomadaire */}
+        {/* Résumé de la semaine en cours & Bouton vers la vue hebdomadaire (Desktop uniquement pour ne pas surcharger mobile) */}
         {currentWeekStats && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden md:flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs">
               <span className="text-slate-400 font-medium hidden sm:inline">Semaine en cours :</span>
               <span className="font-mono font-bold text-amber-300">{currentWeekStats.totalLoad} UA</span>
@@ -257,22 +257,21 @@ export default function Grid({
                 title="Consulter le bilan hebdomadaire complet, les graphiques et le comparateur"
               >
                 <BarChart3 size={13} />
-                <span className="hidden sm:inline">Bilan & Comparateur Hebdo</span>
-                <span className="sm:hidden">Bilan Hebdo</span>
+                <span>Bilan & Comparateur Hebdo</span>
               </button>
             )}
           </div>
         )}
 
-        {/* Boutons de navigation rapide Passé / Aujourd'hui / Futur */}
-        <div className="flex items-center gap-1.5 self-center sm:self-auto">
+        {/* Boutons de navigation rapide Passé / Aujourd'hui / Futur (centrés et épurés sur smartphone) */}
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => {
               haptics.tap();
               scrollHorizontally(-400);
             }}
-            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 touch-press active:scale-92 active:bg-white/15 transition-all cursor-pointer shadow-sm"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 touch-press active:scale-92 active:bg-white/15 transition-all cursor-pointer shadow-sm"
             title="Glisser vers le passé (-7 jours)"
           >
             <ChevronLeft size={14} className="text-sky-400" />
@@ -286,7 +285,7 @@ export default function Grid({
               haptics.tap();
               scrollToToday();
             }}
-            className="flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 border border-blue-400/40 touch-press active:scale-92 active:brightness-125 transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1 sm:gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 border border-blue-400/40 touch-press active:scale-92 active:brightness-125 transition-all cursor-pointer"
             title="Recentrer immédiatement la vue sur le jour d'aujourd'hui"
           >
             <Calendar size={13} />
@@ -300,7 +299,7 @@ export default function Grid({
               haptics.tap();
               scrollHorizontally(400);
             }}
-            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 touch-press active:scale-92 active:bg-white/15 transition-all cursor-pointer shadow-sm"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 touch-press active:scale-92 active:bg-white/15 transition-all cursor-pointer shadow-sm"
             title="Glisser vers le futur (+7 jours)"
           >
             <span className="hidden sm:inline">Futur (+7j)</span>

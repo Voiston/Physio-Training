@@ -272,7 +272,7 @@ function AppContent() {
           </div>
 
           {/* ACTIONS RAPIDES MOBILE (Compact, épuré, sans surcharge) */}
-          <div className="flex md:hidden items-center gap-1.5">
+          <div className="flex md:hidden items-center gap-2">
             {/* Synchro Cloud Mobile */}
             <button
               onClick={() => setShowCloudSyncModal(true)}
@@ -287,23 +287,7 @@ function AppContent() {
             >
               <Cloud size={16} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} />
               {cloudSync.syncStatus === 'synced' && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-              )}
-            </button>
-
-            {/* Bouton Mode Salle Mobile */}
-            <button
-              onClick={() => {
-                haptics.modeSwitch();
-                setShowLiveGymModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 touch-press active:scale-90 active:bg-emerald-500/35 transition-all"
-              title="Lancer le Mode Salle"
-            >
-              <Dumbbell size={15} className="text-emerald-400" />
-              <span>Salle ⏱️</span>
-              {hasGymDraft && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
               )}
             </button>
 
@@ -313,7 +297,7 @@ function AppContent() {
                 haptics.tap();
                 setShowMobileTools(prev => !prev);
               }}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 touch-press active:scale-90 active:rotate-12 active:bg-white/15 transition-all"
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 touch-press active:scale-90 active:bg-white/15 transition-all"
               title="Outils et réglages"
             >
               <MoreVertical size={16} />
@@ -726,16 +710,21 @@ function AppContent() {
                     )}
                   </div>
 
-                  {/* Guide Physiologique EMA Aéré & Lisible (Polices >= 12px, Interligne Souple) */}
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-xl text-slate-200">
-                    <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2.5">
-                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
-                        Guide Physiologique EMA
-                      </h3>
-                      <span className="text-[10px] font-mono text-slate-400">Banister</span>
-                    </div>
+                  {/* Guide Physiologique EMA (Déroulant sur mobile pour désencombrer, ouvert sur grand écran) */}
+                  <details className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-xl text-slate-200 group xl:open">
+                    <summary className="flex items-center justify-between cursor-pointer list-none select-none">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider m-0">
+                          Guide Physiologique EMA
+                        </h3>
+                        <span className="text-[10px] text-blue-400 font-mono">Banister</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 group-open:rotate-180 transition-transform font-bold">
+                        ▼
+                      </span>
+                    </summary>
 
-                    <div className="space-y-2.5">
+                    <div className="space-y-2.5 mt-3 border-t border-white/10 pt-3">
                       {/* EMA 3j */}
                       <div className="p-2.5 rounded-xl bg-slate-900/60 border border-sky-500/20">
                         <div className="flex items-center gap-2 mb-1">
@@ -780,7 +769,7 @@ function AppContent() {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </details>
                 </aside>
               )}
 

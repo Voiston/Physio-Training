@@ -1167,17 +1167,17 @@ export default function MetricsDashboard({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tableau de Bord Physiologique</h4>
-                <p className="text-[11px] text-slate-400">Modèle PMC (Charge & Forme), Foster Monotony & Affûtage</p>
+                <p className="text-[11px] text-slate-400 hidden sm:block">Modèle PMC (Charge & Forme), Foster Monotony & Affûtage</p>
               </div>
             </div>
 
-            {/* Standardisation : 3 boutons secondaires neutres + 1 accent principal (Bilan PDF) */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Standardisation : boutons adaptés mobile & desktop */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {onToggleSimulation && (
                 <button
                   type="button"
                   onClick={() => onToggleSimulation()}
-                  className={`flex items-center gap-1.5 h-8 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border ${
+                  className={`flex items-center gap-1.5 h-8 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border ${
                     isSimulationActive 
                       ? 'bg-purple-950/40 text-purple-300 border-purple-500/40 shadow-sm' 
                       : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10'
@@ -1185,7 +1185,8 @@ export default function MetricsDashboard({
                   title="Activer la simulation prédictive pour projeter les jours futurs"
                 >
                   <Sparkles size={13} className={isSimulationActive ? 'text-purple-400' : 'text-slate-400'} />
-                  <span>{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
+                  <span className="hidden sm:inline">{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
+                  <span className="sm:hidden">Simu</span>
                 </button>
               )}
 
@@ -1193,14 +1194,14 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={onOpenCompetitionModal}
-                  className="flex items-center gap-1.5 h-8 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
                   title="Configurer une compétition ou un objectif de course"
                 >
                   <Trophy size={13} className="text-slate-400" />
                   <span>
                     {taperingAnalysis?.targetCompetition 
                       ? `${taperingAnalysis.targetCompetition.name} (J-${taperingAnalysis.daysRemaining})` 
-                      : 'Course Objectif'}
+                      : 'Objectif'}
                   </span>
                 </button>
               )}
@@ -1209,11 +1210,12 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={onOpenPhysioSettingsModal}
-                  className="flex items-center gap-1.5 h-8 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
                   title="Calibrer les constantes de rémanence Banister (tau fatigue et condition)"
                 >
                   <Sliders size={13} className="text-slate-400" />
-                  <span>Calibrage (τ₁:{tauFatigue}j, τ₂:{tauFitness}j)</span>
+                  <span className="hidden sm:inline">Calibrage (τ₁:{tauFatigue}j, τ₂:{tauFitness}j)</span>
+                  <span className="sm:hidden font-mono">τ:{tauFatigue}/{tauFitness}j</span>
                 </button>
               )}
 
@@ -1221,7 +1223,7 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={onOpenReportModal}
-                  className="flex items-center gap-1.5 h-8 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-500/40 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/25 cursor-pointer"
+                  className="flex items-center gap-1.5 h-8 px-3 sm:px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-500/40 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/25 cursor-pointer"
                   title="Générer un bilan d'entraînement imprimable en PDF"
                 >
                   <FileText size={13} className="text-white" />

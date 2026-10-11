@@ -203,35 +203,35 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                   {activeWeek.relativeLabel}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">
                 Volumes totaux de charge, heures d'entraînement, comparaison à S-1 et ventilation par qualité physique.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             {/* Bouton bascule mode Comparateur */}
             <button
               onClick={() => setIsCompareMode(prev => !prev)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+              className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 isCompareMode
                   ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
                   : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border-white/10'
               }`}
               title="Comparer côte à côte deux semaines au choix"
             >
-              <ArrowUpDown size={14} />
-              <span>{isCompareMode ? 'Fermer Comparateur' : 'Comparer 2 Semaines'}</span>
+              <ArrowUpDown size={13} />
+              <span>{isCompareMode ? 'Fermer' : 'Comparer'}</span>
             </button>
 
             {/* Bouton Copier Résumé */}
             <button
               onClick={handleCopySummary}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer"
               title="Copier le bilan de la semaine pour votre coach ou carnet"
             >
-              {copiedSummary ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-              <span>{copiedSummary ? 'Copié !' : 'Copier le Bilan'}</span>
+              {copiedSummary ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+              <span>{copiedSummary ? 'Copié !' : 'Copier'}</span>
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   Sparkles, AlertTriangle, Clock, Zap, CheckCircle2, 
-  ArrowUp, ArrowDown, ChevronRight, Play, Flame, ShieldAlert,
+  ArrowUp, ArrowDown, ChevronRight, ChevronDown, ChevronUp, Play, Flame, ShieldAlert,
   ArrowUpDown, Dumbbell, Info
 } from 'lucide-react';
 import { Quality, TrainingRecommendation, TrainingBlock } from '../hooks/useData';
@@ -29,6 +29,7 @@ export default function SmartSuggestions({
   onNavigateToMuscles
 }: SmartSuggestionsProps) {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [showMoreOnMobile, setShowMoreOnMobile] = useState<boolean>(false);
 
   if (!recommendations || recommendations.length === 0) return null;
 
@@ -97,7 +98,7 @@ export default function SmartSuggestions({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-400 mt-0.5 hidden sm:block">
               Recommandations calculées selon l'ordre de priorité de vos lignes, l'état physiologique et votre bloc actif.
             </p>
           </div>
@@ -107,27 +108,28 @@ export default function SmartSuggestions({
         <div className="flex items-center gap-1.5 text-xs">
           <button
             onClick={onReorderByUrgency}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer text-[11px]"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer text-[10px] sm:text-[11px]"
             title="Place les qualités les plus désentraînées et urgentes en haut du tableau"
           >
-            <ArrowUpDown size={12} className="text-amber-400" />
-            <span>Trier par urgence</span>
+            <ArrowUpDown size={11} className="text-amber-400" />
+            <span>Urgence</span>
           </button>
 
           {activeBlock && (
             <button
               onClick={onReorderByBlock}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 rounded-lg transition-colors cursor-pointer text-[11px]"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 rounded-lg transition-colors cursor-pointer text-[10px] sm:text-[11px]"
               title={`Place les qualités ciblées par le bloc ${activeBlock.name} en haut du tableau`}
             >
-              <Dumbbell size={12} className="text-blue-400" />
-              <span>Priorité bloc {activeBlock.name}</span>
+              <Dumbbell size={11} className="text-blue-400" />
+              <span className="hidden sm:inline">Priorité bloc</span>
+              <span className="sm:hidden">Bloc</span>
             </button>
           )}
 
           <button
             onClick={onResetOrder}
-            className="px-2 py-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+            className="px-1.5 sm:px-2 py-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
             title="Rétablir l'ordre d'origine"
           >
             Rétablir
@@ -224,11 +226,14 @@ export default function SmartSuggestions({
             btnStyle = 'bg-slate-800/60 hover:bg-slate-700/60 text-slate-300 border border-slate-700/80 hover:border-slate-500 shadow-sm';
           }
           
+          // Sur smartphone, si l'utilisateur n'a pas développé, masquer les priorités 2 et 3 pour garder l'écran aéré
+          const hideOnMobile = index > 0 && !showMoreOnMobile;
+          
           return (
             <div 
               key={item.quality.id}
               onClick={() => onOpenSessionModal(item.quality)}
-              className={`p-4 rounded-2xl border flex flex-col justify-between transition-all cursor-pointer group hover:scale-[1.01] ${cardStyle}`}
+              className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col justify-between transition-all cursor-pointer group hover:scale-[1.01] ${cardStyle} ${hideOnMobile ? 'hidden md:flex' : 'flex'}`}
               title={`Cliquer pour enregistrer une séance pour ${item.quality.name}`}
             >
               <div>
@@ -251,27 +256,27 @@ export default function SmartSuggestions({
 
                 {/* Block focus indicator if applicable */}
                 {item.isBlockFocus && (
-                  <div className="flex items-center gap-1 text-[10px] text-amber-300 font-semibold mb-2">
+                  <div className="flex items-center gap-1 text-[10px] text-amber-300 font-semibold mb-1.5">
                     <Zap size={11} className="text-amber-400 shrink-0" />
-                    <span>Focus du cycle actif : répétition fréquente requise</span>
+                    <span>Focus du cycle actif</span>
                   </div>
                 )}
 
-                {/* Reason description */}
-                <p className="text-xs text-slate-300 leading-relaxed mb-3 font-sans">
+                {/* Reason description - condensé sur mobile */}
+                <p className="text-xs text-slate-300 leading-relaxed mb-2.5 sm:mb-3 font-sans line-clamp-2 sm:line-clamp-none">
                   {item.reason}
                 </p>
               </div>
 
               {/* Action and Tip footer */}
-              <div className="pt-2.5 border-t border-white/5 space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <div className="pt-2 sm:pt-2.5 border-t border-white/5 space-y-2">
+                <div className="hidden sm:flex items-center justify-between text-[11px] text-slate-400">
                   <span className="italic truncate pr-2">
                     {item.actionTip}
                   </span>
                 </div>
 
-                {/* Valorisation du bouton d'action principal */}
+                {/* Bouton d'action épuré sur smartphone */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -280,8 +285,9 @@ export default function SmartSuggestions({
                   }}
                   className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${btnStyle}`}
                 >
-                  <Play size={13} className="fill-current" />
-                  <span>Saisir la séance ({item.quality.name})</span>
+                  <Play size={12} className="fill-current" />
+                  <span className="sm:hidden">Saisir la séance</span>
+                  <span className="hidden sm:inline">Saisir la séance ({item.quality.name})</span>
                 </button>
               </div>
             </div>
@@ -289,7 +295,32 @@ export default function SmartSuggestions({
         })}
       </div>
 
-      {/* Expand/Collapse Button if more than 3 */}
+      {/* Bouton mobile : Dérouler/Réduire les priorités secondaires (#2, #3) */}
+      {displayList.length > 1 && !isExpanded && (
+        <div className="md:hidden mt-2">
+          {!showMoreOnMobile ? (
+            <button
+              type="button"
+              onClick={() => setShowMoreOnMobile(true)}
+              className="w-full py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 font-medium flex items-center justify-center gap-1.5 active:bg-white/15 transition-all cursor-pointer"
+            >
+              <span>Voir les 2 autres priorités suggérées</span>
+              <ChevronDown size={14} className="text-blue-400" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowMoreOnMobile(false)}
+              className="w-full py-1.5 px-3 text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1 hover:text-white transition-colors cursor-pointer"
+            >
+              <span>Réduire à la priorité clé</span>
+              <ChevronUp size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Expand/Collapse Button if more than 3 (Desktop & mode étendu) */}
       {recommendations.length > 3 && (
         <div className="mt-3 text-center">
           <button
@@ -297,7 +328,7 @@ export default function SmartSuggestions({
             className="text-xs text-slate-400 hover:text-white transition-colors underline cursor-pointer"
           >
             {isExpanded 
-              ? 'Réduire la liste aux 3 priorités majeures' 
+              ? 'Réduire la liste aux priorités majeures' 
               : `Voir l'analyse des ${recommendations.length} qualités physiques →`}
           </button>
         </div>
