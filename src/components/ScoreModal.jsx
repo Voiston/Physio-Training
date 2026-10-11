@@ -20,6 +20,7 @@ import {
   computeAdaptiveProgression
 } from '../utils/muscleHelpers';
 import { MuscleBodyMap } from './MuscleBodyMap';
+import { haptics } from '../utils/haptics';
 
 const MONTH_NAMES = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -116,6 +117,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const handleDuplicateLastSession = () => {
     if (!lastSessionWithExercises?.session?.exercises) return;
+    haptics.validate();
     const cloned = JSON.parse(JSON.stringify(lastSessionWithExercises.session.exercises));
     setExercises(cloned);
 
@@ -450,6 +452,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     }
 
     if (finalRpeMusc && finalRpeCardio && finalFatigue && finalDuration) {
+      haptics.validate();
       const durNum = Number(finalDuration);
       const rpeMNum = Number(finalRpeMusc);
       const rpeCNum = Number(finalRpeCardio);
@@ -471,12 +474,14 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         exercises: exercises.length > 0 ? exercises : undefined
       }, applyImpacts, selectedDate);
     } else {
+      haptics.warning();
       onSave(null, applyImpacts, selectedDate);
     }
     onClose();
   };
 
   const handleDelete = () => {
+    haptics.warning();
     onSave(null, applyImpacts, selectedDate);
     onClose();
   };
@@ -509,7 +514,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             {onOpenLiveGym && (
               <button
                 type="button"
-                onClick={onOpenLiveGym}
+                onClick={() => {
+                  haptics.modeSwitch();
+                  onOpenLiveGym();
+                }}
                 className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                 title="Passer en mode saisie live à la salle avec chronomètre de repos automatique"
               >

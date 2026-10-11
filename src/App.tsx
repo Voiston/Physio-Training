@@ -21,6 +21,7 @@ import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { CloudSyncModal } from './components/CloudSyncModal';
 import { ToastProvider, useToast } from './components/Toast';
+import { haptics } from './utils/haptics';
 import { computeAllWeeksStats } from './utils/weekHelpers';
 import { 
   computeWeeklyMuscularSummary, 
@@ -190,7 +191,10 @@ function AppContent() {
 
             {/* Bouton Mode Salle / Live Gym Tracker */}
             <button
-              onClick={() => setShowLiveGymModal(true)}
+              onClick={() => {
+                haptics.modeSwitch();
+                setShowLiveGymModal(true);
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10 group"
               title="Lancer le Mode Salle : suivi tactile en direct, minuteur de repos et charge adaptative"
             >
@@ -204,6 +208,7 @@ function AppContent() {
             {/* Bouton Mode Simulation (What-If) */}
             <button
               onClick={() => {
+                haptics.modeSwitch();
                 toggleSimulation();
                 showToast({
                   type: 'info',
@@ -271,12 +276,12 @@ function AppContent() {
             {/* Synchro Cloud Mobile */}
             <button
               onClick={() => setShowCloudSyncModal(true)}
-              className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+              className={`p-2 rounded-xl border text-xs font-semibold touch-press cursor-pointer flex items-center gap-1 active:scale-90 transition-all ${
                 cloudSync.syncStatus === 'synced'
                   ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
                   : cloudSync.syncStatus === 'syncing'
                   ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                  : 'bg-white/5 text-slate-300 border-white/10'
+                  : 'bg-white/5 text-slate-300 border-white/10 active:bg-white/15'
               }`}
               title="Synchronisation Cloud"
             >
@@ -288,8 +293,11 @@ function AppContent() {
 
             {/* Bouton Mode Salle Mobile */}
             <button
-              onClick={() => setShowLiveGymModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 active:scale-95 transition-transform"
+              onClick={() => {
+                haptics.modeSwitch();
+                setShowLiveGymModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 touch-press active:scale-90 active:bg-emerald-500/35 transition-all"
               title="Lancer le Mode Salle"
             >
               <Dumbbell size={15} className="text-emerald-400" />
@@ -301,8 +309,11 @@ function AppContent() {
 
             {/* Bouton Menu Outils Mobile */}
             <button
-              onClick={() => setShowMobileTools(prev => !prev)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 active:scale-95 transition-transform"
+              onClick={() => {
+                haptics.tap();
+                setShowMobileTools(prev => !prev);
+              }}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 touch-press active:scale-90 active:rotate-12 active:bg-white/15 transition-all"
               title="Outils et réglages"
             >
               <MoreVertical size={16} />
@@ -344,7 +355,7 @@ function AppContent() {
             onClick={() => setShowMobileTools(false)}
           >
             <div 
-              className="w-full bg-[#121217] border-t border-white/15 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-3.5 pb-[max(env(safe-area-inset-bottom,0px),20px)]"
+              className="w-full bg-[#121217] border-t border-white/15 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-3.5 pb-[max(env(safe-area-inset-bottom,0px),20px)] animate-sheet-up"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -356,7 +367,7 @@ function AppContent() {
                 </div>
                 <button 
                   onClick={() => setShowMobileTools(false)}
-                  className="p-1.5 rounded-xl bg-white/5 text-slate-400 hover:text-white"
+                  className="p-1.5 rounded-xl bg-white/5 text-slate-400 hover:text-white touch-press active:scale-90"
                 >
                   <X size={16} />
                 </button>
@@ -366,6 +377,7 @@ function AppContent() {
                 {/* Simulation What-If */}
                 <button
                   onClick={() => {
+                    haptics.modeSwitch();
                     setShowMobileTools(false);
                     toggleSimulation();
                     showToast({
@@ -374,10 +386,10 @@ function AppContent() {
                       message: isSimulationActive ? 'Retour aux charges réelles.' : 'Testez des séances prévisionnelles sur 14 jours.'
                     });
                   }}
-                  className={`flex items-center gap-2 p-3 rounded-xl text-xs font-semibold border transition-all text-left ${
+                  className={`flex items-center gap-2 p-3 rounded-xl text-xs font-semibold border touch-press active:scale-[0.96] text-left ${
                     isSimulationActive 
-                      ? 'bg-purple-600/30 border-purple-400 text-purple-200' 
-                      : 'bg-white/5 border-white/10 text-slate-200'
+                      ? 'bg-purple-600/30 border-purple-400 text-purple-200 active:bg-purple-600/40' 
+                      : 'bg-white/5 border-white/10 text-slate-200 active:bg-white/10 active:border-white/20'
                   }`}
                 >
                   <Sparkles size={16} className="text-purple-400 shrink-0" />
@@ -393,7 +405,7 @@ function AppContent() {
                     setShowMobileTools(false);
                     setShowReportModal(true);
                   }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 text-left"
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
                 >
                   <FileText size={16} className="text-blue-400 shrink-0" />
                   <div>
@@ -408,7 +420,7 @@ function AppContent() {
                     setShowMobileTools(false);
                     setShowPhysioSettingsModal(true);
                   }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 text-left"
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
                 >
                   <Sliders size={16} className="text-blue-400 shrink-0" />
                   <div>
@@ -418,7 +430,7 @@ function AppContent() {
                 </button>
 
                 {/* Bouton PWA Install */}
-                <div className="flex items-center p-2.5 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center p-2.5 rounded-xl bg-white/5 border border-white/10 touch-press active:scale-[0.96]">
                   <PWAInstallButton />
                 </div>
 
@@ -428,7 +440,7 @@ function AppContent() {
                     setShowMobileTools(false);
                     fileInputRef.current?.click();
                   }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 text-left"
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
                 >
                   <FileUp size={16} className="text-emerald-400 shrink-0" />
                   <div>
@@ -448,7 +460,7 @@ function AppContent() {
                       message: 'Fichier de sauvegarde JSON téléchargé.'
                     });
                   }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-blue-500/10 border border-blue-500/20 text-blue-300 text-left"
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-blue-500/10 border border-blue-500/20 text-blue-300 touch-press active:scale-[0.96] active:bg-blue-500/20 text-left"
                 >
                   <FileDown size={16} className="text-blue-400 shrink-0" />
                   <div>
@@ -575,26 +587,32 @@ function AppContent() {
             <div className="flex xl:hidden items-center p-1 bg-white/5 border border-white/10 rounded-2xl shadow-sm">
               <button
                 type="button"
-                onClick={() => setMobileGridTab('grid')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  haptics.modeSwitch();
+                  setMobileGridTab('grid');
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer touch-press active:scale-95 ${
                   mobileGridTab === 'grid'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-slate-400 hover:text-white active:bg-white/5'
                 }`}
               >
-                <Calendar size={14} />
+                <Calendar size={14} className={mobileGridTab === 'grid' ? 'scale-110 transition-transform' : ''} />
                 <span>Grille des Séances</span>
               </button>
               <button
                 type="button"
-                onClick={() => setMobileGridTab('athlete')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  haptics.modeSwitch();
+                  setMobileGridTab('athlete');
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer touch-press active:scale-95 ${
                   mobileGridTab === 'athlete'
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-slate-400 hover:text-white active:bg-white/5'
                 }`}
               >
-                <Activity size={14} />
+                <Activity size={14} className={mobileGridTab === 'athlete' ? 'scale-110 transition-transform' : ''} />
                 <span>Profil Athlète & Cycle</span>
               </button>
             </div>
@@ -1138,40 +1156,40 @@ function AppContent() {
       {/* BARRE DE NAVIGATION INFÉRIEURE MOBILE (Sticky bottom tactile avec bouton central Mode Salle) */}
       <nav 
         aria-label="Navigation principale mobile"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d12]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[max(env(safe-area-inset-bottom,0px),8px)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d12]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[max(env(safe-area-inset-bottom,0px),8px)] select-none"
       >
         {/* Onglet 1: Grille */}
         <button
           type="button"
           onClick={() => setActiveTab('grid')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
-            activeTab === 'grid' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
+            activeTab === 'grid' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
           }`}
         >
-          <Calendar size={18} className={activeTab === 'grid' ? 'text-blue-400 scale-110' : ''} />
-          <span className="text-[10px]">Grille</span>
+          <Calendar size={18} className={`transition-transform duration-200 ${activeTab === 'grid' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
+          <span className="text-[10px] tracking-tight">Grille</span>
         </button>
 
         {/* Onglet 2: Semaines */}
         <button
           type="button"
           onClick={() => setActiveTab('weeks')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
-            activeTab === 'weeks' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
+            activeTab === 'weeks' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
           }`}
         >
-          <BarChart3 size={18} className={activeTab === 'weeks' ? 'text-blue-400 scale-110' : ''} />
-          <span className="text-[10px]">Semaines</span>
+          <BarChart3 size={18} className={`transition-transform duration-200 ${activeTab === 'weeks' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
+          <span className="text-[10px] tracking-tight">Semaines</span>
         </button>
 
         {/* Bouton central surélevé Mode Salle (accès instantané en 1 clic pour la séance gym) */}
         <button
           type="button"
           onClick={() => setShowLiveGymModal(true)}
-          className="relative -mt-6 mx-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-600/35 border border-emerald-400/50 active:scale-95 transition-transform cursor-pointer"
+          className="relative -mt-6 mx-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-600/40 border border-emerald-400/50 touch-press active:scale-88 active:brightness-125 active:shadow-emerald-500/60 transition-all cursor-pointer group"
           title="Lancer le Mode Salle"
         >
-          <Dumbbell size={20} className={hasGymDraft ? 'animate-pulse' : ''} />
+          <Dumbbell size={20} className={`group-hover:rotate-12 transition-transform ${hasGymDraft ? 'animate-pulse' : ''}`} />
           <span className="text-[9px] font-extrabold mt-0.5 tracking-tight whitespace-nowrap">Salle ⏱️</span>
           {hasGymDraft && (
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
@@ -1182,24 +1200,24 @@ function AppContent() {
         <button
           type="button"
           onClick={() => setActiveTab('physiology')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
-            activeTab === 'physiology' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
+            activeTab === 'physiology' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
           }`}
         >
-          <TrendingUp size={18} className={activeTab === 'physiology' ? 'text-blue-400 scale-110' : ''} />
-          <span className="text-[10px]">Banister</span>
+          <TrendingUp size={18} className={`transition-transform duration-200 ${activeTab === 'physiology' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
+          <span className="text-[10px] tracking-tight">Banister</span>
         </button>
 
         {/* Onglet 5: Cycles */}
         <button
           type="button"
           onClick={() => setActiveTab('periodization')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 transition-all cursor-pointer ${
-            activeTab === 'periodization' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
+            activeTab === 'periodization' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
           }`}
         >
-          <Target size={18} className={activeTab === 'periodization' ? 'text-blue-400 scale-110' : ''} />
-          <span className="text-[10px]">Cycles</span>
+          <Target size={18} className={`transition-transform duration-200 ${activeTab === 'periodization' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
+          <span className="text-[10px] tracking-tight">Cycles</span>
         </button>
       </nav>
     </div>

@@ -361,7 +361,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               <button
                 key={week.weekId}
                 onClick={() => setSelectedWeekId(week.weekId)}
-                className={`flex flex-col p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
+                className={`flex flex-col p-3 rounded-xl border text-left touch-press active:scale-95 active:brightness-110 transition-all cursor-pointer relative ${
                   isSelected
                     ? 'bg-blue-600/20 border-blue-500 shadow-md shadow-blue-500/20 text-white'
                     : isCurrent

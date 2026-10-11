@@ -12,6 +12,7 @@ import {
   ChevronLeft, ChevronRight, Calendar, Compass, ArrowLeftRight,
   BarChart3, Scale, Zap, Clock
 } from 'lucide-react';
+import { haptics } from '../utils/haptics';
 
 export default function Grid({ 
   timeline, 
@@ -248,8 +249,11 @@ export default function Grid({
             {onOpenWeeklyView && (
               <button
                 type="button"
-                onClick={onOpenWeeklyView}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 transition-all cursor-pointer shadow-sm"
+                onClick={() => {
+                  haptics.modeSwitch();
+                  onOpenWeeklyView();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 touch-press active:scale-92 active:bg-blue-600/40 transition-all cursor-pointer shadow-sm"
                 title="Consulter le bilan hebdomadaire complet, les graphiques et le comparateur"
               >
                 <BarChart3 size={13} />
@@ -264,8 +268,11 @@ export default function Grid({
         <div className="flex items-center gap-1.5 self-center sm:self-auto">
           <button
             type="button"
-            onClick={() => scrollHorizontally(-400)}
-            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
+            onClick={() => {
+              haptics.tap();
+              scrollHorizontally(-400);
+            }}
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 touch-press active:scale-92 active:bg-white/15 transition-all cursor-pointer shadow-sm"
             title="Glisser vers le passé (-7 jours)"
           >
             <ChevronLeft size={14} className="text-sky-400" />
@@ -275,8 +282,11 @@ export default function Grid({
 
           <button
             type="button"
-            onClick={scrollToToday}
-            className="flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer border border-blue-400/40"
+            onClick={() => {
+              haptics.tap();
+              scrollToToday();
+            }}
+            className="flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 border border-blue-400/40 touch-press active:scale-92 active:brightness-125 transition-all cursor-pointer"
             title="Recentrer immédiatement la vue sur le jour d'aujourd'hui"
           >
             <Calendar size={13} />
@@ -286,8 +296,11 @@ export default function Grid({
 
           <button
             type="button"
-            onClick={() => scrollHorizontally(400)}
-            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all cursor-pointer shadow-sm"
+            onClick={() => {
+              haptics.tap();
+              scrollHorizontally(400);
+            }}
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 touch-press active:scale-92 active:bg-white/15 transition-all cursor-pointer shadow-sm"
             title="Glisser vers le futur (+7 jours)"
           >
             <span className="hidden sm:inline">Futur (+7j)</span>
@@ -717,7 +730,10 @@ export default function Grid({
                         >
                            <div 
                               className={`relative flex items-center justify-center w-full h-8 rounded-lg border transition-all cursor-pointer cell-interactive ${cellHeatmapStyle} ${cellState.isBurnout ? 'burnout' : ''}`}
-                              onClick={() => onCellClick(q, day.dateStr, sessionData)}
+                              onClick={() => {
+                                haptics.tap();
+                                onCellClick(q, day.dateStr, sessionData);
+                              }}
                            >
                              {cellState.isBurnout && (
                                <span className="absolute top-0 right-0 -mt-1 -mr-1 text-[10px] z-20">🔥</span>

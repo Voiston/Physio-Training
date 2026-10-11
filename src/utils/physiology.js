@@ -19,7 +19,7 @@ export const DEFAULT_QUALITIES = [
   { id: 'pull', name: 'Musculation Pull', g: 8, o: 5, retentionDays: 30, category: 'force' },
   { id: 'push', name: 'Musculation Push', g: 8, o: 5, retentionDays: 30, category: 'force' },
   { id: 'isolation', name: 'Micro-séance / Isolation', g: 4, o: 2, retentionDays: 10, category: 'force' },
-  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, retentionDays: 30, category: 'force', impacts: [{ id: 'plyo', ratio: 0.3, confidence: 'estimé' }, { id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
+  { id: 'leg', name: 'Musculation Leg', g: 8, o: 5, retentionDays: 30, category: 'force', impacts: [{ id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'plyo', name: 'Plyométrie', g: 5, o: 3, retentionDays: 5, category: 'force', impacts: [{ id: 'leg', ratio: 0.4, confidence: 'estimé' }, { id: 'sprint', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'co2', name: 'Tolérance CO2', g: 6, o: 4, retentionDays: 10, category: 'cardio' },
   { id: 'abdos', name: 'Protocole Abdos', g: 7, o: 4, retentionDays: 7, category: 'force' },

@@ -21,6 +21,7 @@ import {
   playVictoryFanfare, 
   triggerVibration 
 } from '../utils/audioHelpers';
+import { haptics } from '../utils/haptics';
 
 export interface LiveSet {
   id: string;
@@ -337,6 +338,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     };
 
     setActiveExercises([initialEx]);
+    haptics.modeSwitch();
     setStage('active');
   };
 
@@ -384,6 +386,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     setElapsedSeconds(0);
     setIsWorkoutPaused(false);
     setRestTimer(null);
+    haptics.modeSwitch();
     setStage('active');
   };
 
@@ -406,6 +409,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
             label: parsed.restTimer.exerciseName
           });
         }
+        haptics.modeSwitch();
         setStage('active');
       }
     } catch (e) {
@@ -582,6 +586,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
   // --- FIN DE SÉANCE ET ENREGISTREMENT ---
   const handleOpenSummary = () => {
+    haptics.validate();
     // Calculer RPE suggéré à partir de la moyenne des RIR et des séries
     const completedSetsList = activeExercises.flatMap(ex => ex.sets.filter(s => s.completed));
     let suggestedRpe = 8;
@@ -594,6 +599,9 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   };
 
   const handleConfirmSaveSession = () => {
+    // Vibration physique de succès et célébration
+    haptics.success();
+
     // Conversion en structure compatible avec le reste de l'application
     const sessionDurationMin = Math.max(5, Math.round(elapsedSeconds / 60));
     const isIso = selectedQualityId === 'isolation';
@@ -665,6 +673,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
   const handleAbandonWorkout = () => {
     if (window.confirm('Voulez-vous vraiment abandonner cette séance ? Les données non enregistrées seront effacées.')) {
+      haptics.warning();
       try {
         localStorage.removeItem(STORAGE_DRAFT_KEY);
       } catch (e) {

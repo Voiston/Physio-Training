@@ -271,7 +271,7 @@ export function useData() {
               ...q,
               retentionDays: def.retentionDays,
               category: def.category,
-              impacts: q.impacts || def.impacts
+              impacts: q.id === 'leg' ? def.impacts : (q.impacts || def.impacts)
             };
           }
           return q;

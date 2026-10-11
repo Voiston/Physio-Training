@@ -1,3 +1,5 @@
+import { triggerHaptic } from './haptics';
+
 /**
  * Helpers audio et haptiques pour le Mode Salle / Live Gym Tracker
  * Utilise la Web Audio API (aucun fichier audio externe requis) et la Vibration API
@@ -158,11 +160,5 @@ export function playVictoryFanfare() {
  * Déclenche une vibration haptique si supportée par le terminal (smartphone)
  */
 export function triggerVibration(pattern: number | number[]) {
-  try {
-    if (typeof window !== 'undefined' && 'navigator' in window && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(pattern);
-    }
-  } catch (e) {
-    // Ignore
-  }
+  triggerHaptic(pattern);
 }
