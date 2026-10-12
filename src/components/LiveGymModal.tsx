@@ -3,7 +3,7 @@ import {
   Play, Pause, RotateCcw, Plus, Trash2, Check, Clock, Dumbbell, 
   ChevronDown, ChevronUp, AlertCircle, Sparkles, Volume2, VolumeX,
   X, Flame, Zap, ArrowRight, CheckCircle2, ChevronRight, Search, 
-  Layers, ShieldAlert, Award, Timer, BatteryCharging, Info
+  Layers, ShieldAlert, Award, Timer, BatteryCharging, Info, Sun
 } from 'lucide-react';
 import { 
   MUSCLE_GROUPS, 
@@ -428,9 +428,28 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
   // Gestion du Wake Lock API pour empêcher l'écran du smartphone de se verrouiller
   const wakeLockRef = useRef<any>(null);
+  const [keepScreenAwake, setKeepScreenAwake] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('physio_wake_lock_enabled');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleKeepScreenAwake = () => {
+    setKeepScreenAwake(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('physio_wake_lock_enabled', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
-    if (!isOpen || stage !== 'active') {
+    // Relâcher le Wake Lock si la séance est terminée, en pause, ou si l'utilisateur a désactivé le maintien de l'écran
+    if (!isOpen || stage !== 'active' || isWorkoutPaused || !keepScreenAwake) {
       if (wakeLockRef.current) {
         try {
           wakeLockRef.current.release();
@@ -456,7 +475,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     requestWakeLock();
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && stage === 'active') {
+      if (document.visibilityState === 'visible' && stage === 'active' && !isWorkoutPaused && keepScreenAwake) {
         requestWakeLock();
       }
     };
@@ -473,7 +492,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         wakeLockRef.current = null;
       }
     };
-  }, [isOpen, stage]);
+  }, [isOpen, stage, isWorkoutPaused, keepScreenAwake]);
 
   // Vérifier s'il existe déjà un brouillon sauvegardé dans localStorage
   useEffect(() => {
@@ -1181,20 +1200,32 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               </div>
             </div>
 
-            {/* Préférences Audio */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
+            {/* Préférences Audio & Écran */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs text-slate-400">
               <span className="flex items-center gap-2">
                 <Timer size={15} className="text-slate-400" />
-                Minuteur automatique après validation de série (bips & haptique)
+                Minuteur automatique après validation de série
               </span>
-              <button
-                type="button"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors"
-              >
-                {soundEnabled ? <Volume2 size={14} className="text-emerald-400" /> : <VolumeX size={14} className="text-rose-400" />}
-                {soundEnabled ? 'Sons activés' : 'Muet'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleKeepScreenAwake}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer"
+                  title={keepScreenAwake ? "L'écran reste allumé pendant la séance" : "L'écran peut se mettre en veille pour économiser la batterie"}
+                  aria-label={keepScreenAwake ? "Écran maintenu allumé activé" : "Veille normale de l'écran activée"}
+                >
+                  <Sun size={14} className={keepScreenAwake ? "text-amber-400" : "text-slate-500"} />
+                  {keepScreenAwake ? 'Écran allumé' : 'Veille auto'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-colors cursor-pointer"
+                >
+                  {soundEnabled ? <Volume2 size={14} className="text-emerald-400" /> : <VolumeX size={14} className="text-rose-400" />}
+                  {soundEnabled ? 'Sons activés' : 'Muet'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1242,6 +1273,19 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
               {/* Bouton Pause & Fin de séance */}
               <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={toggleKeepScreenAwake}
+                  className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                    keepScreenAwake 
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20' 
+                      : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'
+                  }`}
+                  title={keepScreenAwake ? "Écran maintenu allumé (cliquer pour autoriser la veille)" : "Veille automatique autorisée (cliquer pour forcer l'écran allumé)"}
+                  aria-label={keepScreenAwake ? "Écran maintenu allumé actif" : "Mise en veille normale de l'écran active"}
+                >
+                  <Sun size={16} />
+                </button>
                 <button
                   type="button"
                   onClick={handleToggleWorkoutPause}

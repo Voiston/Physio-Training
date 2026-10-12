@@ -6,6 +6,19 @@ import { triggerHaptic } from './haptics';
  */
 
 let audioCtx: AudioContext | null = null;
+let suspendTimeoutId: number | null = null;
+
+function scheduleAudioContextSuspend() {
+  if (typeof window === 'undefined') return;
+  if (suspendTimeoutId !== null) {
+    window.clearTimeout(suspendTimeoutId);
+  }
+  suspendTimeoutId = window.setTimeout(() => {
+    if (audioCtx && audioCtx.state === 'running') {
+      audioCtx.suspend().catch(() => {});
+    }
+  }, 1500);
+}
 
 function getAudioContext(): AudioContext | null {
   try {
@@ -17,6 +30,7 @@ function getAudioContext(): AudioContext | null {
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
+    scheduleAudioContextSuspend();
     return audioCtx;
   } catch (err) {
     console.warn('AudioContext non disponible:', err);
