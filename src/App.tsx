@@ -1,28 +1,39 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { disableNetwork, enableNetwork } from 'firebase/firestore';
 import { db } from './firebase';
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
 import { useData } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
 import Grid from './components/Grid';
-import ScoreModal from './components/ScoreModal';
-import MetricModal from './components/MetricModal';
-import QualityChartModal from './components/QualityChartModal';
 import RadarChart from './components/RadarChart';
-import MetricsDashboard from './components/MetricsDashboard';
-import TrainingBlocksModal from './components/TrainingBlocksModal';
 import SmartSuggestions from './components/SmartSuggestions';
-import { PeriodizationView } from './components/PeriodizationView';
-import { WeeklyAnalysisView } from './components/WeeklyAnalysisView';
-import { CompetitionModal } from './components/CompetitionModal';
-import { TrainingReportModal } from './components/TrainingReportModal';
-import { PhysiologicalSettingsModal } from './components/PhysiologicalSettingsModal';
-import { LiveGymModal } from './components/LiveGymModal';
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { CloudSyncModal } from './components/CloudSyncModal';
 import { ToastProvider, useToast } from './components/Toast';
+
+// Vues découpées en code-splitting asynchrone (chargement à la demande par onglet)
+const MetricsDashboard = lazy(() => import('./components/MetricsDashboard'));
+const WeeklyAnalysisView = lazy(() => import('./components/WeeklyAnalysisView').then(m => ({ default: m.WeeklyAnalysisView })));
+const PeriodizationView = lazy(() => import('./components/PeriodizationView').then(m => ({ default: m.PeriodizationView })));
+
+// Modales découpées en code-splitting (chargées uniquement lors de l'interaction utilisateur)
+const ScoreModal = lazy(() => import('./components/ScoreModal'));
+const MetricModal = lazy(() => import('./components/MetricModal'));
+const QualityChartModal = lazy(() => import('./components/QualityChartModal'));
+const TrainingBlocksModal = lazy(() => import('./components/TrainingBlocksModal'));
+const CompetitionModal = lazy(() => import('./components/CompetitionModal').then(m => ({ default: m.CompetitionModal })));
+const TrainingReportModal = lazy(() => import('./components/TrainingReportModal').then(m => ({ default: m.TrainingReportModal })));
+const PhysiologicalSettingsModal = lazy(() => import('./components/PhysiologicalSettingsModal').then(m => ({ default: m.PhysiologicalSettingsModal })));
+const LiveGymModal = lazy(() => import('./components/LiveGymModal').then(m => ({ default: m.LiveGymModal })));
+const CloudSyncModal = lazy(() => import('./components/CloudSyncModal').then(m => ({ default: m.CloudSyncModal })));
+
+const ViewFallback = () => (
+  <div className="w-full min-h-[380px] flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md animate-pulse">
+    <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
+    <span className="text-xs text-slate-400 font-mono">Chargement du module d'analyse...</span>
+  </div>
+);
 import { haptics } from './utils/haptics';
 import { computeAllWeeksStats } from './utils/weekHelpers';
 import { 
@@ -870,96 +881,106 @@ function AppContent() {
 
         {/* ONGLET NOUVEAU : SYNTHÈSE & VOLUMES HEBDOMADAIRES */}
         {activeTab === 'weeks' && (
-          <div className="w-full animate-fadeIn">
-            <WeeklyAnalysisView 
-              events={events} 
-              qualities={qualities}
-              onOpenScoreModal={(q: any, dateStr: string, currentData: any) => {
-                setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
-              }}
-              showToast={showToast}
-            />
-          </div>
+          <Suspense fallback={<ViewFallback />}>
+            <div className="w-full animate-fadeIn">
+              <WeeklyAnalysisView 
+                events={events} 
+                qualities={qualities}
+                onOpenScoreModal={(q: any, dateStr: string, currentData: any) => {
+                  setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
+                }}
+                showToast={showToast}
+              />
+            </div>
+          </Suspense>
         )}
 
         {/* ONGLET 2 : ANALYSES PHYSIOLOGIQUES & BANISTER */}
         {activeTab === 'physiology' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
-            <MetricsDashboard 
-              events={events} 
-              dailyMetrics={dailyMetrics} 
-              qualities={qualities}
-              qualitiesEMA={qualitiesEMA}
-              fosterMetrics={fosterMetrics}
-              banisterPerformance={banisterPerformance}
-              taperingAnalysis={taperingAnalysis}
-              cardioMuscularBalance={cardioMuscularBalance}
-              intensityDistribution={intensityDistribution}
-              perceivedFatigueAnalysis={perceivedFatigueAnalysis}
-              isSimulationActive={isSimulationActive}
-              physioSettings={physioSettings}
-              trainingBlocks={trainingBlocks}
-              viewMode="physiology"
-              onOpenCompetitionModal={() => setShowCompetitionModal(true)}
-              onOpenReportModal={() => setShowReportModal(true)}
-              onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
-              onToggleSimulation={toggleSimulation}
-            />
-          </div>
+          <Suspense fallback={<ViewFallback />}>
+            <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
+              <MetricsDashboard 
+                events={events} 
+                dailyMetrics={dailyMetrics} 
+                qualities={qualities}
+                qualitiesEMA={qualitiesEMA}
+                fosterMetrics={fosterMetrics}
+                banisterPerformance={banisterPerformance}
+                taperingAnalysis={taperingAnalysis}
+                cardioMuscularBalance={cardioMuscularBalance}
+                intensityDistribution={intensityDistribution}
+                perceivedFatigueAnalysis={perceivedFatigueAnalysis}
+                isSimulationActive={isSimulationActive}
+                physioSettings={physioSettings}
+                trainingBlocks={trainingBlocks}
+                viewMode="physiology"
+                onOpenCompetitionModal={() => setShowCompetitionModal(true)}
+                onOpenReportModal={() => setShowReportModal(true)}
+                onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
+                onToggleSimulation={toggleSimulation}
+              />
+            </div>
+          </Suspense>
         )}
 
         {/* ONGLET 3 : QUALITÉS & RÉMANENCE EMA */}
         {activeTab === 'qualities' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
-            <MetricsDashboard 
-              events={events} 
-              dailyMetrics={dailyMetrics} 
-              qualities={qualities}
-              qualitiesEMA={qualitiesEMA}
-              fosterMetrics={fosterMetrics}
-              banisterPerformance={banisterPerformance}
-              taperingAnalysis={taperingAnalysis}
-              cardioMuscularBalance={cardioMuscularBalance}
-              intensityDistribution={intensityDistribution}
-              perceivedFatigueAnalysis={perceivedFatigueAnalysis}
-              isSimulationActive={isSimulationActive}
-              physioSettings={physioSettings}
-              trainingBlocks={trainingBlocks}
-              viewMode="qualities"
-              onOpenCompetitionModal={() => setShowCompetitionModal(true)}
-              onOpenReportModal={() => setShowReportModal(true)}
-              onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
-              onToggleSimulation={toggleSimulation}
-            />
-          </div>
+          <Suspense fallback={<ViewFallback />}>
+            <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
+              <MetricsDashboard 
+                events={events} 
+                dailyMetrics={dailyMetrics} 
+                qualities={qualities}
+                qualitiesEMA={qualitiesEMA}
+                fosterMetrics={fosterMetrics}
+                banisterPerformance={banisterPerformance}
+                taperingAnalysis={taperingAnalysis}
+                cardioMuscularBalance={cardioMuscularBalance}
+                intensityDistribution={intensityDistribution}
+                perceivedFatigueAnalysis={perceivedFatigueAnalysis}
+                isSimulationActive={isSimulationActive}
+                physioSettings={physioSettings}
+                trainingBlocks={trainingBlocks}
+                viewMode="qualities"
+                onOpenCompetitionModal={() => setShowCompetitionModal(true)}
+                onOpenReportModal={() => setShowReportModal(true)}
+                onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
+                onToggleSimulation={toggleSimulation}
+              />
+            </div>
+          </Suspense>
         )}
 
         {/* ONGLET 4 : PÉRIODISATION & OBJECTIFS */}
         {activeTab === 'periodization' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
-            <PeriodizationView
-              activeBlock={activeBlockToday}
-              blocks={trainingBlocks}
-              templates={blockTemplates}
-              qualities={qualities}
-              targetCompetition={targetCompetition}
-              taperingAnalysis={taperingAnalysis}
-              fosterMetrics={fosterMetrics}
-              banisterPerformance={banisterPerformance}
-              cardioMuscularBalance={cardioMuscularBalance}
-              physioSettings={physioSettings}
-              onOpenBlocksModal={() => setShowBlocksModal(true)}
-              onOpenCompetitionModal={() => setShowCompetitionModal(true)}
-              onOpenReportModal={() => setShowReportModal(true)}
-              onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
-            />
-          </div>
+          <Suspense fallback={<ViewFallback />}>
+            <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
+              <PeriodizationView
+                activeBlock={activeBlockToday}
+                blocks={trainingBlocks}
+                templates={blockTemplates}
+                qualities={qualities}
+                targetCompetition={targetCompetition}
+                taperingAnalysis={taperingAnalysis}
+                fosterMetrics={fosterMetrics}
+                banisterPerformance={banisterPerformance}
+                cardioMuscularBalance={cardioMuscularBalance}
+                physioSettings={physioSettings}
+                onOpenBlocksModal={() => setShowBlocksModal(true)}
+                onOpenCompetitionModal={() => setShowCompetitionModal(true)}
+                onOpenReportModal={() => setShowReportModal(true)}
+                onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
+              />
+            </div>
+          </Suspense>
         )}
 
         </main>
       </div>
 
-      {modalInfo && (
+      {/* Modales asynchrones avec frontière Suspense */}
+      <Suspense fallback={null}>
+        {modalInfo && (
         <ScoreModal 
           info={modalInfo}
           qualities={qualities}
@@ -1161,6 +1182,7 @@ function AppContent() {
           });
         }}
       />
+      </Suspense>
 
       {/* BARRE DE NAVIGATION INFÉRIEURE MOBILE (Sticky bottom tactile avec bouton central Mode Salle) */}
       <nav 

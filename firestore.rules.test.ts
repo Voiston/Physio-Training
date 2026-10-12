@@ -14,7 +14,8 @@ import path from 'path';
 describe('Firestore Security Rules - Vraie Vérification & Invariants', () => {
   const ALLOWED_EMAILS = [
     'poketime.idle@gmail.com',
-    'david.voisard2@gmail.com'
+    'david.voisard2@gmail.com',
+    'vdcoachsportif@gmail.com'
   ];
 
   const validUid = 'user_abc123';
@@ -228,6 +229,16 @@ describe('Firestore Security Rules - Vraie Vérification & Invariants', () => {
         { uid: 'david_uid', email: 'david.voisard2@gmail.com', emailVerified: true },
         'david_uid',
         { ...validRecord, userId: 'david_uid', userEmail: 'david.voisard2@gmail.com' }
+      );
+      expect(res.allowed).toBe(true);
+    });
+
+    // 11. Accès légitime pour le coach principal vdcoachsportif@gmail.com
+    it('autorise l’écriture et la lecture pour vdcoachsportif@gmail.com', () => {
+      const res = validatePayload(
+        { uid: 'coach_uid', email: 'vdcoachsportif@gmail.com', emailVerified: true },
+        'coach_uid',
+        { ...validRecord, userId: 'coach_uid', userEmail: 'vdcoachsportif@gmail.com' }
       );
       expect(res.allowed).toBe(true);
     });

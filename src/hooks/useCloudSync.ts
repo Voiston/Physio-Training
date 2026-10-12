@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import QRCode from 'qrcode';
 import { 
   db, 
   auth, 
@@ -139,21 +138,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     onClearLocalHealthDataRef.current = onClearLocalHealthData;
   }, [onClearLocalHealthData]);
 
-  // QR Code to open the app directly on smartphone
-  const pairingUrl = `${window.location.origin}${window.location.pathname}`;
-
-  useEffect(() => {
-    QRCode.toDataURL(pairingUrl, {
-      width: 240,
-      margin: 1.5,
-      color: {
-        dark: '#3b82f6',
-        light: '#0f172a',
-      },
-    })
-      .then(url => setQrCodeUrl(url))
-      .catch(err => console.error('Failed to generate QR code:', err));
-  }, [pairingUrl]);
+  // QR Code pairing URL to open the app directly on smartphone
+  const pairingUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${typeof window !== 'undefined' ? window.location.pathname : ''}`;
 
   // Push local data to Firestore user document
   const pushToCloud = useCallback(

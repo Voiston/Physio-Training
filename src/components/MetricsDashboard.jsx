@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { 
   AreaChart, Area, ComposedChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, ReferenceLine 
@@ -141,6 +141,71 @@ function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 
     tsbPercent 
   };
 }
+
+/**
+ * Tooltip hautement optimisé à l'échelle du module :
+ * Évite d'être recréé à chaque re-render de MetricsDashboard et supprime les saccades Recharts
+ */
+const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    const dataItem = payload[0]?.payload;
+    const isFut = dataItem?.isFuture;
+    const isTod = dataItem?.isToday;
+
+    return (
+      <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.5)] max-w-xs pointer-events-none select-none">
+        <div className="flex items-center justify-between gap-3 mb-2 pb-1 border-b border-white/10">
+          <span className="font-bold text-slate-100 uppercase text-[10px] tracking-wider font-mono">
+            {dataItem?.dateStr || `Jour ${label}`}
+          </span>
+          {isTod && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300">
+              Aujourd'hui
+            </span>
+          )}
+          {isFut && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300">
+              Projection J+{dataItem.offset}
+            </span>
+          )}
+        </div>
+        {payload.map((p, i) => (
+          <p key={i} style={{ color: p.color }} className="m-0 text-xs font-semibold py-0.5 flex justify-between gap-4">
+            <span>{p.name} :</span>
+            <span className="font-mono font-bold">{p.value}</span>
+          </p>
+        ))}
+
+        {/* Séances associées à cette date */}
+        {dataItem?.sessions && dataItem.sessions.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-white/10">
+            <span className="text-[10px] text-slate-400 font-semibold block mb-1">
+              Séances du jour ({dataItem.sessions.length}) :
+            </span>
+            <div className="space-y-1">
+              {dataItem.sessions.map((s, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-2 text-[10px] bg-white/5 px-1.5 py-0.5 rounded">
+                  <span className="truncate max-w-[130px] font-medium text-slate-200">{s.qualityName}</span>
+                  <span className="font-mono font-bold text-amber-300 shrink-0">{s.load} pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Biométrie du réveil */}
+        {(dataItem?.vfc || dataItem?.hrRest || dataItem?.readiness) && (
+          <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2 text-[10px] font-mono">
+            {dataItem.readiness && <span className="text-blue-300">Readiness : {dataItem.readiness}/10</span>}
+            {dataItem.vfc && <span className="text-emerald-300">VFC : {dataItem.vfc} ms</span>}
+            {dataItem.hrRest && <span className="text-rose-300">FC : {dataItem.hrRest} bpm</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+});
 
 export default function MetricsDashboard({ 
   events = {}, 
@@ -732,67 +797,6 @@ export default function MetricsDashboard({
 
     return insights;
   }, [chartData, vfcAnalysis, hrRestAnalysis, fatigueReport, intensity]);
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const dataItem = payload[0]?.payload;
-      const isFut = dataItem?.isFuture;
-      const isTod = dataItem?.isToday;
-
-      return (
-        <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.5)] max-w-xs">
-          <div className="flex items-center justify-between gap-3 mb-2 pb-1 border-b border-white/10">
-            <span className="font-bold text-slate-100 uppercase text-[10px] tracking-wider font-mono">
-              {dataItem?.dateStr || `Jour ${label}`}
-            </span>
-            {isTod && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300">
-                Aujourd'hui
-              </span>
-            )}
-            {isFut && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300">
-                Projection J+{dataItem.offset}
-              </span>
-            )}
-          </div>
-          {payload.map((p, i) => (
-            <p key={i} style={{ color: p.color }} className="m-0 text-xs font-semibold py-0.5 flex justify-between gap-4">
-              <span>{p.name} :</span>
-              <span className="font-mono font-bold">{p.value}</span>
-            </p>
-          ))}
-
-          {/* Séances associées à cette date */}
-          {dataItem?.sessions && dataItem.sessions.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-white/10">
-              <span className="text-[10px] text-slate-400 font-semibold block mb-1">
-                Séances du jour ({dataItem.sessions.length}) :
-              </span>
-              <div className="space-y-1">
-                {dataItem.sessions.map((s, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-2 text-[10px] bg-white/5 px-1.5 py-0.5 rounded">
-                    <span className="truncate max-w-[130px] font-medium text-slate-200">{s.qualityName}</span>
-                    <span className="font-mono font-bold text-amber-300 shrink-0">{s.load} pts</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Biométrie du réveil */}
-          {(dataItem?.vfc || dataItem?.hrRest || dataItem?.readiness) && (
-            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2 text-[10px] font-mono">
-              {dataItem.readiness && <span className="text-blue-300">Readiness : {dataItem.readiness}/10</span>}
-              {dataItem.vfc && <span className="text-emerald-300">VFC : {dataItem.vfc} ms</span>}
-              {dataItem.hrRest && <span className="text-rose-300">FC : {dataItem.hrRest} bpm</span>}
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
 
   /**
    * Helper d'analyse de magnitude :
@@ -2172,11 +2176,6 @@ export default function MetricsDashboard({
                   <AreaChart 
                     data={chartData} 
                     margin={{ top: 5, right: 8, left: -20, bottom: 0 }}
-                    onMouseMove={(e) => {
-                      if (!isDayPinned && e && e.activePayload && e.activePayload[0]) {
-                        setSelectedBanisterDay(e.activePayload[0].payload);
-                      }
-                    }}
                     onClick={(e) => {
                       if (e && e.activePayload && e.activePayload[0]) {
                         setSelectedBanisterDay(e.activePayload[0].payload);

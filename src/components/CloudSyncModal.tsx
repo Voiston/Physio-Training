@@ -52,6 +52,36 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [localQrCodeUrl, setLocalQrCodeUrl] = useState<string>('');
+
+  // Génération dynamique et asynchrone du code QR à la demande uniquement à l'ouverture de la modale
+  useEffect(() => {
+    if (!isOpen || !pairingUrl || localQrCodeUrl) return;
+
+    let isMounted = true;
+    import('qrcode')
+      .then(m => m.default || m)
+      .then(QRCode => {
+        return QRCode.toDataURL(pairingUrl, {
+          width: 240,
+          margin: 1.5,
+          color: {
+            dark: '#3b82f6',
+            light: '#0f172a',
+          },
+        });
+      })
+      .then(url => {
+        if (isMounted) setLocalQrCodeUrl(url);
+      })
+      .catch(err => {
+        console.warn('Erreur génération QR code:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, pairingUrl, localQrCodeUrl]);
 
   // Fermeture accessible sur touche Escape
   useEffect(() => {
@@ -355,10 +385,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-900 border border-slate-800/80 rounded-xl">
-            {qrCodeUrl ? (
+            {(localQrCodeUrl || qrCodeUrl) ? (
               <div className="p-2.5 bg-slate-950 border border-blue-500/30 rounded-xl shadow-lg shrink-0">
                 <img
-                  src={qrCodeUrl}
+                  src={localQrCodeUrl || qrCodeUrl}
                   alt="Code QR pour appairer et ouvrir l'application sur smartphone"
                   className="w-32 h-32 rounded-lg object-contain"
                 />

@@ -17,7 +17,7 @@ async function startServer() {
   // 2. Defensive HTTP Security Headers
   const CSP_POLICY = [
     "default-src 'self'",
-    "script-src 'self' https://apis.google.com https://www.gstatic.com https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com",
+    "script-src 'self' 'unsafe-inline' https://apis.google.com https://www.gstatic.com https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com",

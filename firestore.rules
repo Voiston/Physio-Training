@@ -29,7 +29,8 @@ service cloud.firestore {
     function isAllowedEmail() {
       return request.auth.token.email.lower() in [
         'poketime.idle@gmail.com',
-        'david.voisard2@gmail.com'
+        'david.voisard2@gmail.com',
+        'vdcoachsportif@gmail.com'
       ];
     }
 
