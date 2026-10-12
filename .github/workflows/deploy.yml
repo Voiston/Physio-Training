@@ -30,6 +30,13 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Ensure lockfile exists
+        run: |
+          if [ -f package.json ] && [ ! -f package-lock.json ]; then
+            echo "Lockfile missing, generating package-lock.json..."
+            npm i --package-lock-only
+          fi
+
       - name: Install dependencies (Strict & Deterministic)
         run: npm ci
 
