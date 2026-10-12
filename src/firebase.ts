@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
+  setPersistence,
+  browserLocalPersistence,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut, 
@@ -21,6 +23,14 @@ export const db = initializeFirestore(
   firebaseConfig.firestoreDatabaseId
 );
 export const auth = getAuth(app);
+
+// Verrouille la persistance locale permanente (survie aux rechargements, fermeture d'onglets et redémarrages)
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch(err => {
+    console.warn('Firebase Auth persistence notice:', err);
+  });
+}
+
 export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
