@@ -37,7 +37,10 @@ export interface CloudSyncOptions {
  * Purge hermétique des données de santé privées dans le localStorage.
  * PRÉSERVE :
  * - 'physio_device_id' (identité de l'appareil matériel pour éviter les boucles d'écho)
- * - 'training_live_session_draft_v1' (brouillon de séance en direct hors-ligne commencé en salle)
+ * PURGE FORMELLEMENT :
+ * - Toutes les clés temporelles YYYY-MM-DD_*
+ * - Toutes les configurations de l'athlète physio_* (hors device_id)
+ * - Le brouillon de séance Mode Salle 'training_live_session_draft_v1'
  */
 export function purgeLocalHealthStorage(): void {
   try {
@@ -60,6 +63,9 @@ export function purgeLocalHealthStorage(): void {
         keysToRemove.push(key);
       }
     }
+
+    // Purge garantie du brouillon de séance en salle sur appareil partagé
+    keysToRemove.push('training_live_session_draft_v1');
 
     keysToRemove.forEach((k) => localStorage.removeItem(k));
   } catch (err) {
