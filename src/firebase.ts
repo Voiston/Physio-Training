@@ -3,13 +3,11 @@ import {
   getAuth, 
   GoogleAuthProvider, 
   signInWithPopup, 
-  signInAnonymously,
   signOut, 
   onAuthStateChanged, 
   type User 
 } from 'firebase/auth';
 import { 
-  getFirestore,
   initializeFirestore 
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -72,5 +70,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-export { signInWithPopup, signInAnonymously, signOut, onAuthStateChanged };
+export { signInWithPopup, signOut, onAuthStateChanged };
 export type { User };

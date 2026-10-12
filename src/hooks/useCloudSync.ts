@@ -94,7 +94,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     let id = localStorage.getItem('physio_device_id');
     if (!id) {
       const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      id = `${isMobileDevice ? 'mobile' : 'pc'}_${Math.random().toString(36).substring(2, 9)}`;
+      const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+      id = `${isMobileDevice ? 'mobile' : 'pc'}_${uuid}`;
       localStorage.setItem('physio_device_id', id);
     }
     return id;

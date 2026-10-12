@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Security Audit
-        run: npm audit --audit-level=critical || true
+        run: npm audit --audit-level=critical
 
       - name: TypeScript Static Typecheck
         run: npm run lint

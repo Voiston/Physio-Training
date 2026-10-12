@@ -14,11 +14,7 @@ async function startServer() {
   // 1. Obfuscation & suppression de l'empreinte serveur
   app.disable('x-powered-by');
 
-  // 2. Limites strictes sur les requêtes pour prévenir les DoS par épuisement mémoire
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: false, limit: '2mb' }));
-
-  // 3. Defensive HTTP Security Headers
+  // 2. Defensive HTTP Security Headers
   const CSP_POLICY = [
     "default-src 'self'",
     "script-src 'self' https://apis.google.com https://www.gstatic.com https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com",
@@ -27,7 +23,6 @@ async function startServer() {
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com",
     "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://festive-condition-nzbz0.firebaseapp.com https://apis.google.com https://accounts.google.com",
     "frame-src 'self' https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com https://apis.google.com",
-    "frame-ancestors 'self'",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
@@ -40,9 +35,8 @@ async function startServer() {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    // HSTS (HTTP Strict Transport Security) : force HTTPS pendant 1 an
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    // HSTS (HTTP Strict Transport Security) : force HTTPS pendant 1 an (sans preload pour éviter de bloquer tout domaine parent)
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     // Permissions Policy
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     // X-XSS-Protection: 0 désactive l'ancien filtre XSS faillible et vulnérable aux attaques par injection
@@ -67,13 +61,15 @@ async function startServer() {
     });
   });
 
-  // 5. Serve Vite in dev mode or static build in production
-  const isProd = process.env.NODE_ENV === 'production' && fs.existsSync(path.join(__dirname, 'dist'));
-
-  if (isProd) {
-    app.use(express.static(path.join(__dirname, 'dist')));
+  // 5. Serve static build in production, or Vite in development
+  if (process.env.NODE_ENV === 'production') {
+    const distPath = path.join(__dirname, 'dist');
+    if (!fs.existsSync(distPath)) {
+      throw new Error('Production bundle missing: "dist" folder not found. Run "npm run build" first.');
+    }
+    app.use(express.static(distPath));
     app.get('*', (_req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   } else {
     const { createServer: createViteServer } = await import('vite');

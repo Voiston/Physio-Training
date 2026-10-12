@@ -64,6 +64,16 @@ export interface LiveSessionDraft {
   } | null;
 }
 
+function isValidLiveDraft(data: unknown): data is LiveSessionDraft {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  if (typeof d.qualityId !== 'string') return false;
+  if (!Array.isArray(d.exercises)) return false;
+  return d.exercises.every((ex: any) => (
+    ex && typeof ex === 'object' && typeof ex.name === 'string' && Array.isArray(ex.sets)
+  ));
+}
+
 interface QualityOption {
   id: string;
   name: string;
@@ -258,13 +268,16 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     try {
       const saved = localStorage.getItem(STORAGE_DRAFT_KEY);
       if (saved) {
-        const parsed: LiveSessionDraft = JSON.parse(saved);
-        if (parsed.exercises && parsed.exercises.length > 0) {
+        const parsed = JSON.parse(saved);
+        if (isValidLiveDraft(parsed) && parsed.exercises.length > 0) {
           setDraftExists(true);
+        } else {
+          localStorage.removeItem(STORAGE_DRAFT_KEY);
         }
       }
     } catch (e) {
-      // Ignore
+      // Nettoyer si corrompu
+      try { localStorage.removeItem(STORAGE_DRAFT_KEY); } catch {}
     }
   }, [isOpen]);
 
@@ -464,9 +477,14 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     try {
       const saved = localStorage.getItem(STORAGE_DRAFT_KEY);
       if (saved) {
-        const parsed: LiveSessionDraft = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!isValidLiveDraft(parsed)) {
+          localStorage.removeItem(STORAGE_DRAFT_KEY);
+          handleStartBlank();
+          return;
+        }
         if (parsed.qualityId) setSelectedQualityId(parsed.qualityId);
-        if (parsed.elapsedSeconds) setElapsedSeconds(parsed.elapsedSeconds);
+        if (typeof parsed.elapsedSeconds === 'number') setElapsedSeconds(parsed.elapsedSeconds);
         if (parsed.isPaused !== undefined) setIsWorkoutPaused(parsed.isPaused);
         if (parsed.exercises && parsed.exercises.length > 0) {
           setActiveExercises(parsed.exercises);
