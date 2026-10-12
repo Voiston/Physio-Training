@@ -30,9 +30,59 @@ export interface UserAccount {
 export interface CloudSyncOptions {
   onRemoteDataReceived: (remoteData: any, senderDeviceId?: string) => void;
   getExportableData: () => any;
+  onClearLocalHealthData?: () => void;
 }
 
-export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudSyncOptions) {
+/**
+ * Purge hermétique des données de santé privées dans le localStorage.
+ * PRÉSERVE :
+ * - 'physio_device_id' (identité de l'appareil matériel pour éviter les boucles d'écho)
+ * - 'training_live_session_draft_v1' (brouillon de séance en direct hors-ligne commencé en salle)
+ */
+export function purgeLocalHealthStorage(): void {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      // Clés de santé temporelles YYYY-MM-DD_*
+      if (/^\d{4}-\d{2}-\d{2}_/.test(key)) {
+        keysToRemove.push(key);
+        continue;
+      }
+
+      // Clés de profil et configurations de l'athlète
+      if (
+        key.startsWith('physio_') &&
+        key !== 'physio_device_id' // Préservé
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (err) {
+    console.warn('Erreur lors de la purge sécurisée du stockage local:', err);
+  }
+}
+
+/**
+ * Vérifie si le localStorage contient des données significatives de santé
+ */
+export function hasLocalHealthData(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && /^\d{4}-\d{2}-\d{2}_/.test(key)) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
+export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearLocalHealthData }: CloudSyncOptions) {
   // 1. Device identity (distinguish PC vs Mobile to avoid self-echo)
   const [deviceId] = useState<string>(() => {
     let id = localStorage.getItem('physio_device_id');
@@ -61,11 +111,14 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [syncNotification, setSyncNotification] = useState<string | null>(null);
 
+  const [confirmFirstPush, setConfirmFirstPush] = useState<boolean>(false);
+
   const debounceTimerRef = useRef<any>(null);
   const isRemoteUpdatingRef = useRef<boolean>(false);
 
   const onRemoteDataReceivedRef = useRef(onRemoteDataReceived);
   const getExportableDataRef = useRef(getExportableData);
+  const onClearLocalHealthDataRef = useRef(onClearLocalHealthData);
 
   useEffect(() => {
     onRemoteDataReceivedRef.current = onRemoteDataReceived;
@@ -74,6 +127,10 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
   useEffect(() => {
     getExportableDataRef.current = getExportableData;
   }, [getExportableData]);
+
+  useEffect(() => {
+    onClearLocalHealthDataRef.current = onClearLocalHealthData;
+  }, [onClearLocalHealthData]);
 
   // QR Code to open the app directly on smartphone
   const pairingUrl = `${window.location.origin}${window.location.pathname}`;
@@ -129,6 +186,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
 
         setSyncStatus('synced');
         setLastSyncedAt(new Date());
+        setConfirmFirstPush(false);
       } catch (err) {
         console.warn('Firestore push error:', err);
         setSyncStatus(navigator.onLine ? 'error' : 'offline');
@@ -225,7 +283,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
       localStorage.setItem('physio_user_account', JSON.stringify(account));
       setSyncNotification(`Connecté avec ${email} · Synchronisation Cloud active`);
       
-      // Pull remote data or push local data
+      // Pull remote data or handle snapshot
       pullFromCloudRef.current();
     } catch (err: any) {
       console.warn('Google sign-in exception:', err?.message || err);
@@ -240,16 +298,45 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
     }
   }, []);
 
-  // Logout
+  // Logout avec PURGE SÉCURISÉE du localStorage pour cloisonner les données de santé sur appareil partagé
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch {}
+
+    // 1. Purge du compte Google enregistré
     localStorage.removeItem('physio_user_account');
     setCurrentUser(null);
     setUserAccount(null);
     setSyncStatus('unpaired');
-    setSyncNotification('Déconnecté du compte Google');
+    setConfirmFirstPush(false);
+
+    // 2. Purge de toutes les données de santé locales (VFC, RPE, charges, blocs, etc.)
+    purgeLocalHealthStorage();
+
+    // 3. Réinitialisation des états en mémoire du client React
+    if (onClearLocalHealthDataRef.current) {
+      onClearLocalHealthDataRef.current();
+    }
+
+    setSyncNotification('Déconnecté : données de santé locales sécurisées et purgées de cet appareil');
+  }, []);
+
+  // Annuler le premier push sur un compte vierge (réinitialise localement)
+  const rejectFirstPush = useCallback(() => {
+    setConfirmFirstPush(false);
+    purgeLocalHealthStorage();
+    if (onClearLocalHealthDataRef.current) {
+      onClearLocalHealthDataRef.current();
+    }
+    setSyncNotification('Nouveau compte initialisé sans les données de l\'appareil');
+  }, []);
+
+  // Confirmer le premier push sur un compte vierge (importe les données locales vers le cloud)
+  const acceptFirstPush = useCallback(() => {
+    setConfirmFirstPush(false);
+    pushToCloudRef.current();
+    setSyncNotification('Données locales associées avec succès à votre compte Cloud');
   }, []);
 
   // Listen to Auth State and Real-Time Firestore changes
@@ -266,6 +353,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
         setCurrentUser(null);
         setUserAccount(null);
         setSyncStatus('unpaired');
+        setConfirmFirstPush(false);
         return;
       }
 
@@ -291,6 +379,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
         docRef,
         (snapshot) => {
           if (snapshot.exists()) {
+            setConfirmFirstPush(false);
             const record = snapshot.data();
             if (record && record.data) {
               // Ignore self-echo
@@ -322,8 +411,16 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
               }
             }
           } else {
-            // First time user, sync local data up
-            pushToCloudRef.current();
+            // First time user (document cloud vierge)
+            // SÉCURITÉ : Ne pas pousser aveuglément les données locales si elles sont présentes !
+            if (hasLocalHealthData()) {
+              setConfirmFirstPush(true);
+              setSyncStatus('synced');
+              setSyncNotification('Nouveau compte détecté : confirmation requise pour la synchronisation');
+            } else {
+              // Aucun historique local résiduel : initialisation normale
+              pushToCloudRef.current();
+            }
           }
         },
         (error) => {
@@ -382,6 +479,9 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData }: CloudS
     qrCodeUrl,
     syncNotification,
     setSyncNotification,
+    confirmFirstPush,
+    acceptFirstPush,
+    rejectFirstPush,
     loginWithGoogle,
     logout,
     pushToCloud,

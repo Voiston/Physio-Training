@@ -440,10 +440,46 @@ export function useData() {
     cloudSyncRef.current?.triggerDebouncedPush();
   }, []);
 
+  // Callback de purge et réinitialisation atomique des états React (appelé au logout)
+  const clearLocalHealthState = useCallback(() => {
+    // 1. Réinitialiser les événements de séances à vide
+    const emptyEvents: Record<string, Record<string, SessionData>> = {};
+    DEFAULT_QUALITIES.forEach(q => (emptyEvents[q.id] = {}));
+    setEvents(emptyEvents);
+
+    // 2. Réinitialiser les métriques journalières
+    setDailyMetrics({});
+
+    // 3. Réinitialiser les blocs et compétitions
+    setTrainingBlocks([]);
+    setTargetCompetitionState(null);
+    setQualitiesState(DEFAULT_QUALITIES);
+    setBlockTemplates(getSavedBlockTemplates());
+    setPhysioSettingsState(DEFAULT_PHYSIO_SETTINGS);
+    setIsSimulationActive(false);
+    setSimulatedEvents({});
+  }, []);
+
   const onRemoteDataReceived = useCallback((remoteData: any) => {
     if (!remoteData) return;
     try {
       const imported = migrateData(remoteData);
+
+      // SÉCURITÉ : Nettoyer les clés de dates existantes pour éviter que des séances
+      // orphelines d'un profil précédent ne polluent les données du nouvel utilisateur
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && /^\d{4}-\d{2}-\d{2}_/.test(key)) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch (err) {
+        console.warn('Erreur lors du nettoyage préalable des clés de séances:', err);
+      }
+
       if (imported.events) {
         setEvents(imported.events);
         Object.entries(imported.events as Record<string, Record<string, SessionData>>).forEach(([qId, dates]) => {
@@ -510,6 +546,7 @@ export function useData() {
   const cloudSync = useCloudSync({
     onRemoteDataReceived,
     getExportableData,
+    onClearLocalHealthData: clearLocalHealthState,
   });
   cloudSyncRef.current = cloudSync;
 

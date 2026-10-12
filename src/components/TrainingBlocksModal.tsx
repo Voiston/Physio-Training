@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Calendar, Zap, Shield, Flame, Activity, Sparkles, 
   Trash2, Plus, Check, Clock, AlertCircle, Dumbbell, Settings,
@@ -34,6 +34,8 @@ export default function TrainingBlocksModal({
   onResetTemplates,
   onReorderByBlock
 }: TrainingBlocksModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
   const todayStr = getLocalYYYYMMDD(new Date());
 
   // Modal navigation tab: 'blocks' or 'templates'
@@ -71,6 +73,79 @@ export default function TrainingBlocksModal({
 
   // Compute end date reactively
   const computedEndDate = computeBlockEndDate(startDate, durationWeeks);
+
+  // Keyboard navigation on tablist (ArrowLeft / ArrowRight)
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const nextTab = activeTab === 'blocks' ? 'templates' : 'blocks';
+      setActiveTab(nextTab);
+      setTimeout(() => {
+        document.getElementById(`tab-${nextTab}`)?.focus();
+      }, 0);
+    }
+  };
+
+  // Focus trap & Escape listener & Focus restoration (WCAG 2.2 SC 2.1.2 & 2.4.3)
+  useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null;
+
+    const timer = setTimeout(() => {
+      if (modalRef.current) {
+        const firstFocusable = modalRef.current.querySelector<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+        );
+        if (firstFocusable) {
+          firstFocusable.focus();
+        } else {
+          modalRef.current.focus();
+        }
+      }
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      // Trap focus within modalRef
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusables = Array.from(
+          modalRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(el => el.offsetParent !== null);
+
+        if (focusables.length === 0) return;
+
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || document.activeElement === modalRef.current) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        previousActiveElementRef.current.focus();
+      }
+    };
+  }, [onClose]);
 
   // Apply a preset to the block form
   const handleSelectPreset = (presetId: string) => {
@@ -176,17 +251,6 @@ export default function TrainingBlocksModal({
     }
   };
 
-  // Fermeture accessible sur touche Escape
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto"
@@ -195,21 +259,23 @@ export default function TrainingBlocksModal({
       aria-labelledby="training-blocks-title"
     >
       <div 
-        className="bg-[#121216] border border-white/10 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh]"
+        ref={modalRef}
+        tabIndex={-1}
+        className="bg-[#121216] border border-white/10 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl my-auto text-slate-100 flex flex-col max-h-[92vh] focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 bg-white/[0.02]">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400" aria-hidden="true">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 bg-white/[0.02] gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 shrink-0" aria-hidden="true">
               <Calendar className="w-5 h-5" />
             </div>
-            <div>
-              <h2 id="training-blocks-title" className="text-lg font-bold text-white flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 id="training-blocks-title" className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 m-0 truncate">
                 Périodisation & Blocs d'Entraînement
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-300 mt-0.5 m-0 line-clamp-1">
                 Cycles spécifiques (3, 4, 6 semaines). Répétition accrue des qualités ciblées et délais allongés en maintien.
               </p>
             </div>
@@ -217,17 +283,19 @@ export default function TrainingBlocksModal({
           <button 
             type="button"
             onClick={onClose}
-            className="min-h-[40px] min-w-[40px] rounded-lg text-slate-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 shrink-0"
             aria-label="Fermer le gestionnaire de cycles et blocs"
+            title="Fermer (Échap)"
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
-        {/* Tab Navigation avec sémantique WAI-ARIA tablist */}
+        {/* Tab Navigation avec sémantique WAI-ARIA tablist et navigation fléchée */}
         <div 
           role="tablist" 
           aria-label="Sections du gestionnaire de blocs"
+          onKeyDown={handleTabKeyDown}
           className="flex items-center border-b border-white/10 bg-black/20 px-4 sm:px-6"
         >
           <button
@@ -236,14 +304,15 @@ export default function TrainingBlocksModal({
             id="tab-blocks"
             aria-selected={activeTab === 'blocks'}
             aria-controls="panel-blocks"
+            tabIndex={activeTab === 'blocks' ? 0 : -1}
             onClick={() => setActiveTab('blocks')}
-            className={`min-h-[44px] py-3 px-4 font-semibold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-[44px] py-3 px-4 font-bold text-xs sm:text-sm border-b-2 transition-all cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
               activeTab === 'blocks'
-                ? 'border-blue-500 text-white font-bold bg-white/[0.03]'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-blue-500 text-white bg-white/[0.04]'
+                : 'border-transparent text-slate-300 hover:text-white'
             }`}
           >
-            <Calendar size={14} aria-hidden="true" />
+            <Calendar size={15} aria-hidden="true" />
             <span>Cycles Planifiés & Déclaration ({blocks.length})</span>
           </button>
 
@@ -253,14 +322,15 @@ export default function TrainingBlocksModal({
             id="tab-templates"
             aria-selected={activeTab === 'templates'}
             aria-controls="panel-templates"
+            tabIndex={activeTab === 'templates' ? 0 : -1}
             onClick={() => setActiveTab('templates')}
-            className={`min-h-[44px] py-3 px-4 font-semibold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            className={`min-h-[44px] py-3 px-4 font-bold text-xs sm:text-sm border-b-2 transition-all cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
               activeTab === 'templates'
-                ? 'border-blue-500 text-white font-bold bg-white/[0.03]'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-blue-500 text-white bg-white/[0.04]'
+                : 'border-transparent text-slate-300 hover:text-white'
             }`}
           >
-            <Settings size={14} aria-hidden="true" />
+            <Settings size={15} aria-hidden="true" />
             <span>Personnaliser les Templates ({templates.length})</span>
           </button>
         </div>
@@ -278,92 +348,93 @@ export default function TrainingBlocksModal({
             >
               {/* Active / Configured Blocks List */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-blue-400" />
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2 m-0">
+                    <Clock className="w-4 h-4 text-blue-400" />
                     Cycles d'entraînement ({blocks.length})
                   </h3>
                   {!showForm && (
                     <button
+                      type="button"
                       onClick={() => {
                         setEditingBlockId(null);
                         handleSelectPreset('force_max');
                         setStartDate(todayStr);
                         setShowForm(true);
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg transition-colors cursor-pointer"
+                      className="min-h-[44px] flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     >
-                      <Plus size={14} /> Déclarer un nouveau bloc
+                      <Plus size={16} /> Déclarer un nouveau bloc
                     </button>
                   )}
                 </div>
 
                 {blocks.length === 0 ? (
-                  <div className="bg-white/[0.02] border border-dashed border-white/15 rounded-xl p-5 text-center text-slate-400 text-xs">
-                    <p className="mb-2">Aucun bloc de préparation déclaré pour le moment.</p>
-                    <p className="text-[11px] text-slate-500">
-                      Déclarez un bloc (ex: Force max sur 4 semaines) pour adapter la fréquence de vos séances.
+                  <div className="bg-white/[0.02] border border-dashed border-white/15 rounded-2xl p-6 text-center text-slate-300 text-xs space-y-1">
+                    <p className="font-semibold text-slate-200 text-sm mb-1">Aucun bloc de préparation déclaré pour le moment.</p>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto m-0">
+                      Déclarez un cycle de préparation spécifique (ex: Force max sur 4 semaines) pour adapter automatiquement la fréquence et l'ordre des qualités physiologiques.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3.5">
                     {blocks.map(b => {
                       const progress = getBlockProgress(b, todayStr);
                       const isCurrent = progress?.isActive;
                       return (
                         <div 
                           key={b.id} 
-                          className={`p-4 rounded-xl border transition-all ${
+                          className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                             isCurrent 
-                              ? 'bg-gradient-to-r from-blue-950/40 via-purple-950/20 to-transparent border-blue-500/40 shadow-lg' 
+                              ? 'bg-gradient-to-r from-blue-950/40 via-purple-950/20 to-slate-900/60 border-blue-500/40 shadow-xl' 
                               : 'bg-white/[0.02] border-white/10'
                           }`}
                         >
-                          <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                            <div className="flex items-center gap-2.5">
-                              <div className="p-1.5 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex flex-wrap items-start justify-between gap-3 mb-2.5">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-xl bg-white/5 border border-white/10 shrink-0">
                                 {getPresetIcon(b.type)}
                               </div>
                               <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-sm text-white">{b.name}</span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-sm sm:text-base text-white">{b.name}</span>
                                   {isCurrent ? (
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                    <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                                       ● En cours (Sem. {progress?.currentWeek}/{b.durationWeeks})
                                     </span>
                                   ) : progress?.isUpcoming ? (
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40">
                                       À venir
                                     </span>
                                   ) : (
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-500/20 text-slate-400 border border-slate-500/30">
+                                    <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-500/20 text-slate-300 border border-slate-500/30">
                                       Terminé
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                                <p className="text-xs text-slate-300 mt-1 font-mono m-0">
                                   Du {b.startDate} au {b.endDate} ({b.durationWeeks} semaines • {progress?.totalDays} jours)
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
                               {onReorderByBlock && (
                                 <button
                                   type="button"
                                   onClick={() => onReorderByBlock(b)}
-                                  className="min-h-[40px] px-3 py-1.5 text-xs text-blue-300 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 rounded-xl border border-blue-500/20 transition-colors flex items-center gap-1.5 active:scale-95"
+                                  className="min-h-[44px] px-3.5 py-2 text-xs font-bold text-blue-200 hover:text-white bg-blue-500/15 hover:bg-blue-500/25 rounded-xl border border-blue-500/30 transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                                   title="Place les qualités ciblées par ce bloc en haut du tableau"
                                   aria-label={`Trier le tableau principal selon le bloc ${b.name}`}
                                 >
-                                  <ArrowUpDown size={13} aria-hidden="true" />
+                                  <ArrowUpDown size={14} aria-hidden="true" />
                                   <span>Trier tableau</span>
                                 </button>
                               )}
                               <button
                                 type="button"
                                 onClick={() => handleEditBlock(b)}
-                                className="min-h-[40px] px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors active:scale-95"
+                                className="min-h-[44px] px-3.5 py-2 text-xs font-bold text-slate-200 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                                 aria-label={`Modifier le bloc ${b.name}`}
                               >
                                 Modifier
@@ -371,20 +442,20 @@ export default function TrainingBlocksModal({
                               <button
                                 type="button"
                                 onClick={() => onDeleteBlock(b.id)}
-                                className="min-h-[40px] min-w-[40px] text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 rounded-xl border border-white/10 hover:border-red-500/20 flex items-center justify-center transition-colors active:scale-95"
+                                className="w-11 h-11 min-w-[44px] min-h-[44px] text-rose-400 hover:text-rose-300 bg-white/5 hover:bg-rose-500/20 rounded-xl border border-white/10 hover:border-rose-500/30 flex items-center justify-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                                 title="Supprimer ce bloc"
                                 aria-label={`Supprimer le bloc ${b.name}`}
                               >
-                                <Trash2 size={15} />
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </div>
 
                           {/* Progress Bar if active */}
                           {isCurrent && progress && (
-                            <div className="mt-3 mb-2">
-                              <div className="flex justify-between text-[11px] text-slate-300 mb-1 font-mono">
-                                <span>Progression : <strong>{progress.percent}%</strong></span>
+                            <div className="mt-3.5 mb-2.5">
+                              <div className="flex justify-between text-xs text-slate-200 mb-1.5 font-mono">
+                                <span>Progression du cycle : <strong>{progress.percent}%</strong></span>
                                 <span>{progress.remainingDays} jours restants</span>
                               </div>
                               <div 
@@ -394,7 +465,7 @@ export default function TrainingBlocksModal({
                                 aria-valuemin={0}
                                 aria-valuemax={100}
                                 aria-valuetext={`${progress.percent}% réalisé, ${progress.remainingDays} jours restants sur ${progress.totalDays} jours`}
-                                className="w-full h-2 bg-white/10 rounded-full overflow-hidden"
+                                className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden"
                               >
                                 <div 
                                   className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-500" 
@@ -405,16 +476,16 @@ export default function TrainingBlocksModal({
                           )}
 
                           {/* Targeted vs Maintenance badges */}
-                          <div className="mt-3 pt-2.5 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                          <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div>
-                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                                <Zap size={11} /> Fréquence de dév. (x0.45 · 2-3x/sem) :
+                              <span className="text-xs font-bold text-red-300 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                                <Zap size={13} className="text-red-400" /> Fréquence de dév. (rappel toutes les 48-72h · x0.45) :
                               </span>
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-wrap gap-1.5">
                                 {b.focusQualities.map(qId => {
                                   const q = qualities.find(item => item.id === qId);
                                   return (
-                                    <span key={qId} className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/20 text-[10px]">
+                                    <span key={qId} className="px-2.5 py-1 rounded-lg bg-red-500/15 text-red-300 border border-red-500/30 text-xs font-medium">
                                       {q?.name || qId}
                                     </span>
                                   );
@@ -423,21 +494,21 @@ export default function TrainingBlocksModal({
                             </div>
 
                             <div>
-                              <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                                <Shield size={11} /> Maintien (x1.0 · Rémanence nominale) :
+                              <span className="text-xs font-bold text-sky-300 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                                <Shield size={13} className="text-sky-400" /> Qualités en maintien nominal (x1.0) :
                               </span>
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-wrap gap-1.5">
                                 {qualities
                                   .filter(q => !b.focusQualities.includes(q.id))
-                                  .slice(0, 4)
+                                  .slice(0, 5)
                                   .map(q => (
-                                    <span key={q.id} className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20 text-[10px]">
+                                    <span key={q.id} className="px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-300 border border-sky-500/20 text-xs font-medium">
                                       {q.name}
                                     </span>
                                   ))}
-                                {qualities.filter(q => !b.focusQualities.includes(q.id)).length > 4 && (
-                                  <span className="px-1.5 py-0.5 text-[10px] text-slate-500">
-                                    +{qualities.filter(q => !b.focusQualities.includes(q.id)).length - 4} autres
+                                {qualities.filter(q => !b.focusQualities.includes(q.id)).length > 5 && (
+                                  <span className="px-2.5 py-1 text-xs text-slate-400 font-medium">
+                                    +{qualities.filter(q => !b.focusQualities.includes(q.id)).length - 5} autres
                                   </span>
                                 )}
                               </div>
@@ -471,10 +542,10 @@ export default function TrainingBlocksModal({
 
                   {/* Presets selector based on templates */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Sélectionnez un modèle de bloc (Template) :
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-2">
+                      Sélectionnez un modèle de cycle (Template) :
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                       {templates.map(p => {
                         const isSelected = selectedPreset === p.id;
                         return (
@@ -482,19 +553,19 @@ export default function TrainingBlocksModal({
                             key={p.id}
                             type="button"
                             onClick={() => handleSelectPreset(p.id)}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            className={`min-h-[52px] p-3 rounded-xl border text-left transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                               isSelected
-                                ? 'bg-blue-600/20 border-blue-500 text-white shadow-md ring-1 ring-blue-500'
-                                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                                ? 'bg-blue-600/25 border-blue-500 text-white shadow-md ring-1 ring-blue-500'
+                                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                             }`}
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-bold text-white flex items-center gap-1.5">
                                 {getPresetIcon(p.id)} {p.name}
                               </span>
-                              {isSelected && <Check size={12} className="text-blue-400" />}
+                              {isSelected && <Check size={14} className="text-blue-400" />}
                             </div>
-                            <p className="text-[10px] text-slate-400 leading-tight line-clamp-2">
+                            <p className="text-xs text-slate-300 leading-snug line-clamp-2 m-0">
                               {p.description}
                             </p>
                           </button>
@@ -504,19 +575,19 @@ export default function TrainingBlocksModal({
                       <button
                         type="button"
                         onClick={() => handleSelectPreset('custom')}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        className={`min-h-[52px] p-3 rounded-xl border text-left transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                           selectedPreset === 'custom'
-                            ? 'bg-blue-600/20 border-blue-500 text-white shadow-md ring-1 ring-blue-500'
-                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                            ? 'bg-blue-600/25 border-blue-500 text-white shadow-md ring-1 ring-blue-500'
+                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <Sparkles size={13} className="text-yellow-400" /> Personnalisé
+                            <Sparkles size={14} className="text-yellow-400" /> Personnalisé
                           </span>
-                          {selectedPreset === 'custom' && <Check size={12} className="text-blue-400" />}
+                          {selectedPreset === 'custom' && <Check size={14} className="text-blue-400" />}
                         </div>
-                        <p className="text-[10px] text-slate-400 leading-tight">
+                        <p className="text-xs text-slate-300 leading-snug m-0">
                           Sélection manuelle libre des qualités et des paramètres.
                         </p>
                       </button>
@@ -525,16 +596,17 @@ export default function TrainingBlocksModal({
 
                   {/* Block Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label htmlFor="block-name-input" className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5">
                       Nom du bloc :
                     </label>
                     <input 
+                      id="block-name-input"
                       type="text" 
                       value={blockName}
                       onChange={(e) => setBlockName(e.target.value)}
                       placeholder="Ex: Force max, Seuil / VMA, etc."
                       required
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
+                      className="w-full min-h-[44px] px-3.5 py-2.5 bg-white/5 border border-white/15 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 placeholder:text-slate-400"
                     />
                   </div>
 
@@ -542,26 +614,26 @@ export default function TrainingBlocksModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Duration options: 3, 4, 6 weeks or custom */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5">
                         Durée du cycle :
                       </label>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
+                      <div className="grid grid-cols-3 gap-2 mb-2.5">
                         {[3, 4, 6].map(weeks => (
                           <button
                             key={weeks}
                             type="button"
                             onClick={() => setDurationWeeks(weeks)}
-                            className={`py-2 px-1 text-center rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                            className={`min-h-[44px] py-2.5 px-2 text-center rounded-xl border text-xs font-bold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                               durationWeeks === weeks
                                 ? 'bg-blue-600 border-blue-500 text-white shadow-md'
-                                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                                : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
                             }`}
                           >
                             {weeks} Semaines
                           </button>
                         ))}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <div className="flex items-center gap-2.5 text-xs text-slate-300">
                         <span>Ou personnalisé :</span>
                         <input 
                           type="number"
@@ -569,7 +641,8 @@ export default function TrainingBlocksModal({
                           max={16}
                           value={durationWeeks}
                           onChange={(e) => setDurationWeeks(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded text-center text-white text-xs"
+                          aria-label="Durée personnalisée en semaines"
+                          className="w-20 min-h-[36px] px-2 py-1 bg-white/5 border border-white/15 rounded-lg text-center text-white text-xs font-bold focus:outline-none focus:border-blue-500"
                         />
                         <span>semaines ({durationWeeks * 7} jours)</span>
                       </div>
@@ -577,35 +650,36 @@ export default function TrainingBlocksModal({
 
                     {/* Start Date & End Date */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      <label htmlFor="start-date-input" className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5">
                         Date de début du bloc :
                       </label>
                       <input 
+                        id="start-date-input"
                         type="date" 
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                         required
-                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+                        className="w-full min-h-[44px] px-3.5 py-2.5 bg-white/5 border border-white/15 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 font-mono"
                       />
-                      <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1 font-mono">
-                        <Check size={12} className="text-emerald-400" />
-                        Fin automatique le : <strong className="text-white">{computedEndDate}</strong>
+                      <p className="text-xs text-slate-300 mt-2 flex items-center gap-1.5 font-mono m-0">
+                        <Check size={14} className="text-emerald-400 shrink-0" />
+                        <span>Fin automatique le : <strong className="text-white font-bold">{computedEndDate}</strong></span>
                       </p>
                     </div>
                   </div>
 
                   {/* Qualities Selection Matrix */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-slate-300">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-200">
                         Sélection des qualités ciblées (Répétées plus souvent) :
                       </label>
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-xs text-slate-300 font-medium">
                         {focusQualities.length} ciblées / {qualities.length - focusQualities.length} en maintien
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                       {qualities.map(q => {
                         const isFocus = focusQualities.includes(q.id);
                         return (
@@ -615,30 +689,30 @@ export default function TrainingBlocksModal({
                             aria-pressed={isFocus}
                             aria-label={`${q.name} : ${isFocus ? 'Ciblée pour développement accéléré (x0.45)' : 'En maintien nominal (x1.0)'}`}
                             onClick={() => toggleQualityFocus(q.id)}
-                            className={`min-h-[44px] p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer active:scale-95 ${
+                            className={`min-h-[48px] p-3 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                               isFocus
-                                ? 'bg-red-500/15 border-red-500/50 text-white ring-1 ring-red-500/30'
-                                : 'bg-sky-500/5 border-sky-500/20 text-slate-400 hover:bg-sky-500/10'
+                                ? 'bg-red-500/20 border-red-500/60 text-white ring-1 ring-red-500/40'
+                                : 'bg-sky-500/10 border-sky-500/25 text-slate-300 hover:bg-sky-500/20'
                             }`}
                           >
-                            <div className="min-w-0 pr-1">
-                              <span className={`text-xs font-bold block truncate ${isFocus ? 'text-red-200' : 'text-slate-300'}`}>
+                            <div className="min-w-0 pr-1.5">
+                              <span className={`text-xs font-bold block truncate ${isFocus ? 'text-red-200' : 'text-slate-200'}`}>
                                 {q.name}
                               </span>
-                              <span className="text-[9px] uppercase tracking-wider block">
+                              <span className="text-xs uppercase tracking-wider block mt-0.5">
                                 {isFocus ? (
-                                  <span className="text-red-400 font-semibold flex items-center gap-1">
-                                    <Zap size={9} aria-hidden="true" /> Dév. (x0.45)
+                                  <span className="text-red-300 font-bold flex items-center gap-1">
+                                    <Zap size={11} aria-hidden="true" /> Dév. (x0.45)
                                   </span>
                                 ) : (
-                                  <span className="text-sky-400 font-semibold flex items-center gap-1">
-                                    <Shield size={9} aria-hidden="true" /> Maintien (x1.0)
+                                  <span className="text-sky-300 font-medium flex items-center gap-1">
+                                    <Shield size={11} aria-hidden="true" /> Maintien (x1.0)
                                   </span>
                                 )}
                               </span>
                             </div>
                             <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isFocus ? 'bg-red-500 text-white' : 'bg-white/10 text-transparent'}`} aria-hidden="true">
-                              <Check size={12} />
+                              <Check size={13} />
                             </div>
                           </button>
                         );
@@ -647,16 +721,16 @@ export default function TrainingBlocksModal({
                   </div>
 
                   {/* Option: Auto-reorder qualities on activation */}
-                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs">
                     <input 
                       type="checkbox" 
                       id="autoReorderCheck"
                       checked={autoReorder}
                       onChange={(e) => setAutoReorder(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded bg-white/10 border-white/20 cursor-pointer"
+                      className="w-5 h-5 text-blue-600 rounded bg-white/10 border-white/20 cursor-pointer focus:ring-blue-400"
                     />
-                    <label htmlFor="autoReorderCheck" className="text-slate-200 cursor-pointer">
-                      <strong>Réorganiser automatiquement le tableau :</strong> placer les qualités ciblées par ce cycle en tête de liste (Lignes #1, #2, #3...).
+                    <label htmlFor="autoReorderCheck" className="text-slate-200 cursor-pointer leading-relaxed">
+                      <strong className="text-white">Réorganiser automatiquement le tableau :</strong> placer les qualités ciblées par ce cycle en tête de liste (Lignes #1, #2, #3...).
                     </label>
                   </div>
 
@@ -666,17 +740,17 @@ export default function TrainingBlocksModal({
                       <button
                         type="button"
                         onClick={() => { setShowForm(false); setEditingBlockId(null); }}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                        className="min-h-[44px] px-4 py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                       >
                         Annuler
                       </button>
                     )}
                     <button
                       type="submit"
-                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
+                      className="min-h-[44px] flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/30 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     >
-                      <Check size={15} />
-                      {editingBlockId ? 'Mettre à jour le cycle' : 'Activer ce bloc de préparation'}
+                      <Check size={16} />
+                      <span>{editingBlockId ? 'Mettre à jour le cycle' : `Activer le cycle · ${blockName}`}</span>
                     </button>
                   </div>
                 </form>
@@ -692,101 +766,106 @@ export default function TrainingBlocksModal({
               aria-labelledby="tab-templates"
               className="space-y-5"
             >
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2 m-0">
                     <Settings className="w-4 h-4 text-blue-400" />
                     Modification des Templates de Cycles
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-300 mt-1 m-0">
                     Modifiez la composition des blocs (ex: quelles qualités sont ciblées par défaut dans Force max, Aérobie, etc.).
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={onResetTemplates}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg border border-white/10 text-xs transition-colors cursor-pointer"
+                  className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl border border-white/10 text-xs font-semibold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title="Rétablir les templates par défaut d'origine"
                 >
-                  <RotateCcw size={13} />
+                  <RotateCcw size={14} />
                   <span>Rétablir les originaux</span>
                 </button>
               </div>
 
               {/* Template selector pills */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2.5">
                 {templates.map(t => (
                   <button
                     key={t.id}
+                    type="button"
                     onClick={() => handleSelectTemplateToEdit(t.id)}
-                    className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+                    className={`min-h-[44px] px-4 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                       editingTemplateId === t.id
                         ? 'bg-blue-600 border-blue-500 text-white shadow-md'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                        : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
                     }`}
                   >
                     {getPresetIcon(t.id)}
                     <span>{t.name}</span>
-                    <span className="text-[10px] opacity-75 font-mono">({t.durationWeeks}s)</span>
+                    <span className="text-xs opacity-80 font-mono">({t.durationWeeks}s)</span>
                   </button>
                 ))}
               </div>
 
               {/* Template Edit Form */}
-              <form onSubmit={handleSaveTemplateSubmit} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
+              <form onSubmit={handleSaveTemplateSubmit} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label htmlFor="template-name-input" className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5">
                       Nom du Template :
                     </label>
                     <input 
+                      id="template-name-input"
                       type="text" 
                       value={templateForm.name}
                       onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
                       required
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
+                      className="w-full min-h-[44px] px-3.5 py-2 bg-white/5 border border-white/15 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label htmlFor="template-duration-input" className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5">
                       Durée par défaut (semaines) :
                     </label>
                     <input 
+                      id="template-duration-input"
                       type="number" 
                       min={1} 
                       max={16}
                       value={templateForm.durationWeeks}
                       onChange={(e) => setTemplateForm(prev => ({ ...prev, durationWeeks: Number(e.target.value) || 1 }))}
                       required
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
+                      className="w-full min-h-[44px] px-3.5 py-2 bg-white/5 border border-white/15 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 font-mono"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label htmlFor="template-desc-input" className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5">
                     Description & Objectif :
                   </label>
                   <input 
+                    id="template-desc-input"
                     type="text" 
                     value={templateForm.description}
                     onChange={(e) => setTemplateForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
+                    className="w-full min-h-[44px] px-3.5 py-2 bg-white/5 border border-white/15 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 placeholder:text-slate-400"
                   />
                 </div>
 
                 {/* Qualities for this template */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-semibold text-slate-300">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-200">
                       Qualités prioritaires incluses dans ce template ({templateForm.focusQualities.length}) :
                     </label>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-300 font-medium">
                       Cochez pour inclure dans la fréquence accrue
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                     {qualities.map(q => {
                       const isIncluded = templateForm.focusQualities.includes(q.id);
                       return (
@@ -796,15 +875,15 @@ export default function TrainingBlocksModal({
                           aria-pressed={isIncluded}
                           aria-label={`${q.name} : ${isIncluded ? 'Incluse dans le template' : 'Non incluse'}`}
                           onClick={() => toggleTemplateQuality(q.id)}
-                          className={`min-h-[44px] p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer active:scale-95 ${
+                          className={`min-h-[48px] p-3 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                             isIncluded
-                              ? 'bg-red-500/20 border-red-500/50 text-white ring-1 ring-red-500/30'
-                              : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                              ? 'bg-red-500/20 border-red-500/60 text-white ring-1 ring-red-500/40'
+                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                           }`}
                         >
-                          <span className="text-xs font-semibold truncate">{q.name}</span>
+                          <span className="text-xs font-bold truncate text-slate-100">{q.name}</span>
                           <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isIncluded ? 'bg-red-500 text-white' : 'bg-white/10 text-transparent'}`} aria-hidden="true">
-                            <Check size={12} />
+                            <Check size={13} />
                           </div>
                         </button>
                       );
@@ -813,8 +892,8 @@ export default function TrainingBlocksModal({
                 </div>
 
                 {templateSavedMsg && (
-                  <div className="p-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-2">
-                    <Check size={14} />
+                  <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-2">
+                    <Check size={16} />
                     <span>{templateSavedMsg}</span>
                   </div>
                 )}
@@ -822,10 +901,10 @@ export default function TrainingBlocksModal({
                 <div className="flex justify-end pt-2">
                   <button
                     type="submit"
-                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition-all cursor-pointer"
+                    className="min-h-[44px] flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   >
-                    <Check size={15} />
-                    <span>Enregistrer les modifications du template</span>
+                    <Check size={16} />
+                    <span>Enregistrer le template · {templateForm.name}</span>
                   </button>
                 </div>
               </form>

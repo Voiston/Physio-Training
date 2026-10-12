@@ -1190,19 +1190,27 @@ export default function MetricsDashboard({
   }, [banisterSummary, tauFatigue, tauFitness]);
 
   return (
-    <div className="p-4 md:p-6 w-full flex flex-col gap-6">
+    <main 
+      role="region" 
+      aria-label="Tableau de bord des métriques et dynamiques physiologiques" 
+      className="p-4 md:p-6 w-full flex flex-col gap-6 pb-12"
+    >
       
       {showPhysiology && (
         <>
           {/* BARRE D'ACTIONS SCIENTIFIQUES : SIMULATION, OBJECTIF & EXPORT */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg">
+          <header 
+            role="toolbar" 
+            aria-label="Actions du tableau de bord physiologique"
+            className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/60 border border-white/10 shadow-lg"
+          >
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/20">
+              <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/20" aria-hidden="true">
                 <Gauge size={16} />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tableau de Bord Physiologique</h4>
-                <p className="text-[11px] text-slate-400 hidden sm:block">Modèle PMC (Charge & Forme), Foster Monotony & Affûtage</p>
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider m-0">Tableau de Bord Physiologique</h3>
+                <p className="text-xs text-slate-300 hidden sm:block mt-0.5 mb-0">Modèle PMC (Charge & Forme), Foster Monotony & Affûtage</p>
               </div>
             </div>
 
@@ -1220,7 +1228,7 @@ export default function MetricsDashboard({
                   }`}
                   title="Activer la simulation prédictive pour projeter les jours futurs"
                 >
-                  <Sparkles size={14} className={isSimulationActive ? 'text-purple-400' : 'text-slate-400'} />
+                  <Sparkles size={14} className={isSimulationActive ? 'text-purple-400' : 'text-slate-400'} aria-hidden="true" />
                   <span className="hidden sm:inline">{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
                   <span className="sm:hidden">Simu</span>
                 </button>
@@ -1233,7 +1241,7 @@ export default function MetricsDashboard({
                   className="flex items-center gap-2 min-h-[44px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title="Configurer une compétition ou un objectif de course"
                 >
-                  <Trophy size={14} className="text-slate-400" />
+                  <Trophy size={14} className="text-slate-400" aria-hidden="true" />
                   <span>
                     {taperingAnalysis?.targetCompetition 
                       ? `${taperingAnalysis.targetCompetition.name} (J-${taperingAnalysis.daysRemaining})` 
@@ -1249,7 +1257,7 @@ export default function MetricsDashboard({
                   className="flex items-center gap-2 min-h-[44px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-semibold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   title="Calibrer les constantes de rémanence Banister (tau fatigue et condition)"
                 >
-                  <Sliders size={14} className="text-slate-400" />
+                  <Sliders size={14} className="text-slate-400" aria-hidden="true" />
                   <span className="hidden sm:inline">Calibrage (τ₁:{tauFatigue}j, τ₂:{tauFitness}j)</span>
                   <span className="sm:hidden font-mono">τ:{tauFatigue}/{tauFitness}j</span>
                 </button>
@@ -1262,28 +1270,31 @@ export default function MetricsDashboard({
                   className="flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 border border-blue-500/40 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/25 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                   title="Générer un bilan d'entraînement imprimable en PDF"
                 >
-                  <FileText size={14} className="text-white" />
+                  <FileText size={14} className="text-white" aria-hidden="true" />
                   <span>Bilan PDF</span>
                 </button>
               )}
             </div>
-          </div>
+          </header>
 
           {/* SECTION TAPER / FOSTER / BALANCE : 3 WIDGETS PHYSIOLOGIQUES COMPLÉMENTAIRES */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             
-            {/* CARTE 1 : AFFÛTAGE & PRÉDICTION COMPÉTITION (Fond standard sombre neutre, badge seul en jaune) */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between shadow-xl">
+            {/* CARTE 1 : AFFÛTAGE & PRÉDICTION COMPÉTITION */}
+            <article 
+              aria-label="Affûtage et prédiction compétition" 
+              className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between shadow-xl"
+            >
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-white/5 text-slate-300 border border-white/10">
+                  <div className="p-2 rounded-xl bg-white/5 text-slate-300 border border-white/10" aria-hidden="true">
                     <Trophy size={16} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider m-0">
                       Affûtage & Objectif Compétition
                     </h4>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-xs text-slate-300 mt-0.5 mb-0">
                       {taperingAnalysis?.targetCompetition 
                         ? taperingAnalysis.targetCompetition.name 
                         : 'Aucun objectif défini'}
@@ -1299,7 +1310,7 @@ export default function MetricsDashboard({
                   <button
                     type="button"
                     onClick={onOpenCompetitionModal}
-                    className="min-h-[44px] px-2 inline-flex items-center text-xs font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg"
+                    className="min-h-[44px] px-3 inline-flex items-center text-xs font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg"
                   >
                     Définir
                   </button>
@@ -1310,57 +1321,60 @@ export default function MetricsDashboard({
                 <div className="space-y-3">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Statut</span>
+                      <span className="text-xs text-slate-300 block font-medium">Statut</span>
                       <span className="text-xs font-bold text-amber-300 truncate block mt-0.5">
                         {taperingAnalysis.statusBadge}
                       </span>
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">TSB Projeté Jour J</span>
+                      <span className="text-xs text-slate-300 block font-medium">TSB Projeté Jour J</span>
                       <span className="text-xs font-bold font-mono text-emerald-400 block mt-0.5">
                         {taperingAnalysis.projectedTsbPercent !== null
                           ? (taperingAnalysis.projectedTsbPercent > 0 ? `+${taperingAnalysis.projectedTsbPercent}%` : `${taperingAnalysis.projectedTsbPercent}%`)
                           : (taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb} pts` : `${taperingAnalysis.projectedTsb} pts`)}
                       </span>
                       {taperingAnalysis.projectedTsbPercent !== null && (
-                        <span className="text-[9px] text-slate-400 block">
+                        <span className="text-xs font-mono text-slate-400 block">
                           ({taperingAnalysis.projectedTsb > 0 ? `+${taperingAnalysis.projectedTsb}` : taperingAnalysis.projectedTsb} pts)
                         </span>
                       )}
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Cible d'Affûtage</span>
+                      <span className="text-xs text-slate-300 block font-medium">Cible d'Affûtage</span>
                       <span className="text-xs font-bold font-mono text-blue-300 block mt-0.5">
                         +{taperingAnalysis.targetTsb}{taperingAnalysis.targetTsbUnit === 'percent' ? '% CTL' : ' pts'}
                       </span>
-                      <span className="text-[9px] text-slate-400 block">
+                      <span className="text-xs text-slate-400 block font-sans">
                         {taperingAnalysis.targetTsbUnit === 'percent' ? 'Fraîcheur relative' : 'Score brut'}
                       </span>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5 m-0">
+                  <p className="text-xs text-slate-200 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5 m-0">
                     {taperingAnalysis.advice}
                   </p>
                 </div>
               ) : (
-                <div className="text-xs text-slate-400 py-2">
+                <div className="text-xs text-slate-300 py-2">
                   Définissez la date de votre objectif pour calculer votre affûtage optimal et modéliser le pic TSB.
                 </div>
               )}
-            </div>
+            </article>
 
             {/* CARTE 2 : MONOTONIE DE FOSTER & STRAIN (PRÉVENTION DES BLESSURES & SURMENAGE) */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between shadow-xl">
+            <article 
+              aria-label="Monotonie de Foster et contrainte hebdomadaire" 
+              className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between shadow-xl"
+            >
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-white/5 text-slate-300 border border-white/10">
+                  <div className="p-2 rounded-xl bg-white/5 text-slate-300 border border-white/10" aria-hidden="true">
                     <ShieldAlert size={16} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider m-0">
                       Monotonie de Foster & Strain
                     </h4>
-                    <p className="text-[11px] text-slate-400">Variabilité des stimuli & protection immunitaire</p>
+                    <p className="text-xs text-slate-300 mt-0.5 mb-0">Variabilité des stimuli & protection immunitaire</p>
                   </div>
                 </div>
 
@@ -1381,50 +1395,53 @@ export default function MetricsDashboard({
                 <div className="space-y-3">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Monotonie</span>
+                      <span className="text-xs text-slate-300 block font-medium">Monotonie</span>
                       <span className={`text-xs font-bold font-mono block mt-0.5 ${
                         fosterMetrics.monotony > 2.0 ? 'text-red-400' : fosterMetrics.monotony > 1.5 ? 'text-amber-400' : 'text-emerald-400'
                       }`}>
-                        {fosterMetrics.monotony} <span className="text-[10px] opacity-70">(&lt;1.5)</span>
+                        {fosterMetrics.monotony} <span className="text-xs opacity-70">(&lt;1.5)</span>
                       </span>
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Strain Hebdo</span>
+                      <span className="text-xs text-slate-300 block font-medium">Strain Hebdo</span>
                       <span className="text-xs font-bold font-mono text-purple-300 block mt-0.5">
                         {fosterMetrics.strain}
                       </span>
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Écart-Type (Variabilité)</span>
+                      <span className="text-xs text-slate-300 block font-medium">Écart-Type (Variabilité)</span>
                       <span className="text-xs font-bold font-mono text-slate-200 block mt-0.5">
                         {fosterMetrics.stdDev}
                       </span>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5 m-0">
+                  <p className="text-xs text-slate-200 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5 m-0">
                     {fosterMetrics.advice}
                   </p>
                 </div>
               )}
-            </div>
+            </article>
 
             {/* CARTE 3 : TRIMP MULTI-FACTEURS (CARDIO VS MUSCULAIRE) */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between shadow-xl">
+            <article 
+              aria-label="Charge cardio versus musculaire" 
+              className="p-4 rounded-2xl bg-slate-900/60 border border-white/10 flex flex-col justify-between shadow-xl"
+            >
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-white/5 text-slate-300 border border-white/10">
+                  <div className="p-2 rounded-xl bg-white/5 text-slate-300 border border-white/10" aria-hidden="true">
                     <Heart size={16} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider m-0">
                       Charge Cardio vs Musculaire (RPE)
                     </h4>
-                    <p className="text-[11px] text-slate-400">Asymétrie de fatigue & stress excentrique</p>
+                    <p className="text-xs text-slate-300 mt-0.5 mb-0">Asymétrie de fatigue & stress excentrique</p>
                   </div>
                 </div>
 
                 {balance && (
-                  <span className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border truncate max-w-[150px] ${
+                  <span className={`px-2 py-0.5 rounded-lg text-xs font-bold border truncate max-w-[150px] ${
                     balance.state === 'CARDIO_DOMINANT'
                       ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
                       : balance.state === 'MUSCULAR_DOMINANT'
@@ -1461,53 +1478,53 @@ export default function MetricsDashboard({
                       />
                     </div>
                     {/* Légende centrée à contraste renforcé */}
-                    <div className="flex items-center justify-between text-[11px] sm:text-xs font-mono px-2 sm:px-2.5 py-1 bg-black/40 rounded-xl border border-white/5 gap-1">
+                    <div className="flex items-center justify-between text-xs font-mono px-2 sm:px-2.5 py-1 bg-black/40 rounded-xl border border-white/5 gap-1">
                       <span className="text-sky-300 flex items-center gap-1 font-bold truncate">
-                        <Heart size={12} className="text-sky-400 shrink-0" /> Cardio : {balance.cardioPercent}%
+                        <Heart size={12} className="text-sky-400 shrink-0" aria-hidden="true" /> Cardio : {balance.cardioPercent}%
                       </span>
-                      <span className="text-slate-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-white/10 shrink-0 hidden xs:inline-block">
+                      <span className="text-slate-200 text-xs font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-white/10 shrink-0 hidden xs:inline-block">
                         Équilibre
                       </span>
                       <span className="text-rose-300 flex items-center gap-1 font-bold truncate">
-                        Musc : {balance.muscPercent}% <Dumbbell size={12} className="text-rose-400 shrink-0" />
+                        Musc : {balance.muscPercent}% <Dumbbell size={12} className="text-rose-400 shrink-0" aria-hidden="true" />
                       </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Cardio 7j</span>
+                      <span className="text-xs text-slate-300 block font-medium">Cardio 7j</span>
                       <span className="text-xs font-bold font-mono text-sky-400 block mt-0.5">
                         {balance.totalCardioLoad}
                       </span>
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Musculaire 7j</span>
+                      <span className="text-xs text-slate-300 block font-medium">Musculaire 7j</span>
                       <span className="text-xs font-bold font-mono text-rose-400 block mt-0.5">
                         {balance.totalMuscLoad}
                       </span>
                     </div>
                     <div className="p-2 rounded-xl bg-black/40 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block">Chocs Excentriques</span>
+                      <span className="text-xs text-slate-300 block font-medium">Chocs Excentriques</span>
                       <span className="text-xs font-bold font-mono text-amber-300 block mt-0.5 flex items-center justify-center gap-1">
-                        <Flame size={11} className="text-amber-400" />
+                        <Flame size={11} className="text-amber-400" aria-hidden="true" />
                         {balance.totalEccentricSessions} s.
                       </span>
                     </div>
                   </div>
 
-                  <div className="text-[11px] text-slate-300 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5 m-0 space-y-1">
+                  <div className="text-xs text-slate-200 leading-relaxed bg-white/5 p-2 rounded-lg border border-white/5 m-0 space-y-1">
                     <p className="m-0 leading-tight">
                       <strong className="text-white">Diagnostic :</strong> {balance.description}
                     </p>
-                    <p className="m-0 text-emerald-300 text-[11px] leading-tight flex items-center gap-1.5 font-medium">
-                      <Target size={13} className="text-emerald-400 shrink-0" />
+                    <p className="m-0 text-emerald-300 text-xs leading-tight flex items-center gap-1.5 font-medium">
+                      <Target size={13} className="text-emerald-400 shrink-0" aria-hidden="true" />
                       <span>{balance.recommendation}</span>
                     </p>
                   </div>
                 </div>
               )}
-            </div>
+            </article>
 
           </div>
 
@@ -1543,14 +1560,14 @@ export default function MetricsDashboard({
             <div className="flex items-center justify-between mb-2 px-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity size={14} className="text-blue-400" />
+                  <Activity size={14} className="text-blue-400" aria-hidden="true" />
                   Indicateurs de Modélisation PMC (Jour J)
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                <span className="text-xs text-slate-300 font-mono hidden sm:inline">
                   (Survolez les indicateurs pour comprendre leur rôle et leurs seuils)
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400">
+              <span className="text-xs font-mono text-slate-300">
                 τ₁: {tauFatigue}j · τ₂: {tauFitness}j
               </span>
             </div>
@@ -1738,7 +1755,7 @@ export default function MetricsDashboard({
                       </button>
                     </div>
 
-                    {/* Valeur principale agrandie et sous-formule lisible en gris #94A3B8 */}
+                    {/* Valeur principale agrandie et sous-formule lisible en gris slate-300 */}
                     <div className="flex items-baseline justify-between gap-2 mb-1.5 min-w-0">
                       <div className="flex items-baseline gap-1.5 min-w-0 flex-wrap">
                         <span className={`text-3xl sm:text-5xl font-black font-mono tracking-tight ${valueColor}`}>
@@ -1754,7 +1771,7 @@ export default function MetricsDashboard({
                         )}
                       </div>
                       <div 
-                        className="text-[10px] sm:text-xs font-mono font-semibold text-[#94A3B8] bg-white/5 px-1.5 sm:px-2 py-0.5 rounded-lg border border-white/10 shrink-0"
+                        className="text-xs font-mono font-semibold text-slate-300 bg-white/5 px-2 py-0.5 rounded-lg border border-white/10 shrink-0"
                         title={info.formula}
                       >
                         {shortFormula}
@@ -1808,7 +1825,7 @@ export default function MetricsDashboard({
                       </div>
                       
                       {/* Sous-titres de repères de la jauge sans chevauchement */}
-                      <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-mono text-[#94A3B8] mt-1.5 gap-1">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-300 mt-1.5 gap-1">
                         <span className="truncate max-w-[32%] text-left" title={gaugeSubtextLeft}>{gaugeSubtextLeft}</span>
                         <span className="text-emerald-400 font-bold truncate max-w-[36%] text-center shrink-0" title={gaugeSubtextCenter}>{gaugeSubtextCenter}</span>
                         <span className="truncate max-w-[32%] text-right" title={gaugeSubtextRight}>{gaugeSubtextRight}</span>
@@ -1816,7 +1833,7 @@ export default function MetricsDashboard({
                     </div>
 
                     {/* Diagnostic textuel avec bouton accessible */}
-                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] min-w-0 gap-2">
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs min-w-0 gap-2">
                       <span className={`font-semibold truncate min-w-0 ${statusColor}`}>
                         {info.currentInterpretation}
                       </span>
@@ -2298,8 +2315,8 @@ export default function MetricsDashboard({
                   {vfcAnalysis && (
                     <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-300">Variabilité Cardiaque (VFC)</span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                        <span className="font-semibold text-slate-200">Variabilité Cardiaque (VFC)</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
                           vfcAnalysis.status === 'optimal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
                           vfcAnalysis.status === 'low' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
                           vfcAnalysis.status === 'high' ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' :
@@ -2308,11 +2325,11 @@ export default function MetricsDashboard({
                           {vfcAnalysis.badge}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 m-0 leading-tight">
+                      <p className="text-xs text-slate-300 m-0 leading-relaxed">
                         {vfcAnalysis.interpretation}
                       </p>
                       {vfcAnalysis.corridorLower !== null && vfcAnalysis.corridorUpper !== null && (
-                        <div className="text-[10px] text-slate-500 font-mono">
+                        <div className="text-xs text-slate-300 font-mono">
                           Corridor SWC (0.5 SD) : {vfcAnalysis.corridorLower} – {vfcAnalysis.corridorUpper} ms • Base 7j : {vfcAnalysis.baseline7d} ms
                         </div>
                       )}
@@ -2322,8 +2339,8 @@ export default function MetricsDashboard({
                   {hrRestAnalysis && (
                     <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-300">FC de Repos au Réveil</span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                        <span className="font-semibold text-slate-200">FC de Repos au Réveil</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded border ${
                           hrRestAnalysis.status === 'optimal' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
                           hrRestAnalysis.status === 'elevated' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
                           hrRestAnalysis.status === 'low' ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' :
@@ -2332,11 +2349,11 @@ export default function MetricsDashboard({
                           {hrRestAnalysis.badge}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 m-0 leading-tight">
+                      <p className="text-xs text-slate-300 m-0 leading-relaxed">
                         {hrRestAnalysis.interpretation}
                       </p>
                       {hrRestAnalysis.median28d !== null && (
-                        <div className="text-[10px] text-slate-500 font-mono">
+                        <div className="text-xs text-slate-300 font-mono">
                           Médiane 28j : {hrRestAnalysis.median28d} bpm • Écart à date : {hrRestAnalysis.deltaBpm !== null && hrRestAnalysis.deltaBpm > 0 ? `+${hrRestAnalysis.deltaBpm}` : hrRestAnalysis.deltaBpm} bpm
                         </div>
                       )}
@@ -2350,15 +2367,16 @@ export default function MetricsDashboard({
 
           {/* POINT 4 : PANNEAU D'INSPECTION & DIAGNOSTIC DYNAMIQUE DE CHARGE BANISTER */}
           {currentInspectedDay && banisterInterpretation && (
-            <div 
+            <section 
               id="banister-day-inspector"
+              aria-label="Inspecteur physiologique du jour sélectionné"
               aria-live="polite"
               className="bg-slate-900/70 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl"
             >
               {/* En-tête avec date inspectée, badge temporel, état épinglé et bouton retour aujourd'hui */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/25">
+                  <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/25" aria-hidden="true">
                     <Calendar size={16} />
                   </div>
                   <div>
@@ -2367,20 +2385,20 @@ export default function MetricsDashboard({
                         {formatFullInspectionDate(currentInspectedDay.dateStr)}
                       </h4>
                       {currentInspectedDay.isToday ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-500/25 text-blue-300 border border-blue-500/40">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-black bg-blue-500/25 text-blue-300 border border-blue-500/40">
                           Aujourd'hui (Jour J)
                         </span>
                       ) : currentInspectedDay.isFuture ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-500/25 text-purple-300 border border-purple-500/40">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-black bg-purple-500/25 text-purple-300 border border-purple-500/40">
                           Projection (+{currentInspectedDay.offset}j)
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-slate-300 border border-white/10">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-white/10 text-slate-200 border border-white/10">
                           J{currentInspectedDay.offset}
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5 mb-0 hidden sm:block">
+                    <p className="text-xs text-slate-300 mt-0.5 mb-0 hidden sm:block">
                       Cliquez sur la courbe Banister pour figer une date ou naviguez via la barre chronologique
                     </p>
                   </div>
@@ -2389,10 +2407,10 @@ export default function MetricsDashboard({
                 <div className="flex items-center gap-2">
                   {isDayPinned ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-xl">
-                      <Pin size={13} className="text-amber-400" /> Date Épinglée
+                      <Pin size={13} className="text-amber-400" aria-hidden="true" /> Date Épinglée
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-xs text-slate-400 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl font-mono">
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-300 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl font-mono">
                       Survol interactif
                     </span>
                   )}
@@ -2408,7 +2426,7 @@ export default function MetricsDashboard({
                       className="flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-blue-300 hover:text-blue-200 border border-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                       title="Réinitialiser l'inspection sur la date d'aujourd'hui"
                     >
-                      <RotateCcw size={13} />
+                      <RotateCcw size={13} aria-hidden="true" />
                       <span>Aujourd'hui</span>
                     </button>
                   )}
@@ -2419,7 +2437,7 @@ export default function MetricsDashboard({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {/* Forme TSB */}
                 <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                  <span className="text-xs uppercase font-bold tracking-wider text-slate-300 block truncate">
                     Forme (TSB)
                   </span>
                   <div className="flex items-baseline gap-2 my-1">
@@ -2431,55 +2449,55 @@ export default function MetricsDashboard({
                       {currentInspectedDay.tsb > 0 ? `+${currentInspectedDay.tsb}` : currentInspectedDay.tsb}
                     </span>
                   </div>
-                  <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block truncate max-w-full ${banisterInterpretation.zoneBadge}`}>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded border inline-block truncate max-w-full ${banisterInterpretation.zoneBadge}`}>
                     {banisterInterpretation.zoneTitle}
                   </span>
                 </div>
 
                 {/* Fatigue Aiguë ATL */}
                 <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                  <span className="text-xs uppercase font-bold tracking-wider text-slate-300 block truncate">
                     Fatigue (ATL)
                   </span>
                   <div className="flex items-baseline gap-1.5 my-1">
                     <span className="text-xl sm:text-2xl font-black font-mono text-rose-400">
                       {currentInspectedDay.loadEMA7}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">pts</span>
+                    <span className="text-xs font-mono text-slate-300">pts</span>
                   </div>
-                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+                  <span className="text-xs font-mono text-slate-300 truncate">
                     Moyenne {tauFatigue}j
                   </span>
                 </div>
 
                 {/* Condition CTL */}
                 <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                  <span className="text-xs uppercase font-bold tracking-wider text-slate-300 block truncate">
                     Condition (CTL)
                   </span>
                   <div className="flex items-baseline gap-1.5 my-1">
                     <span className="text-xl sm:text-2xl font-black font-mono text-sky-400">
                       {currentInspectedDay.loadEMA21}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">pts</span>
+                    <span className="text-xs font-mono text-slate-300">pts</span>
                   </div>
-                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+                  <span className="text-xs font-mono text-slate-300 truncate">
                     Moyenne {tauFitness}j
                   </span>
                 </div>
 
                 {/* Charge Quotidienne */}
                 <div className="p-2.5 sm:p-3 rounded-xl bg-black/40 border border-white/10 flex flex-col justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block truncate">
+                  <span className="text-xs uppercase font-bold tracking-wider text-slate-300 block truncate">
                     Charge Jour
                   </span>
                   <div className="flex items-baseline gap-1.5 my-1">
                     <span className="text-xl sm:text-2xl font-black font-mono text-amber-300">
                       {currentInspectedDay.load}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-mono text-slate-400">pts</span>
+                    <span className="text-xs font-mono text-slate-300">pts</span>
                   </div>
-                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 truncate">
+                  <span className="text-xs font-mono text-slate-300 truncate">
                     {currentInspectedDay.sessions?.length || 0} séance(s)
                   </span>
                 </div>
@@ -2488,7 +2506,7 @@ export default function MetricsDashboard({
               {/* Explication Contextuelle Rédigée en Français Clair */}
               <div className="p-3.5 rounded-xl bg-black/30 border border-white/5 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Sparkles size={14} className="text-blue-400 shrink-0" />
+                  <Sparkles size={14} className="text-blue-400 shrink-0" aria-hidden="true" />
                   <span className="text-xs font-bold text-white uppercase tracking-wider">
                     Diagnostic Physiologique & Recommandation
                   </span>
@@ -2497,7 +2515,7 @@ export default function MetricsDashboard({
                   {banisterInterpretation.summary}
                 </p>
                 <div className="text-xs text-emerald-300 font-medium bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg flex items-start gap-2">
-                  <Target size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <Target size={14} className="text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
                   <div>
                     <strong className="text-emerald-200">Conseil d'entraînement :</strong> {banisterInterpretation.prescription}
                   </div>
@@ -2506,20 +2524,20 @@ export default function MetricsDashboard({
                 {/* Triptyque Biométrique du Réveil (Readiness, VFC, FC de Repos) */}
                 {(currentInspectedDay.readiness || currentInspectedDay.vfc || currentInspectedDay.hrRest) && (
                   <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 font-sans">Biométrie du Réveil :</span>
+                    <span className="text-xs uppercase font-bold text-slate-300 font-sans">Biométrie du Réveil :</span>
                     {currentInspectedDay.readiness && (
                       <span className="inline-flex items-center gap-1.5 text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
-                        <Zap size={12} className="text-blue-400 shrink-0" /> Readiness : <strong>{currentInspectedDay.readiness}/10</strong>
+                        <Zap size={12} className="text-blue-400 shrink-0" aria-hidden="true" /> Readiness : <strong>{currentInspectedDay.readiness}/10</strong>
                       </span>
                     )}
                     {currentInspectedDay.vfc && (
                       <span className="inline-flex items-center gap-1.5 text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                        <Activity size={12} className="text-emerald-400 shrink-0" /> VFC : <strong>{currentInspectedDay.vfc} ms</strong>
+                        <Activity size={12} className="text-emerald-400 shrink-0" aria-hidden="true" /> VFC : <strong>{currentInspectedDay.vfc} ms</strong>
                       </span>
                     )}
                     {currentInspectedDay.hrRest && (
                       <span className="inline-flex items-center gap-1.5 text-rose-300 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20">
-                        <Heart size={12} className="text-rose-400 shrink-0" /> FC Repos : <strong>{currentInspectedDay.hrRest} bpm</strong>
+                        <Heart size={12} className="text-rose-400 shrink-0" aria-hidden="true" /> FC Repos : <strong>{currentInspectedDay.hrRest} bpm</strong>
                       </span>
                     )}
                   </div>
@@ -2530,7 +2548,7 @@ export default function MetricsDashboard({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs uppercase tracking-wider font-bold text-slate-200 flex items-center gap-1.5">
-                    <Dumbbell size={14} className="text-blue-400" />
+                    <Dumbbell size={14} className="text-blue-400" aria-hidden="true" />
                     Séances Réalisées Ce Jour ({currentInspectedDay.sessions?.length || 0})
                   </span>
                 </div>
@@ -2543,18 +2561,18 @@ export default function MetricsDashboard({
                           <span className="text-xs font-bold text-white truncate">
                             {s.qualityName}
                           </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                             {s.load} pts
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-1">
+                        <div className="flex items-center justify-between text-xs font-mono text-slate-300 mt-1">
                           <span className="flex items-center gap-1">
-                            <Clock size={11} className="text-slate-400 shrink-0" /> {s.duration} min
+                            <Clock size={11} className="text-slate-300 shrink-0" aria-hidden="true" /> {s.duration} min
                           </span>
                           <span>RPE C:{s.rpeC} · M:{s.rpeM}{s.fatigue ? ` · Fat:${s.fatigue}/10` : ''}</span>
                         </div>
                         {s.notes && (
-                          <p className="text-[11px] text-slate-400 italic line-clamp-1 m-0 pt-1 border-t border-white/5">
+                          <p className="text-xs text-slate-300 italic line-clamp-1 m-0 pt-1 border-t border-white/5">
                             « {s.notes} »
                           </p>
                         )}
@@ -2563,12 +2581,12 @@ export default function MetricsDashboard({
                   </div>
                 ) : (
                   <div className="p-3.5 rounded-xl bg-white/[0.02] border border-dashed border-white/10 text-xs text-slate-300 flex items-center justify-center gap-2">
-                    <Calendar size={14} className="text-emerald-400 shrink-0" />
+                    <Calendar size={14} className="text-emerald-400 shrink-0" aria-hidden="true" />
                     <span>Journée de repos (0 point de charge) — Favorable à l'abaissement de la fatigue aiguë ATL et au relèvement du TSB.</span>
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           )}
         </>
       )}
@@ -2577,34 +2595,37 @@ export default function MetricsDashboard({
       {showQualities && qualities.length > 0 && (
         <div className="flex flex-col gap-6">
           {/* POINT 5 : RUBAN DE STATUT DE RÉMANENCE IMMÉDIAT (« QUICK STATUS BAR ») */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-white/10 space-y-3.5 shadow-xl">
+          <section 
+            aria-labelledby="heading-remanence-bar"
+            className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-white/10 space-y-3.5 shadow-xl"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30" aria-hidden="true">
                     <Layers size={16} />
                   </div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider m-0">
+                  <h4 id="heading-remanence-bar" className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider m-0">
                     Ruban de Statut de Rémanence Immédiat
                   </h4>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
                     {qualities.length} Filières
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1 mb-0">
+                <p className="text-xs text-slate-300 mt-1 mb-0">
                   Surveillance en direct de l'effet résiduel, des paliers de stabilisation et des urgences de rappel
                 </p>
               </div>
 
-              {/* Filtres rapides d'urgence du ruban */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Filtres rapides d'urgence du ruban avec min-h 44px */}
+              <div className="flex items-center gap-1.5 flex-wrap" role="toolbar" aria-label="Filtres de statut de rémanence">
                 <button
                   type="button"
                   onClick={() => setRemanenceFilter('all')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     remanenceFilter === 'all'
                       ? 'bg-blue-600 text-white border-blue-400 shadow-sm font-bold'
-                      : 'bg-white/5 text-slate-400 hover:text-white border-white/5'
+                      : 'bg-white/5 text-slate-200 hover:text-white border-white/10'
                   }`}
                 >
                   Toutes ({remanenceStatusList.length})
@@ -2613,14 +2634,14 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={() => setRemanenceFilter('urgent')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${
                     remanenceFilter === 'urgent'
                       ? 'bg-rose-600 text-white border-rose-400 shadow-sm font-bold'
                       : 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border-rose-500/30'
                   }`}
                 >
                   <span>🚨 Déclin & Urgence</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-black/40 font-bold">
+                  <span className="px-1.5 py-0.5 rounded-full text-xs font-mono bg-black/40 font-bold">
                     {urgentCount}
                   </span>
                 </button>
@@ -2628,14 +2649,14 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={() => setRemanenceFilter('recall')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                     remanenceFilter === 'recall'
                       ? 'bg-amber-600 text-white border-amber-400 shadow-sm font-bold'
                       : 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border-amber-500/30'
                   }`}
                 >
                   <span>⚡ Rappel (24-48h)</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-black/40 font-bold">
+                  <span className="px-1.5 py-0.5 rounded-full text-xs font-mono bg-black/40 font-bold">
                     {recallCount}
                   </span>
                 </button>
@@ -2643,14 +2664,14 @@ export default function MetricsDashboard({
                 <button
                   type="button"
                   onClick={() => setRemanenceFilter('optimal')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                     remanenceFilter === 'optimal'
                       ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm font-bold'
                       : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border-emerald-500/30'
                   }`}
                 >
                   <span>✅ Consolidées</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-black/40 font-bold">
+                  <span className="px-1.5 py-0.5 rounded-full text-xs font-mono bg-black/40 font-bold">
                     {optimalCount}
                   </span>
                 </button>
@@ -2658,7 +2679,7 @@ export default function MetricsDashboard({
             </div>
 
             {/* Défilement horizontal des cartes de rémanence express */}
-            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar pt-1">
+            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar pt-1" role="region" aria-label="Cartes de rémanence défilantes">
               {filteredRemanenceList.map(item => {
                 const isSelected = item.quality.id === selectedQualityId;
                 const IconComponent = item.statusIcon;
@@ -2672,8 +2693,18 @@ export default function MetricsDashboard({
                 return (
                   <div
                     key={item.quality.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    aria-label={`Filière ${item.quality.name}, statut ${item.statusLabel}, rémanence ${item.remainingPercent}%`}
                     onClick={() => setSelectedQualityId(item.quality.id)}
-                    className={`shrink-0 w-64 p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between select-none ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedQualityId(item.quality.id);
+                      }
+                    }}
+                    className={`shrink-0 w-64 p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                       isSelected
                         ? 'bg-blue-950/60 border-blue-400 ring-2 ring-blue-500/60 shadow-lg shadow-blue-500/20'
                         : 'bg-slate-900/80 border-white/10 hover:border-white/20 hover:bg-slate-900'
@@ -2684,8 +2715,8 @@ export default function MetricsDashboard({
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded ${
-                            isSelected ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-300'
+                          <span className={`text-xs font-black font-mono px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-blue-500 text-white' : 'bg-white/10 text-slate-200'
                           }`}>
                             #{item.rank}
                           </span>
@@ -2693,7 +2724,7 @@ export default function MetricsDashboard({
                             {item.quality.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 font-mono mt-1 block">
+                        <span className="text-xs text-slate-300 font-mono mt-1 block">
                           Fenêtre : {item.plateauDays}j g + {item.declineDays}j o
                         </span>
                       </div>
@@ -2709,14 +2740,14 @@ export default function MetricsDashboard({
 
                     {/* Badge de statut immédiat */}
                     <div className="mb-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${item.statusBg}`}>
-                        <IconComponent size={11} className="shrink-0" />
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold border ${item.statusBg}`}>
+                        <IconComponent size={11} className="shrink-0" aria-hidden="true" />
                         <span className="truncate">{item.statusLabel}</span>
                       </span>
                     </div>
 
                     {/* Ligne d'action & dernier rappel */}
-                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-300">
                       <span>
                         {item.daysSince === null ? 'Jamais' : item.daysSince === 0 ? 'Aujourd\'hui' : `J-${item.daysSince}`}
                       </span>
@@ -2734,12 +2765,12 @@ export default function MetricsDashboard({
               })}
 
               {filteredRemanenceList.length === 0 && (
-                <div className="w-full py-4 text-center text-xs text-slate-400 bg-white/[0.02] rounded-xl border border-white/5">
+                <div className="w-full py-4 text-center text-xs text-slate-300 bg-white/[0.02] rounded-xl border border-white/5">
                   Aucune qualité ne correspond à ce filtre de rémanence.
                 </div>
               )}
             </div>
-          </div>
+          </section>
 
           <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-xl">
           {/* EN-TÊTE ÉPURÉ : NOM DE LA FILIÈRE + SÉLECTEUR DE COMPARAISON IMMÉDIATEMENT ATTACHÉ */}
@@ -2752,10 +2783,10 @@ export default function MetricsDashboard({
                 </span>
               </div>
 
-              {/* Rapprochement des filtres temporels directement à côté de la filière active */}
-              <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 text-[11px]" role="radiogroup" aria-label="Base de comparaison temporelle">
-                <span className="text-slate-300 px-1 text-[10px] font-semibold flex items-center gap-1">
-                  <Gauge size={11} className="text-blue-400" aria-hidden="true" />
+              {/* Rapprochement des filtres temporels directement à côté de la filière active avec 44px touch target */}
+              <div className="flex items-center gap-1.5 bg-black/40 p-1.5 rounded-xl border border-white/10" role="radiogroup" aria-label="Base de comparaison temporelle">
+                <span className="text-slate-300 px-1 text-xs font-semibold flex items-center gap-1">
+                  <Gauge size={13} className="text-blue-400" aria-hidden="true" />
                   vs :
                 </span>
                 <button
@@ -2763,7 +2794,7 @@ export default function MetricsDashboard({
                   role="radio"
                   aria-checked={trendBasis === 'period'}
                   onClick={() => setTrendBasis('period')}
-                  className={`px-2.5 py-1 min-h-[32px] rounded-lg font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                  className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     trendBasis === 'period'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                       : 'text-slate-300 hover:text-white'
@@ -2777,7 +2808,7 @@ export default function MetricsDashboard({
                   role="radio"
                   aria-checked={trendBasis === 'daily'}
                   onClick={() => setTrendBasis('daily')}
-                  className={`px-2.5 py-1 min-h-[32px] rounded-lg font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                  className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     trendBasis === 'daily'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                       : 'text-slate-300 hover:text-white'
@@ -2791,7 +2822,7 @@ export default function MetricsDashboard({
                   role="radio"
                   aria-checked={trendBasis === 'week'}
                   onClick={() => setTrendBasis('week')}
-                  className={`px-2.5 py-1 min-h-[32px] rounded-lg font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                  className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-semibold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     trendBasis === 'week'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
                       : 'text-slate-300 hover:text-white'
@@ -2804,22 +2835,22 @@ export default function MetricsDashboard({
             </div>
 
             {/* Sémantique claire des tendances */}
-            <div className="text-[11px] font-mono text-[#94A3B8] flex items-center gap-1.5 bg-black/25 px-2.5 py-1 rounded-lg border border-white/5">
+            <div className="text-xs font-mono text-slate-300 flex items-center gap-2 bg-black/25 px-3 py-1.5 rounded-lg border border-white/5">
               <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                <ArrowUp size={11} className="stroke-[3]" /> Hausse
+                <ArrowUp size={12} className="stroke-[3]" aria-hidden="true" /> Hausse
               </span>
-              <span className="text-slate-600">|</span>
+              <span className="text-slate-500">|</span>
               <span className="flex items-center gap-1 text-rose-400 font-bold">
-                <ArrowDown size={11} className="stroke-[3]" /> Baisse
+                <ArrowDown size={12} className="stroke-[3]" aria-hidden="true" /> Baisse
               </span>
             </div>
           </div>
 
           {/* SÉLECTEUR DE FILIÈRES : GROUPEMENT PAR CATÉGORIES + RECHERCHE + BADGES ÉPURÉS SANS 0 */}
-          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
-              {/* Onglets de filtrage par catégorie physiologique */}
-              <div className="flex items-center gap-1.5 flex-wrap" role="radiogroup" aria-label="Filtrer les qualités par catégorie">
+          <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Onglets de filtrage par catégorie physiologique avec cibles 44px */}
+              <div className="flex items-center gap-2 flex-wrap" role="radiogroup" aria-label="Filtrer les qualités par catégorie">
                 {[
                   { id: 'all', label: 'Toutes' },
                   { id: 'cardio', label: '🫀 Cardio' },
@@ -2832,10 +2863,10 @@ export default function MetricsDashboard({
                     role="radio"
                     aria-checked={selectedCategory === cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1.5 min-h-[34px] rounded-xl text-xs font-semibold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                    className={`px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-semibold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                       selectedCategory === cat.id
-                        ? 'bg-blue-600/40 text-blue-200 border-blue-400 font-bold shadow-sm'
-                        : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
+                        ? 'bg-blue-600 text-white border-blue-400 font-bold shadow-sm'
+                        : 'bg-white/5 text-slate-200 hover:text-white hover:bg-white/10 border-white/10'
                     }`}
                   >
                     {cat.label}
@@ -2847,15 +2878,15 @@ export default function MetricsDashboard({
                   type="button"
                   aria-pressed={hideZeroOnly}
                   onClick={() => setHideZeroOnly(!hideZeroOnly)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[34px] rounded-xl text-xs font-semibold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                  className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-semibold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     hideZeroOnly
                       ? 'bg-amber-500/20 text-amber-200 border-amber-500/40 shadow-sm font-bold'
-                      : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
+                      : 'bg-white/5 text-slate-200 hover:text-white hover:bg-white/10 border-white/10'
                   }`}
                   title="Masquer les qualités dont les valeurs EMA sont toutes à zéro"
                 >
                   <span>🔥 Actives uniquement</span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${hideZeroOnly ? 'bg-amber-400/25 text-amber-100 font-bold' : 'bg-white/10 text-slate-300'}`}>
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${hideZeroOnly ? 'bg-amber-400/25 text-amber-100 font-bold' : 'bg-white/10 text-slate-200'}`}>
                     {activeQualitiesCount}/{qualities.length}
                   </span>
                 </button>
@@ -2866,31 +2897,31 @@ export default function MetricsDashboard({
                 <label htmlFor="quality-search-field" className="sr-only">
                   Rechercher une qualité physique
                 </label>
-                <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" aria-hidden="true" />
+                <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" aria-hidden="true" />
                 <input
                   id="quality-search-field"
                   type="search"
                   value={qualitySearch}
                   onChange={(e) => setQualitySearch(e.target.value)}
                   placeholder="Rechercher une qualité (VO2, seuil...)"
-                  className="w-full pl-8 pr-8 py-1.5 text-xs bg-slate-950/70 border border-white/15 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-slate-900 transition-all shadow-inner"
+                  className="w-full min-h-[44px] pl-9 pr-9 py-2 text-xs bg-slate-950/70 border border-white/15 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-slate-900 transition-all shadow-inner"
                 />
                 {qualitySearch && (
                   <button
                     type="button"
                     aria-label="Effacer la recherche de qualité"
                     onClick={() => setQualitySearch('')}
-                    className="absolute right-2 text-slate-400 hover:text-white p-1 rounded-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                    className="absolute right-2.5 text-slate-400 hover:text-white p-1 rounded-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     title="Effacer la recherche"
                   >
-                    <X size={14} aria-hidden="true" />
+                    <X size={15} aria-hidden="true" />
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Puces de sélection : masquage automatique des badges à zéro pour épurer l'interface */}
-            <div className="flex flex-wrap gap-1.5 pt-0.5">
+            {/* Puces de sélection avec min-h 44px et contrastes renforcés */}
+            <div className="flex flex-wrap gap-2 pt-0.5" role="toolbar" aria-label="Sélection rapide de la filière active">
               {filteredQualities.map(q => {
                 const isSelected = q.id === selectedQualityId;
                 const qEma = qualitiesEMA[q.id]?.current;
@@ -2903,30 +2934,31 @@ export default function MetricsDashboard({
                   <button
                     key={q.id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedQualityId(q.id)}
-                    className={`group px-3 py-1.5 rounded-xl text-xs transition-all border cursor-pointer flex items-center gap-1.5 ${
+                    className={`group min-h-[44px] px-3.5 py-2 rounded-xl text-xs transition-all border cursor-pointer flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                       isSelected 
                         ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/25 font-bold' 
-                        : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/5 hover:border-white/15'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/10 hover:border-white/20'
                     }`}
                   >
                     <span>{q.name}</span>
                     {/* LOGIQUE DE MASQUAGE AUTOMATIQUE : badge affiché UNIQUEMENT si valeur > 0 */}
                     {val3 > 0 ? (
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${
                         isSelected ? 'bg-black/30 text-blue-100' : 'bg-blue-500/20 text-blue-300'
                       }`}>
                         {val3}
                       </span>
                     ) : null}
-                    {val3 > 0 && isUp && <ArrowUp size={11} className={`stroke-[3] ${isSelected ? 'text-emerald-200' : 'text-emerald-400'}`} />}
-                    {val3 > 0 && isDown && <ArrowDown size={11} className={`stroke-[3] ${isSelected ? 'text-rose-200' : 'text-rose-400'}`} />}
+                    {val3 > 0 && isUp && <ArrowUp size={12} className={`stroke-[3] ${isSelected ? 'text-emerald-200' : 'text-emerald-400'}`} aria-hidden="true" />}
+                    {val3 > 0 && isDown && <ArrowDown size={12} className={`stroke-[3] ${isSelected ? 'text-rose-200' : 'text-rose-400'}`} aria-hidden="true" />}
                   </button>
                 );
               })}
 
               {filteredQualities.length === 0 && (
-                <div className="flex items-center justify-between w-full py-2.5 px-3 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-400">
+                <div className="flex items-center justify-between w-full py-3 px-4 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-300">
                   <span>Aucune filière ne correspond à vos critères de recherche.</span>
                   <button
                     type="button"
@@ -2947,13 +2979,16 @@ export default function MetricsDashboard({
           {/* CARTES KPI AVEC PALETTE MONOCHROMATIQUE (TEMPORALITÉ EN BLEU/INDIGO) & MINIATURES SPARKLINE */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* EMA 3j : BLEU CLAIR / CYAN */}
-            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-sky-500/30 transition-all shadow-md">
+            <article 
+              aria-label="EMA 3 jours, dynamique à court terme"
+              className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-sky-500/30 transition-all shadow-md"
+            >
               <div className="flex items-center justify-between gap-1 mb-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400" aria-hidden="true"></span>
                   <span className="text-xs text-slate-200 font-semibold">EMA 3j (Court terme)</span>
                 </div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">vs {periodLabel3}</span>
+                <span className="text-xs text-slate-300 font-mono">vs {periodLabel3}</span>
               </div>
 
               {/* Chiffre principal agrandi + Tendance + Sparkline intégrée */}
@@ -2968,22 +3003,25 @@ export default function MetricsDashboard({
                 <MiniSparkline data={sparklineSeries.ema3} color="#38bdf8" />
               </div>
 
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
-                <span>Réf. {periodLabel3} : <strong className="text-slate-200">{prevVal3}</strong></span>
-                <span className={d3 > 0.05 ? 'text-emerald-400 font-semibold' : d3 < -0.05 ? 'text-rose-400 font-semibold' : 'text-[#94A3B8]'}>
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-300">
+                <span>Réf. {periodLabel3} : <strong className="text-white">{prevVal3}</strong></span>
+                <span className={d3 > 0.05 ? 'text-emerald-400 font-semibold' : d3 < -0.05 ? 'text-rose-400 font-semibold' : 'text-slate-300'}>
                   Δ {d3 > 0 ? `+${d3}` : d3}
                 </span>
               </div>
-            </div>
+            </article>
 
             {/* EMA 7j : BLEU COBALT */}
-            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-blue-500/30 transition-all shadow-md">
+            <article 
+              aria-label="EMA 7 jours, dynamique à moyen terme"
+              className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-blue-500/30 transition-all shadow-md"
+            >
               <div className="flex items-center justify-between gap-1 mb-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" aria-hidden="true"></span>
                   <span className="text-xs text-slate-200 font-semibold">EMA 7j (Moyen terme)</span>
                 </div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">vs {periodLabel7}</span>
+                <span className="text-xs text-slate-300 font-mono">vs {periodLabel7}</span>
               </div>
 
               {/* Chiffre principal agrandi + Tendance + Sparkline intégrée */}
@@ -2998,22 +3036,25 @@ export default function MetricsDashboard({
                 <MiniSparkline data={sparklineSeries.ema7} color="#3b82f6" />
               </div>
 
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
-                <span>Réf. {periodLabel7} : <strong className="text-slate-200">{prevVal7}</strong></span>
-                <span className={d7 > 0.05 ? 'text-emerald-400 font-semibold' : d7 < -0.05 ? 'text-rose-400 font-semibold' : 'text-[#94A3B8]'}>
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-300">
+                <span>Réf. {periodLabel7} : <strong className="text-white">{prevVal7}</strong></span>
+                <span className={d7 > 0.05 ? 'text-emerald-400 font-semibold' : d7 < -0.05 ? 'text-rose-400 font-semibold' : 'text-slate-300'}>
                   Δ {d7 > 0 ? `+${d7}` : d7}
                 </span>
               </div>
-            </div>
+            </article>
 
             {/* EMA 21j : INDIGO FONCÉ */}
-            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-indigo-500/30 transition-all shadow-md">
+            <article 
+              aria-label="EMA 21 jours, fond durable et charge chronique"
+              className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-indigo-500/30 transition-all shadow-md"
+            >
               <div className="flex items-center justify-between gap-1 mb-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" aria-hidden="true"></span>
                   <span className="text-xs text-slate-200 font-semibold">EMA 21j (Fond durable)</span>
                 </div>
-                <span className="text-[10px] text-[#94A3B8] font-mono">vs {periodLabel21}</span>
+                <span className="text-xs text-slate-300 font-mono">vs {periodLabel21}</span>
               </div>
 
               {/* Chiffre principal agrandi + Tendance + Sparkline intégrée */}
@@ -3028,19 +3069,22 @@ export default function MetricsDashboard({
                 <MiniSparkline data={sparklineSeries.ema21} color="#818cf8" />
               </div>
 
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
-                <span>Réf. {periodLabel21} : <strong className="text-slate-200">{prevVal21}</strong></span>
-                <span className={d21 > 0.05 ? 'text-emerald-400 font-semibold' : d21 < -0.05 ? 'text-rose-400 font-semibold' : 'text-[#94A3B8]'}>
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-slate-300">
+                <span>Réf. {periodLabel21} : <strong className="text-white">{prevVal21}</strong></span>
+                <span className={d21 > 0.05 ? 'text-emerald-400 font-semibold' : d21 < -0.05 ? 'text-rose-400 font-semibold' : 'text-slate-300'}>
                   Δ {d21 > 0 ? `+${d21}` : d21}
                 </span>
               </div>
-            </div>
+            </article>
 
             {/* Ratio ACWR */}
-            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-white/20 transition-all shadow-md">
+            <article 
+              aria-label="Ratio de charge aiguë sur chronique ACWR"
+              className="bg-slate-900/80 border border-white/10 rounded-xl p-3.5 flex flex-col justify-between hover:border-white/20 transition-all shadow-md"
+            >
               <div className="flex items-center justify-between gap-1 mb-1">
                 <span className="text-xs text-slate-200 font-semibold">Ratio ACWR (7j / 21j)</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
                   curr.acwr > 1.5 
                     ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                     : curr.acwr > 1.3
@@ -3054,15 +3098,16 @@ export default function MetricsDashboard({
               </div>
               <div className="flex items-baseline justify-between mt-1">
                 <span className="text-3xl font-black font-mono text-white">{curr.acwr !== null ? curr.acwr : '—'}</span>
-                <span className="text-[11px] text-[#94A3B8] font-mono">
+                <span className="text-xs text-slate-300 font-mono">
                   Zone d'équilibre : 0.8 - 1.3x
                 </span>
               </div>
-              <div className="pt-2 border-t border-white/5 text-[11px] text-[#94A3B8] flex items-center justify-between">
+              <div className="pt-2 border-t border-white/5 text-xs text-slate-300 flex items-center justify-between">
                 <span>Ratio Aigu / Chronique</span>
-                <span className="text-slate-400 font-semibold">{curr.acwr !== null && curr.acwr >= 0.8 && curr.acwr <= 1.3 ? 'Équilibré' : 'Surveillance'}</span>
+                <span className="text-slate-200 font-semibold">{curr.acwr !== null && curr.acwr >= 0.8 && curr.acwr <= 1.3 ? 'Équilibré' : 'Surveillance'}</span>
               </div>
-            </div>
+            </article>
+          </div>
           </div>
 
           {/* ZONE GRAPHIQUE OU ÉTAT VIDE NEUTRE (EMPTY STATE PROPRE) */}
@@ -3127,13 +3172,16 @@ export default function MetricsDashboard({
           )}
 
           {/* TABLEAU RÉCAPITULATIF DE TOUTES LES QUALITÉS (VALEURS EMA & FLÈCHES DE TENDANCE AVEC MAGNITUDE) */}
-          <div className="bg-black/30 border border-white/10 rounded-xl overflow-hidden mt-1">
+          <section 
+            aria-labelledby="heading-qualities-table"
+            className="bg-black/30 border border-white/10 rounded-xl overflow-hidden mt-1"
+          >
             <div className="p-3 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <Activity size={14} className="text-blue-400" />
+              <h4 id="heading-qualities-table" className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2 m-0">
+                <Activity size={14} className="text-blue-400" aria-hidden="true" />
                 Tableau Comparatif : Valeurs EMA & Flèches de Tendance ({qualities.length} Qualités)
               </h4>
-              <span className="text-[11px] text-slate-400 font-mono">
+              <span className="text-xs text-slate-300 font-mono">
                 Magnitudes calculées par rapport à la {trendBasis === 'daily' ? 'veille (J-1)' : trendBasis === 'week' ? 'semaine passée (J-7)' : 'période précédente (J-3/7/21)'}
               </span>
             </div>
@@ -3144,7 +3192,7 @@ export default function MetricsDashboard({
                   Tableau comparatif des dynamiques EMA 3j, 7j, 21j et ratio ACWR pour chaque qualité d'entraînement
                 </caption>
                 <thead>
-                  <tr className="bg-white/[0.04] text-[10px] uppercase text-slate-300 border-b border-white/10 font-semibold">
+                  <tr className="bg-white/[0.04] text-xs uppercase text-slate-200 border-b border-white/10 font-semibold">
                     <th scope="col" className="p-2.5 pl-3">Rang & Qualité</th>
                     <th scope="col" className="p-2.5 text-center">EMA 3j (Aiguë)</th>
                     <th scope="col" className="p-2.5 text-center hidden sm:table-cell">EMA 7j (Récente)</th>
@@ -3189,17 +3237,27 @@ export default function MetricsDashboard({
                     return (
                       <tr 
                         key={q.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-selected={isSelected}
+                        aria-label={`Sélectionner la filière ${q.name}, EMA 3j : ${qInfo.ema3}, ACWR : ${qInfo.acwr}`}
                         onClick={() => setSelectedQualityId(q.id)}
-                        className={`transition-colors cursor-pointer ${
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedQualityId(q.id);
+                          }
+                        }}
+                        className={`transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                           isSelected 
-                            ? 'bg-blue-500/10 font-medium' 
-                            : 'hover:bg-white/[0.03]'
+                            ? 'bg-blue-500/15 font-medium' 
+                            : 'hover:bg-white/[0.04]'
                         }`}
                       >
                         {/* Qualité */}
                         <td className="p-2.5 pl-3">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono font-bold text-slate-500">
+                            <span className="text-xs font-mono font-bold text-slate-400">
                               #{idx + 1}
                             </span>
                             <span className={`font-semibold ${isSelected ? 'text-blue-300' : 'text-slate-200'}`}>
@@ -3234,7 +3292,7 @@ export default function MetricsDashboard({
 
                         {/* ACWR */}
                         <td className="p-2.5 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono border ${
                             qInfo.acwr > 1.5 
                               ? 'bg-red-500/20 text-red-400 border-red-500/30'
                               : qInfo.acwr > 1.3
@@ -3250,24 +3308,24 @@ export default function MetricsDashboard({
                         {/* Tendance Globale */}
                         <td className="p-2.5 pr-3 text-right">
                           {isOverallUp ? (
-                            <span className="text-[10px] font-bold text-emerald-400 inline-flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                              <ArrowUp size={11} className="stroke-[3]" />
+                            <span className="text-xs font-bold text-emerald-400 inline-flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                              <ArrowUp size={12} className="stroke-[3]" aria-hidden="true" />
                               <span>Progression</span>
-                              <span className="text-[9px] opacity-80 font-mono hidden sm:inline">
+                              <span className="text-xs opacity-80 font-mono hidden sm:inline">
                                 ({maxMag >= 25 ? 'Forte' : maxMag >= 10 ? 'Modérée' : 'Légère'})
                               </span>
                             </span>
                           ) : isOverallDown ? (
-                            <span className="text-[10px] font-bold text-red-400 inline-flex items-center gap-1 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
-                              <ArrowDown size={11} className="stroke-[3]" />
+                            <span className="text-xs font-bold text-red-400 inline-flex items-center gap-1 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
+                              <ArrowDown size={12} className="stroke-[3]" aria-hidden="true" />
                               <span>Déclin</span>
-                              <span className="text-[9px] opacity-80 font-mono hidden sm:inline">
+                              <span className="text-xs opacity-80 font-mono hidden sm:inline">
                                 ({maxMag >= 25 ? 'Fort' : maxMag >= 10 ? 'Modéré' : 'Léger'})
                               </span>
                             </span>
                           ) : (
-                            <span className="text-[10px] text-slate-500 font-mono inline-flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">
-                              <Minus size={9} />
+                            <span className="text-xs text-slate-400 font-mono inline-flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">
+                              <Minus size={10} aria-hidden="true" />
                               <span>Stable</span>
                             </span>
                           )}
@@ -3278,27 +3336,26 @@ export default function MetricsDashboard({
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
 
           {/* CADRE MÉTHODOLOGIQUE & AIDE À LA DÉCISION (REPLIABLE EN ACCORDÉON SUR MOBILE) */}
-          <details className="group p-3.5 sm:p-4 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-400 text-xs mt-6 cursor-pointer">
+          <details className="group p-4 rounded-2xl bg-slate-900/40 border border-white/10 text-slate-300 text-xs mt-6 cursor-pointer">
             <summary className="flex items-center justify-between font-bold text-slate-200 list-none select-none">
               <div className="flex items-center gap-2">
-                <Info size={16} className="text-sky-400 shrink-0" />
+                <Info size={16} className="text-sky-400 shrink-0" aria-hidden="true" />
                 <span>Cadre méthodologique & Indicateurs d'aide à la décision</span>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono group-open:rotate-180 transition-transform">▼</span>
+              <span className="text-xs text-slate-400 font-mono group-open:rotate-180 transition-transform" aria-hidden="true">▼</span>
             </summary>
-            <p className="text-[11px] leading-relaxed text-slate-400 mt-2.5 pt-2 border-t border-white/5 m-0">
+            <p className="text-xs leading-relaxed text-slate-300 mt-2.5 pt-2 border-t border-white/10 m-0">
               Les métriques intégrées (Modèle PMC de Coggan avec filtres continus, Monotonie de Foster, RPE Différentiel, VFC en ln(rMSSD) selon Plews &amp; Buchheit, et Répartition Seiler) constituent des <strong>indicateurs d'aide à la décision d'entraînement</strong>. 
               Elles fournissent un repère quantifié pour piloter les cycles de charge et la fraîcheur. Elles ne constituent ni une prédiction médicale de blessure ni un avis médical. Fiez-vous toujours à vos sensations et consultez un professionnel de santé en cas de douleur persistante ou d'anomalie.
             </p>
           </details>
 
         </div>
-        </div>
       )}
 
-    </div>
+    </main>
   );
 }

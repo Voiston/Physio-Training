@@ -1132,6 +1132,9 @@ function AppContent() {
         lastSyncedAt={cloudSync.lastSyncedAt}
         pairingUrl={cloudSync.pairingUrl}
         qrCodeUrl={cloudSync.qrCodeUrl}
+        confirmFirstPush={cloudSync.confirmFirstPush}
+        onAcceptFirstPush={cloudSync.acceptFirstPush}
+        onRejectFirstPush={cloudSync.rejectFirstPush}
         onLoginWithGoogle={cloudSync.loginWithGoogle}
         onLogout={cloudSync.logout}
         onPushToCloud={() => {

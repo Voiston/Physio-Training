@@ -25,6 +25,9 @@ interface CloudSyncModalProps {
   lastSyncedAt: Date | null;
   pairingUrl: string;
   qrCodeUrl: string;
+  confirmFirstPush?: boolean;
+  onAcceptFirstPush?: () => void;
+  onRejectFirstPush?: () => void;
   onLoginWithGoogle: () => void;
   onLogout: () => void;
   onPushToCloud: () => void;
@@ -39,6 +42,9 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   lastSyncedAt,
   pairingUrl,
   qrCodeUrl,
+  confirmFirstPush = false,
+  onAcceptFirstPush,
+  onRejectFirstPush,
   onLoginWithGoogle,
   onLogout,
   onPushToCloud,
@@ -115,6 +121,43 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
+
+        {/* Alerte Sécurité : Premier Push sur Compte Vierge */}
+        {confirmFirstPush && (
+          <div 
+            role="alert" 
+            className="p-4 bg-amber-500/15 border border-amber-500/40 rounded-xl flex flex-col gap-3 shadow-lg"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex-1">
+                <h3 className="text-xs font-bold text-amber-200 uppercase tracking-wide m-0">
+                  Nouveau compte détecté · Données locales présentes
+                </h3>
+                <p className="text-xs text-slate-200 mt-1 leading-relaxed m-0">
+                  Ce compte Google n'a pas encore de profil Cloud, mais des séances d'entraînement sont présentes sur cet appareil.
+                  Souhaitez-vous téléverser ces séances vers votre nouveau compte ou démarrer avec un compte vierge ?
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={onRejectFirstPush}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              >
+                Démarrer à zéro (vierge)
+              </button>
+              <button
+                type="button"
+                onClick={onAcceptFirstPush}
+                className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-md shadow-amber-400/20 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                Téléverser vers mon compte
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Live Status Badge */}
         <div 

@@ -44,36 +44,62 @@ function formatFrenchDate(dateStr) {
 
 function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, activeColor = 'blue' }) {
   const numVal = Number(value);
+
+  const handleKeyDown = (e, currentNum) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextNum = currentNum >= max ? min : currentNum + 1;
+      if (haptics.selection) haptics.selection();
+      onChange(String(nextNum));
+      setTimeout(() => {
+        document.getElementById(`${id}-option-${nextNum}`)?.focus();
+      }, 0);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevNum = currentNum <= min ? max : currentNum - 1;
+      if (haptics.selection) haptics.selection();
+      onChange(String(prevNum));
+      setTimeout(() => {
+        document.getElementById(`${id}-option-${prevNum}`)?.focus();
+      }, 0);
+    }
+  };
+
   return (
     <div 
       id={id}
-      className="flex items-center gap-1 overflow-x-auto py-1 custom-scrollbar" 
-      role="group" 
-      aria-label={`Sélecteur rapide : ${label}`}
+      className="flex items-center gap-1.5 overflow-x-auto py-1.5 custom-scrollbar" 
+      role="radiogroup" 
+      aria-label={`Échelle rapide de notation : ${label} de ${min} à ${max}`}
     >
       {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => {
         const isSelected = numVal === n;
+        const isFocusable = isSelected || (!numVal && n === min);
         return (
           <button
             key={n}
+            id={`${id}-option-${n}`}
             type="button"
+            role="radio"
+            tabIndex={isFocusable ? 0 : -1}
+            aria-checked={isSelected}
             onClick={() => {
               if (haptics.selection) haptics.selection();
               onChange(String(n));
             }}
-            className={`min-w-[34px] h-9 px-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer border flex items-center justify-center shrink-0 ${
+            onKeyDown={(e) => handleKeyDown(e, n)}
+            className={`min-w-[44px] min-h-[44px] h-11 px-3 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all cursor-pointer border flex items-center justify-center shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
               isSelected
                 ? activeColor === 'red'
-                  ? 'bg-red-600 text-white border-red-400 shadow-md shadow-red-500/30 ring-2 ring-red-400'
+                  ? 'bg-red-600 text-white border-red-300 shadow-md shadow-red-500/30 ring-2 ring-red-400'
                   : activeColor === 'sky'
-                  ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-500/30 ring-2 ring-sky-400'
+                  ? 'bg-sky-600 text-white border-sky-300 shadow-md shadow-sky-500/30 ring-2 ring-sky-400'
                   : activeColor === 'amber'
-                  ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-500/30 ring-2 ring-amber-400'
-                  : 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/30 ring-2 ring-blue-400'
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 hover:border-slate-500'
+                  ? 'bg-amber-600 text-white border-amber-300 shadow-md shadow-amber-500/30 ring-2 ring-amber-400'
+                  : 'bg-blue-600 text-white border-blue-300 shadow-md shadow-blue-500/30 ring-2 ring-blue-400'
+                : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/10 hover:border-slate-400'
             }`}
-            aria-label={`${label} : ${n}`}
-            aria-pressed={isSelected}
+            aria-label={`${label} : niveau ${n} sur ${max}`}
           >
             {n}
           </button>
@@ -692,7 +718,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 id="score-modal-title" className="text-xl font-bold text-slate-100 tracking-tight m-0">{info.qName}</h3>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border ${
                 isIsolation
                   ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
                   : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
@@ -700,8 +726,8 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                 {isIsolation ? 'Micro-séance Ciblée' : 'Saisie Séance'}
               </span>
               {isEccentric && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 shadow-sm">
-                  <Zap size={11} className="text-amber-400" aria-hidden="true" /> Excentrique (+15%)
+                <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 shadow-sm">
+                  <Zap size={13} className="text-amber-400" aria-hidden="true" /> Excentrique (+15%)
                 </span>
               )}
             </div>
@@ -720,10 +746,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   haptics.modeSwitch();
                   onOpenLiveGym();
                 }}
-                className="min-h-[40px] px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                 title="Passer en mode saisie live à la salle avec chronomètre de repos automatique"
               >
-                <Dumbbell size={13} className="text-emerald-400" aria-hidden="true" />
+                <Dumbbell size={14} className="text-emerald-400" aria-hidden="true" />
                 <span className="hidden sm:inline">Mode Salle</span>
               </button>
             )}
@@ -732,7 +758,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             <button
               type="button"
               onClick={onClose}
-              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/20 text-slate-300 hover:text-white border border-white/10 flex items-center justify-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               aria-label="Fermer la boîte de dialogue"
               title="Fermer (Échap)"
             >
@@ -751,23 +777,23 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         )}
 
         {/* SECTION SÉLECTEUR DE DATE & VUE CALENDRIER INTERACTIVE */}
-        <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-2.5 mb-4">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
-                <Calendar size={14} aria-hidden="true" />
+        <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-3 mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+                <Calendar size={16} aria-hidden="true" />
               </div>
               <div>
-                <label htmlFor="score-date-input" className="text-[10px] uppercase font-bold text-slate-300 tracking-wider block cursor-pointer">
+                <label htmlFor="score-date-input" className="text-xs uppercase font-bold text-slate-300 tracking-wider block cursor-pointer">
                   Date de la séance
                 </label>
-                <span className="text-xs font-bold text-white capitalize block mt-0.5">
+                <span className="text-xs sm:text-sm font-bold text-white capitalize block mt-0.5">
                   {formatFrenchDate(selectedDate)}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               {/* Sélecteur natif date rapide */}
               <input
                 id="score-date-input"
@@ -780,7 +806,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                     setViewDate({ year: y, month: m - 1 });
                   }
                 }}
-                className="bg-slate-900 text-xs font-mono text-slate-200 px-2.5 py-1.5 min-h-[36px] rounded-xl border border-white/10 focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="bg-slate-900 text-xs sm:text-sm font-mono text-slate-200 px-3 py-2 min-h-[44px] rounded-xl border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer"
                 aria-label="Sélectionner une date"
               />
 
@@ -788,10 +814,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               <button
                 type="button"
                 onClick={() => setShowCalendarView(!showCalendarView)}
-                className={`px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                className={`px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                   showCalendarView 
                     ? 'bg-blue-600 text-white border-blue-400 shadow-sm' 
-                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 hover:text-white'
+                    : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/10 hover:text-white'
                 }`}
                 aria-expanded={showCalendarView}
                 aria-label={showCalendarView ? 'Fermer le calendrier mensuel' : 'Ouvrir le calendrier mensuel'}
@@ -802,8 +828,8 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
           </div>
 
           {/* Raccourcis rapides de date (Aujourd'hui, Hier, J-2, J-3) */}
-          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-white/5">
-            <span className="text-xs text-slate-300 font-semibold">Raccourcis :</span>
+          <div className="flex items-center gap-2 flex-wrap pt-1.5 border-t border-white/5">
+            <span className="text-xs text-slate-300 font-semibold mr-1">Raccourcis :</span>
             {quickDateShortcuts.map((sc) => {
               const isCurrent = selectedDate === sc.dateStr;
               return (
@@ -815,10 +841,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                     const [y, m] = sc.dateStr.split('-').map(Number);
                     setViewDate({ year: y, month: m - 1 });
                   }}
-                  className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                  className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                     isCurrent
-                      ? 'bg-blue-600 text-white border-blue-400 shadow-sm font-bold ring-1 ring-blue-300'
-                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 hover:text-white'
+                      ? 'bg-blue-600 text-white border-blue-400 shadow-sm font-bold ring-2 ring-blue-300'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/10 hover:text-white'
                   }`}
                   aria-pressed={isCurrent}
                 >
@@ -829,54 +855,54 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
             {/* Indicateur si une séance est déjà enregistrée pour cette date */}
             {currentSessionData && (
-              <span className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full">
-                <CheckCircle2 size={13} className="text-amber-400" aria-hidden="true" /> Séance existante ({currentSessionData.load || (currentSessionData * 5)} pts)
+              <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-full">
+                <CheckCircle2 size={14} className="text-amber-400" aria-hidden="true" /> Séance existante ({currentSessionData.load || (currentSessionData * 5)} pts)
               </span>
             )}
           </div>
 
           {/* VUE CALENDRIER MENSUELLE DÉPLIABLE */}
           {showCalendarView && (
-            <div className="pt-2 border-t border-white/10 animate-fadeIn space-y-2">
+            <div className="pt-3 border-t border-white/10 animate-fadeIn space-y-2.5">
               {/* Navigation Mois & Année */}
               <div className="flex items-center justify-between px-1">
                 <button
                   type="button"
                   onClick={handlePrevMonth}
-                  className="min-w-[36px] min-h-[36px] p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 transition-colors cursor-pointer flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   aria-label="Mois précédent"
                   title="Mois précédent"
                 >
-                  <ChevronLeft size={16} aria-hidden="true" />
+                  <ChevronLeft size={18} aria-hidden="true" />
                 </button>
 
-                <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+                <span className="text-xs sm:text-sm font-bold text-white font-mono uppercase tracking-wider">
                   {MONTH_NAMES[viewDate.month]} {viewDate.year}
                 </span>
 
                 <button
                   type="button"
                   onClick={handleNextMonth}
-                  className="min-w-[36px] min-h-[36px] p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 transition-colors cursor-pointer flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   aria-label="Mois suivant"
                   title="Mois suivant"
                 >
-                  <ChevronRight size={16} aria-hidden="true" />
+                  <ChevronRight size={18} aria-hidden="true" />
                 </button>
               </div>
 
               {/* En-têtes jours de la semaine */}
-              <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-300 border-b border-white/5 pb-1">
+              <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-slate-300 border-b border-white/5 pb-1">
                 {WEEKDAY_NAMES.map((wd, i) => (
                   <span key={i}>{wd}</span>
                 ))}
               </div>
 
               {/* Grille des jours du mois */}
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-1.5">
                 {calendarGrid.map((item, idx) => {
                   if (!item.day) {
-                    return <div key={`empty-${idx}`} className="h-9" />;
+                    return <div key={`empty-${idx}`} className="h-11 min-h-[44px]" />;
                   }
 
                   return (
@@ -884,12 +910,12 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       key={item.dateStr}
                       type="button"
                       onClick={() => handleSelectDate(item.dateStr)}
-                      className={`relative min-h-[36px] h-9 rounded-lg text-xs font-semibold flex flex-col items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                      className={`relative min-h-[44px] h-11 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                         item.isSelected
-                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/30 ring-1 ring-blue-300'
+                          ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/30 ring-2 ring-blue-300'
                           : item.isToday
                           ? 'bg-blue-500/15 text-blue-300 border border-blue-500/40 hover:bg-blue-500/25'
-                          : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/5'
                       }`}
                       aria-label={`${formatFrenchDate(item.dateStr)}${item.hasSessionForThisQuality ? ' (Séance enregistrée)' : ''}`}
                       aria-pressed={item.isSelected}
@@ -898,7 +924,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       
                       {/* Puce indicatrice si une séance a eu lieu */}
                       {item.hasSessionForThisQuality ? (
-                        <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.8)]" aria-hidden="true" />
+                        <span className="absolute bottom-1 w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.8)]" aria-hidden="true" />
                       ) : item.hasOtherSession ? (
                         <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-slate-400 opacity-60" aria-hidden="true" />
                       ) : null}
@@ -947,7 +973,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
           <div 
             role="tablist" 
             aria-label="Sections du formulaire de séance"
-            className="flex items-center gap-2 border-b border-white/10 pb-2.5"
+            className="flex items-center gap-2 border-b border-white/10 pb-3"
             onKeyDown={handleTabKeyDown}
           >
             <button
@@ -958,13 +984,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               tabIndex={activeModalTab === 'parameters' ? 0 : -1}
               type="button"
               onClick={() => setActiveModalTab('parameters')}
-              className={`min-h-[40px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+              className={`min-h-[44px] flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                 activeModalTab === 'parameters'
-                  ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-1 ring-blue-300'
-                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/5 hover:text-white'
+                  ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-2 ring-blue-300'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/5 hover:text-white'
               }`}
             >
-              <Zap size={14} className={activeModalTab === 'parameters' ? 'text-white' : 'text-amber-400'} aria-hidden="true" />
+              <Zap size={16} className={activeModalTab === 'parameters' ? 'text-white' : 'text-amber-400'} aria-hidden="true" />
               <span>⚡ Paramètres & Charge</span>
             </button>
 
@@ -976,20 +1002,20 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               tabIndex={activeModalTab === 'exercises' ? 0 : -1}
               type="button"
               onClick={() => setActiveModalTab('exercises')}
-              className={`min-h-[40px] flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+              className={`min-h-[44px] flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                 activeModalTab === 'exercises'
-                  ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-1 ring-blue-300'
-                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/5 hover:text-white'
+                  ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-2 ring-blue-300'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-200 border-white/5 hover:text-white'
               }`}
             >
-              <Dumbbell size={14} className={activeModalTab === 'exercises' ? 'text-white' : 'text-red-400'} aria-hidden="true" />
+              <Dumbbell size={16} className={activeModalTab === 'exercises' ? 'text-white' : 'text-red-400'} aria-hidden="true" />
               <span>🏋️ Musculation & Exercices</span>
               {exercises.length > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold ml-1">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold ml-1">
                   {exercises.length} exo{exercises.length > 1 ? 's' : ''} · {muscularAnalysis.totalSets} s
                 </span>
               ) : (
-                <span className="text-[10px] font-normal text-slate-400 opacity-75">
+                <span className="text-xs font-normal text-slate-400 opacity-90">
                   (Optionnel)
                 </span>
               )}
@@ -1002,39 +1028,39 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               id="panel-parameters"
               role="tabpanel"
               aria-labelledby="tab-parameters"
-              className="space-y-3.5 animate-fadeIn"
+              className="space-y-4 animate-fadeIn"
             >
               {/* SÉLECTEUR DE SPORT (Course à pied vs Vélo / Home-trainer) pour VO2max, Seuil, EF et Sprint */}
               {isMultiSport && (
-                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
-                  <label className="text-xs font-semibold text-slate-300 block">
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5">
+                  <label className="text-xs font-semibold text-slate-200 block">
                     Modalité sportive / Pratique :
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setSport('run')}
-                      className={`min-h-[42px] flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                      className={`min-h-[44px] flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                         sport === 'run'
-                          ? 'bg-blue-600 border-blue-400 text-white shadow-md ring-1 ring-blue-400'
-                          : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                          ? 'bg-blue-600 border-blue-400 text-white shadow-md ring-2 ring-blue-300'
+                          : 'bg-white/5 border-white/10 text-slate-200 hover:text-white hover:bg-white/10'
                       }`}
                       aria-pressed={sport === 'run'}
                     >
-                      <span className="text-base" aria-hidden="true">🏃</span>
+                      <span className="text-lg" aria-hidden="true">🏃</span>
                       <span>Course à pied</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSport('bike')}
-                      className={`min-h-[42px] flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                      className={`min-h-[44px] flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                         sport === 'bike'
-                          ? 'bg-amber-600 border-amber-400 text-white shadow-md ring-1 ring-amber-400'
-                          : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                          ? 'bg-amber-600 border-amber-400 text-white shadow-md ring-2 ring-amber-300'
+                          : 'bg-white/5 border-white/10 text-slate-200 hover:text-white hover:bg-white/10'
                       }`}
                       aria-pressed={sport === 'bike'}
                     >
-                      <span className="text-base" aria-hidden="true">🚴</span>
+                      <span className="text-lg" aria-hidden="true">🚴</span>
                       <span>Vélo / HT</span>
                     </button>
                   </div>
@@ -1048,13 +1074,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
               {/* Raccourci / Statut si des exercices sont renseignés */}
               {exercises.length > 0 ? (
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/30 to-blue-950/30 border border-emerald-500/30 flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                      <Dumbbell size={14} aria-hidden="true" />
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/30 to-blue-950/30 border border-emerald-500/30 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                      <Dumbbell size={16} aria-hidden="true" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-white block">
+                      <span className="text-xs sm:text-sm font-bold text-white block">
                         {exercises.length} exercice{exercises.length > 1 ? 's' : ''} configuré{exercises.length > 1 ? 's' : ''} ({muscularAnalysis.totalSets} séries)
                       </span>
                       <span className="text-xs text-slate-300 block">
@@ -1066,29 +1092,29 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                     <button
                       type="button"
                       onClick={handleApplyToSession}
-                      className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                      className={`min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                         appliedFeedback 
                           ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
                           : 'bg-white/10 hover:bg-white/20 text-emerald-300 border-emerald-500/30'
                       }`}
                       title="Copier la durée et le RPE calculés par les exercices"
                     >
-                      <Sparkles size={13} aria-hidden="true" />
+                      <Sparkles size={14} aria-hidden="true" />
                       <span>{appliedFeedback ? 'Appliqué !' : 'Synchroniser durée & RPE'}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveModalTab('exercises')}
-                      className="min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-400/30 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-400/30 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     >
                       Voir exercices →
                     </button>
                   </div>
                 </div>
               ) : lastSessionWithExercises && (
-                <div className="p-2.5 rounded-xl bg-blue-950/30 border border-blue-500/20 flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-xs text-slate-300 flex items-center gap-1.5">
-                    <Copy size={13} className="text-blue-400" aria-hidden="true" />
+                <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/20 flex items-center justify-between gap-3 flex-wrap">
+                  <span className="text-xs text-slate-300 flex items-center gap-2">
+                    <Copy size={15} className="text-blue-400" aria-hidden="true" />
                     Séance précédente trouvée ({lastSessionWithExercises.session.exercises.length} exercices)
                   </span>
                   <button
@@ -1097,7 +1123,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       handleDuplicateLastSession();
                       setActiveModalTab('exercises');
                     }}
-                    className="text-xs font-bold text-blue-400 hover:text-blue-300 underline cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 rounded px-1"
+                    className="min-h-[36px] px-3 py-1 text-xs font-bold text-blue-300 hover:text-white bg-blue-600/20 hover:bg-blue-600/40 border border-blue-400/30 rounded-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-all"
                   >
                     ⚡ Dupliquer en 1 clic
                   </button>
@@ -1106,28 +1132,31 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
               {/* Champ Durée Effective */}
               <div className="input-group">
-                <label htmlFor="score-duration-input" className="text-xs font-medium text-slate-200 block mb-1">
-                  Durée effective (min) *
+                <label htmlFor="score-duration-input" className="text-xs font-semibold text-slate-200 block mb-1">
+                  Durée effective de la séance (minutes) *
                 </label>
-                <input 
-                  id="score-duration-input"
-                  type="number" 
-                  min="1" 
-                  max="600" 
-                  value={duration} 
-                  onChange={(e) => {
-                    setDuration(e.target.value);
-                    if (validationErrors.duration) {
-                      setValidationErrors(prev => ({ ...prev, duration: undefined }));
-                    }
-                  }} 
-                  placeholder="Ex: 45" 
-                  className={`bg-slate-900 border rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none transition-colors ${
-                    validationErrors.duration ? 'border-red-500 ring-2 ring-red-500' : 'border-white/10 focus:border-blue-400'
-                  }`}
-                  aria-invalid={Boolean(validationErrors.duration)}
-                  aria-describedby={validationErrors.duration ? 'score-duration-error' : undefined}
-                />
+                <div className="flex items-center gap-2">
+                  <input 
+                    id="score-duration-input"
+                    type="number" 
+                    min="1" 
+                    max="600" 
+                    value={duration} 
+                    onChange={(e) => {
+                      setDuration(e.target.value);
+                      if (validationErrors.duration) {
+                        setValidationErrors(prev => ({ ...prev, duration: undefined }));
+                      }
+                    }} 
+                    placeholder="Ex: 45" 
+                    className={`bg-slate-900 border rounded-xl px-3.5 py-2 min-h-[44px] text-sm sm:text-base font-mono font-bold text-white placeholder-slate-500 focus:outline-none transition-colors w-32 ${
+                      validationErrors.duration ? 'border-red-500 ring-2 ring-red-500' : 'border-white/10 focus-visible:border-blue-400 focus-visible:ring-2 focus-visible:ring-blue-400'
+                    }`}
+                    aria-invalid={Boolean(validationErrors.duration)}
+                    aria-describedby={validationErrors.duration ? 'score-duration-error' : undefined}
+                  />
+                  <span className="text-xs sm:text-sm text-slate-300 font-mono">minutes</span>
+                </div>
                 {validationErrors.duration && (
                   <span id="score-duration-error" className="text-xs text-red-400 mt-1 block font-semibold">
                     {validationErrors.duration}
@@ -1136,14 +1165,14 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               </div>
 
               {/* Grille RPE Musculaire et Cardio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* RPE Musculaire */}
-                <div className={`input-group !mb-0 p-3 rounded-xl bg-red-950/20 border transition-all ${
+                <div className={`input-group !mb-0 p-3.5 rounded-2xl bg-red-950/20 border transition-all ${
                   validationErrors.rpeMusc ? 'border-red-500 ring-2 ring-red-500' : 'border-red-500/20'
                 }`}>
-                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                    <label htmlFor="score-rpe-musc-input" className="text-xs font-semibold text-red-300 flex items-center gap-1">
-                      <Dumbbell size={13} className="text-red-400" aria-hidden="true" /> RPE Musculaire *
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                    <label htmlFor="score-rpe-musc-input" className="text-xs font-bold text-red-300 flex items-center gap-1.5">
+                      <Dumbbell size={15} className="text-red-400" aria-hidden="true" /> RPE Musculaire *
                     </label>
                     <span id="score-rpe-musc-hint" className="text-xs text-slate-300">Tension, fibres, cuisses</span>
                   </div>
@@ -1159,11 +1188,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         setRpeMusc(e.target.value);
                         if (validationErrors.rpeMusc) setValidationErrors(prev => ({ ...prev, rpeMusc: undefined }));
                       }}
-                      className="w-20 bg-slate-900 border border-white/15 rounded-xl px-2.5 py-1.5 text-sm font-mono text-center font-bold text-white focus:outline-none focus:border-red-400"
+                      className="w-24 min-h-[44px] bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-base font-mono text-center font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
                       aria-invalid={Boolean(validationErrors.rpeMusc)}
                       aria-describedby="score-rpe-musc-hint"
                     />
-                    <span className="text-xs text-slate-300 font-mono">/ 10</span>
+                    <span className="text-xs sm:text-sm text-slate-300 font-mono">/ 10</span>
                   </div>
                   <QuickScaleSelector 
                     id="quick-rpe-musc" 
@@ -1181,12 +1210,12 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                 </div>
 
                 {/* RPE Cardio */}
-                <div className={`input-group !mb-0 p-3 rounded-xl bg-sky-950/20 border transition-all ${
+                <div className={`input-group !mb-0 p-3.5 rounded-2xl bg-sky-950/20 border transition-all ${
                   validationErrors.rpeCardio ? 'border-red-500 ring-2 ring-red-500' : 'border-sky-500/20'
                 }`}>
-                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                    <label htmlFor="score-rpe-cardio-input" className="text-xs font-semibold text-sky-300 flex items-center gap-1">
-                      <Heart size={13} className="text-sky-400" aria-hidden="true" /> RPE Cardio *
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                    <label htmlFor="score-rpe-cardio-input" className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                      <Heart size={15} className="text-sky-400" aria-hidden="true" /> RPE Cardio *
                     </label>
                     <span id="score-rpe-cardio-hint" className="text-xs text-slate-300">Souffle, FC, ventilation</span>
                   </div>
@@ -1202,11 +1231,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         setRpeCardio(e.target.value);
                         if (validationErrors.rpeCardio) setValidationErrors(prev => ({ ...prev, rpeCardio: undefined }));
                       }}
-                      className="w-20 bg-slate-900 border border-white/15 rounded-xl px-2.5 py-1.5 text-sm font-mono text-center font-bold text-white focus:outline-none focus:border-sky-400"
+                      className="w-24 min-h-[44px] bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-base font-mono text-center font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                       aria-invalid={Boolean(validationErrors.rpeCardio)}
                       aria-describedby="score-rpe-cardio-hint"
                     />
-                    <span className="text-xs text-slate-300 font-mono">/ 10</span>
+                    <span className="text-xs sm:text-sm text-slate-300 font-mono">/ 10</span>
                   </div>
                   <QuickScaleSelector 
                     id="quick-rpe-cardio" 
@@ -1225,18 +1254,18 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               </div>
 
               {/* Option Excentrique & Chocs structurels */}
-              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
-                <label htmlFor="score-eccentric-check" className="flex items-start gap-2.5 cursor-pointer">
+              <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10">
+                <label htmlFor="score-eccentric-check" className="flex items-start gap-3 cursor-pointer min-h-[44px]">
                   <input 
                     id="score-eccentric-check"
                     type="checkbox" 
                     checked={isEccentric} 
                     onChange={e => setIsEccentric(e.target.checked)} 
-                    className="mt-0.5 rounded accent-amber-500 w-4 h-4 cursor-pointer" 
+                    className="mt-1 rounded accent-amber-500 w-5 h-5 cursor-pointer" 
                   />
                   <div className="text-left">
-                    <span className="text-xs font-semibold text-amber-300 flex items-center gap-1">
-                      <Flame size={12} className="text-amber-400" aria-hidden="true" /> Stress Excentrique & Impacts Musculaires Élevés
+                    <span className="text-xs sm:text-sm font-semibold text-amber-300 flex items-center gap-1.5">
+                      <Flame size={14} className="text-amber-400" aria-hidden="true" /> Stress Excentrique & Impacts Musculaires Élevés
                     </span>
                     <span className="text-xs text-slate-300 block leading-tight mt-0.5">
                       Descente trail, pliométrie, charges lourdes (majore la contrainte structurelle mécanique de +15%).
@@ -1246,15 +1275,15 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               </div>
 
               {/* Fatigue Perçue Globale */}
-              <div className={`input-group p-3 rounded-xl bg-white/[0.03] border transition-all ${
+              <div className={`input-group p-3.5 rounded-2xl bg-white/[0.03] border transition-all ${
                 validationErrors.fatigue ? 'border-red-500 ring-2 ring-red-500' : 'border-white/10'
               }`}>
-                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
                   <label htmlFor="score-fatigue-input" className="text-xs font-semibold text-slate-200">
                     Fatigue Perçue Globale Post-Séance (1-10) *
                   </label>
                   {fatigue && (
-                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded-md font-bold border ${
+                    <span className={`text-xs font-mono px-2.5 py-1 rounded-md font-bold border ${
                       numFatigue > 6 
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
                         : numFatigue < 5 
@@ -1277,11 +1306,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       if (validationErrors.fatigue) setValidationErrors(prev => ({ ...prev, fatigue: undefined }));
                     }} 
                     placeholder="1-10" 
-                    className="w-20 bg-slate-900 border border-white/15 rounded-xl px-2.5 py-1.5 text-sm font-mono text-center font-bold text-white focus:outline-none focus:border-amber-400"
+                    className="w-24 min-h-[44px] bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-base font-mono text-center font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                     aria-invalid={Boolean(validationErrors.fatigue)}
                     aria-describedby="score-fatigue-hint"
                   />
-                  <span className="text-xs text-slate-300 font-mono">/ 10</span>
+                  <span className="text-xs sm:text-sm text-slate-300 font-mono">/ 10</span>
                 </div>
                 <QuickScaleSelector 
                   id="quick-fatigue" 
@@ -1293,7 +1322,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   }} 
                   activeColor="amber" 
                 />
-                <p id="score-fatigue-hint" className="text-xs text-slate-300 mt-1 leading-tight m-0">
+                <p id="score-fatigue-hint" className="text-xs text-slate-300 mt-2 leading-relaxed m-0">
                   {numFatigue > 6 
                     ? `⚡ Marqueur de réponse : Fatigue perçue élevée (${numFatigue}/10). Veillez particulièrement à l'assimilation et au sommeil.` 
                     : numFatigue < 5 
@@ -1305,48 +1334,60 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                 )}
               </div>
 
-              {/* Décomposition Charge Multi-Facteurs */}
-              <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 space-y-2.5">
-                <div className="flex items-center justify-between">
+              {/* Décomposition Charge Multi-Facteurs (Modélisation Carl Foster sRPE) */}
+              <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-300 font-semibold">Charge Stimulus de Séance :</span>
+                    <span className="text-xs sm:text-sm text-slate-200 font-bold">Charge Stimulus de Séance (sRPE Carl Foster) :</span>
                     {load > 0 && (
-                      <span className="text-xs font-mono px-2 py-0.5 rounded font-bold bg-white/10 text-slate-300">
+                      <span className="text-xs font-mono px-2.5 py-1 rounded font-bold bg-white/10 text-slate-200">
                         {isCardio ? 'Filière Cardio' : isForce ? 'Filière Musculaire' : 'Mixte'}
                       </span>
                     )}
                   </div>
-                  <div className="text-right flex items-baseline gap-1.5">
-                    <strong className="text-lg font-mono font-bold text-white">
+                  <div className="text-right flex items-baseline gap-2">
+                    <strong className="text-xl sm:text-2xl font-mono font-bold text-white">
                       {load > 0 ? `${load} UA` : '-'}
                     </strong>
                   </div>
                 </div>
 
+                {/* Formule didactique explicite de Foster */}
+                {duration && (rpeMusc || rpeCardio) && (
+                  <div className="text-xs font-mono text-slate-300 bg-black/40 p-2.5 rounded-xl border border-white/10 flex items-center justify-between flex-wrap gap-2">
+                    <span>
+                      📐 Formule : {duration} min × RPE max({rpeCardio || 0}, {rpeMusc || 0}){isEccentric ? ' × 1.15 (excentrique)' : ''}
+                    </span>
+                    <span className="font-bold text-blue-300">
+                      = {load} UA (Unités Arbitraires)
+                    </span>
+                  </div>
+                )}
+
                 {load > 0 && (
                   <>
-                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                      <div className="p-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20">
-                        <span className="text-xs text-sky-300 block flex items-center justify-center gap-1">
-                          <Heart size={11} aria-hidden="true" /> Charge Cardio
+                    <div className="grid grid-cols-2 gap-2.5 text-center text-xs">
+                      <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                        <span className="text-xs text-sky-300 block flex items-center justify-center gap-1 font-semibold">
+                          <Heart size={13} aria-hidden="true" /> Charge Cardio
                         </span>
-                        <span className="font-bold font-mono text-sky-200 text-sm">{loadCardio}</span>
-                        <span className="text-xs text-slate-400 block">{cardioPercent}%</span>
+                        <span className="font-bold font-mono text-sky-200 text-base sm:text-lg block my-0.5">{loadCardio}</span>
+                        <span className="text-xs text-slate-300 block">{cardioPercent}% de la charge</span>
                       </div>
 
-                      <div className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <span className="text-xs text-red-300 block flex items-center justify-center gap-1">
-                          <Dumbbell size={11} aria-hidden="true" /> Charge Musculaire
+                      <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20">
+                        <span className="text-xs text-red-300 block flex items-center justify-center gap-1 font-semibold">
+                          <Dumbbell size={13} aria-hidden="true" /> Charge Musculaire
                         </span>
-                        <span className="font-bold font-mono text-red-200 text-sm">
+                        <span className="font-bold font-mono text-red-200 text-base sm:text-lg block my-0.5">
                           {loadMusc} {isEccentric && <span className="text-xs text-amber-400 font-normal">x1.15</span>}
                         </span>
-                        <span className="text-xs text-slate-400 block">{muscPercent}%</span>
+                        <span className="text-xs text-slate-300 block">{muscPercent}% de la charge</span>
                       </div>
                     </div>
 
                     {/* Barre de répartition */}
-                    <div className="w-full h-1.5 rounded-full overflow-hidden flex bg-white/10">
+                    <div className="w-full h-2 rounded-full overflow-hidden flex bg-white/10">
                       <div className="bg-sky-400 h-full transition-all" style={{ width: `${cardioPercent}%` }} />
                       <div className="bg-red-400 h-full transition-all" style={{ width: `${muscPercent}%` }} />
                     </div>
@@ -1391,21 +1432,21 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             >
               {/* BANNIÈRE D'ACCÉLÉRATION : DUPLIQUER LA DERNIÈRE SÉANCE */}
               {lastSessionWithExercises && (
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between gap-3 flex-wrap">
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 shrink-0">
                       <Copy size={16} />
                     </div>
                     <div className="truncate">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-white">
+                        <span className="text-xs sm:text-sm font-bold text-white">
                           Séance précédente ({formatFrenchDate(lastSessionWithExercises.date)})
                         </span>
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-white/10 text-blue-300">
+                        <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-blue-300">
                           {lastSessionWithExercises.session.exercises.length} exercice{lastSessionWithExercises.session.exercises.length > 1 ? 's' : ''}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 m-0 truncate">
+                      <p className="text-xs text-slate-300 m-0 truncate mt-0.5">
                         {lastSessionWithExercises.session.exercises.map(e => e.name).join(' · ')}
                       </p>
                     </div>
@@ -1414,21 +1455,21 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   <button
                     type="button"
                     onClick={handleDuplicateLastSession}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                    className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                       duplicateSuccess
-                        ? 'bg-emerald-600 text-white shadow-emerald-500/30 ring-1 ring-emerald-400'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/25 hover:scale-[1.02]'
+                        ? 'bg-emerald-600 text-white shadow-emerald-500/30 ring-2 ring-emerald-400'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/25 hover:scale-[1.01]'
                     }`}
                     title="Cloner instantanément tous les exercices de la dernière séance"
                   >
                     {duplicateSuccess ? (
                       <>
-                        <Check size={14} className="text-white" />
+                        <Check size={16} className="text-white" />
                         <span>Séance clonée avec succès !</span>
                       </>
                     ) : (
                       <>
-                        <Copy size={14} />
+                        <Copy size={16} />
                         <span>Dupliquer la dernière séance</span>
                       </>
                     )}
@@ -1437,12 +1478,12 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               )}
 
               {/* Formulaire d'ajout rapide d'un exercice */}
-              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Sélection de l'exercice */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] font-bold uppercase text-slate-300 block">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold uppercase text-slate-200 block">
                         Exercice
                       </label>
                       <div className="flex items-center gap-2">
@@ -1450,25 +1491,25 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           <button
                             type="button"
                             onClick={(e) => handleDeleteCustomExercise(selectedExId, e)}
-                            className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                            className="min-h-[36px] px-2.5 py-1 rounded-lg text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 font-semibold flex items-center gap-1 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                             title="Supprimer cet exercice de la bibliothèque"
                           >
-                            <Trash2 size={11} />
+                            <Trash2 size={13} />
                             <span>Supprimer</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => setIsCreatingCustom(!isCreatingCustom)}
-                          className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                          className="min-h-[36px] px-2.5 py-1 rounded-lg text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 font-semibold flex items-center gap-1 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                         >
-                          <BookmarkPlus size={11} />
+                          <BookmarkPlus size={13} />
                           <span>{isCreatingCustom ? 'Fermer création' : '+ Créer exo perso'}</span>
                         </button>
                       </div>
                     </div>
-                    <div className="relative mb-1.5">
-                      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    <div className="relative mb-2">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                       <input
                         type="text"
                         value={exerciseSearchFilter}
@@ -1479,13 +1520,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           }
                         }}
                         placeholder="Recherche rapide (ex: squat, fentes, dips...)"
-                        className="w-full bg-slate-900/90 border border-white/10 rounded-lg pl-7 pr-7 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                        className="w-full min-h-[44px] bg-slate-900 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                       />
                       {exerciseSearchFilter && (
                         <button
                           type="button"
                           onClick={() => setExerciseSearchFilter('')}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-[11px] px-1 cursor-pointer"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1.5 cursor-pointer"
                           title="Effacer le filtre"
                         >
                           ✕
@@ -1498,16 +1539,16 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       <button
                         type="button"
                         onClick={() => setIsExerciseDropdownOpen(!isExerciseDropdownOpen)}
-                        className="w-full flex items-center justify-between bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-blue-400 text-left cursor-pointer hover:border-slate-500 transition-colors"
+                        className="w-full min-h-[44px] flex items-center justify-between bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 text-left cursor-pointer hover:border-slate-400 transition-colors"
                       >
-                        <div className="flex items-center gap-1.5 truncate">
+                        <div className="flex items-center gap-2 truncate">
                           {frequentIds.has(selectedExId) && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                            <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
                               Fréquent
                             </span>
                           )}
                           {customExercises.some(c => c.id === selectedExId) && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0">
+                            <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 shrink-0">
                               Perso
                             </span>
                           )}
@@ -1515,9 +1556,9 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                             {allAvailableExercises.find(e => e.id === selectedExId)?.name || 'Sélectionner un exercice...'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <span className="text-[10px] text-slate-400 hidden sm:inline">Catalogue</span>
-                          <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isExerciseDropdownOpen ? 'rotate-180 text-blue-400' : ''}`} />
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <span className="text-xs text-slate-400 hidden sm:inline">Catalogue</span>
+                          <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${isExerciseDropdownOpen ? 'rotate-180 text-blue-400' : ''}`} />
                         </div>
                       </button>
 
@@ -1529,15 +1570,15 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           />
                           <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-slate-950 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden max-h-80 flex flex-col animate-fadeIn">
                             {/* Entête avec repliage général */}
-                            <div className="px-2.5 py-1.5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between text-[10px] text-slate-400 shrink-0">
-                              <span className="font-bold flex items-center gap-1.5 text-slate-300">
-                                <Layers size={12} className="text-blue-400" />
+                            <div className="px-3 py-2 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between text-xs text-slate-300 shrink-0">
+                              <span className="font-bold flex items-center gap-2 text-slate-200">
+                                <Layers size={14} className="text-blue-400" />
                                 Catalogue par muscle principal
                               </span>
                               <button
                                 type="button"
                                 onClick={toggleAllModalMuscles}
-                                className="text-blue-400 hover:text-blue-300 font-bold transition-colors cursor-pointer px-2 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-[10px]"
+                                className="text-blue-400 hover:text-blue-300 font-bold transition-colors cursor-pointer px-2.5 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-xs min-h-[32px]"
                               >
                                 {Object.values(expandedModalMuscles).some(Boolean) ? 'Tout replier' : 'Tout déplier'}
                               </button>
@@ -1933,21 +1974,21 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         <button
                           type="button"
                           onClick={handleApplySuggestion}
-                          className={`self-start sm:self-center px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-sm ${
+                          className={`self-start sm:self-center min-h-[44px] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                             suggestionApplied
-                              ? 'bg-emerald-600 text-white shadow-emerald-500/25 ring-1 ring-emerald-400'
+                              ? 'bg-emerald-600 text-white shadow-emerald-500/25 ring-2 ring-emerald-400'
                               : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 hover:border-emerald-400/60'
                           }`}
                           title="Pré-remplir automatiquement les paramètres avec cette suggestion"
                         >
                           {suggestionApplied ? (
                             <>
-                              <Check size={14} className="stroke-[2.5]" />
+                              <Check size={16} className="stroke-[2.5]" />
                               <span>Suggestion appliquée !</span>
                             </>
                           ) : (
                             <>
-                              <Sparkles size={13} className="text-emerald-400" />
+                              <Sparkles size={15} className="text-emerald-400" />
                               <span>
                                 Appliquer {loadSuggestion.suggestedWeightKg !== undefined ? `(${loadSuggestion.suggestedWeightKg} kg)` : 'la suggestion'}
                               </span>
@@ -1957,21 +1998,21 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-300">
                       <div className="flex items-center gap-2">
-                        <Sparkles size={13} className="text-blue-400/70 shrink-0" />
-                        <span className="text-[11px] text-slate-300">{loadSuggestion.reason}</span>
+                        <Sparkles size={14} className="text-blue-400 shrink-0" />
+                        <span className="text-xs text-slate-300">{loadSuggestion.reason}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-slate-500 shrink-0">Zone MAV cible : 2 RIR</span>
+                      <span className="text-xs font-mono text-slate-400 shrink-0">Zone MAV cible : 2 RIR</span>
                     </div>
                   )
                 )}
 
                 {/* Ligne Paramètres : Séries, RIR (Prioritaire), Reps (Optionnel), Poids (Optionnel) et Bouton Ajouter */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end pt-1">
                   {/* Séries (obligatoire) */}
                   <div className="sm:col-span-2">
-                    <label htmlFor="exercise-sets-input" className="text-xs font-bold uppercase text-slate-300 block mb-1">
+                    <label htmlFor="exercise-sets-input" className="text-xs font-bold uppercase text-slate-200 block mb-1">
                       Séries *
                     </label>
                     <input
@@ -1981,7 +2022,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       max="20"
                       value={exSets}
                       onChange={(e) => setExSets(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-sm text-center font-mono font-bold text-white focus:outline-none focus:border-blue-400"
+                      className="w-full min-h-[44px] bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-base text-center font-mono font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     />
                   </div>
 
@@ -1991,7 +2032,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       <label htmlFor="exercise-rir-select" className="text-xs font-bold uppercase text-emerald-400 block">
                         RIR (Proximité échec) *
                       </label>
-                      <span className="text-xs font-mono text-slate-300">
+                      <span className="text-xs font-mono text-slate-300 font-semibold">
                         RPE {Math.min(10, Math.max(1, 10 - (Number(exRir) || 0)))}
                       </span>
                     </div>
@@ -1999,7 +2040,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       id="exercise-rir-select"
                       value={exRir}
                       onChange={(e) => setExRir(e.target.value)}
-                      className="w-full bg-slate-900 border border-emerald-500/30 rounded-xl px-2.5 py-2 text-xs font-semibold text-emerald-300 focus:outline-none focus:border-emerald-400 cursor-pointer min-h-[38px]"
+                      className="w-full bg-slate-900 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-emerald-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 cursor-pointer min-h-[44px]"
                     >
                       <option value="0">0 RIR · Échec absolu (Max Effort · RPE 10)</option>
                       <option value="1">1 RIR · 1 rep en réserve (Très dur · RPE 9)</option>
@@ -2012,7 +2053,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
                   {/* Répétitions (Optionnel) */}
                   <div className="sm:col-span-2">
-                    <label htmlFor="exercise-reps-input" className="text-xs font-semibold uppercase text-slate-300 block mb-1">
+                    <label htmlFor="exercise-reps-input" className="text-xs font-semibold uppercase text-slate-200 block mb-1">
                       Reps <span className="text-xs text-slate-400 font-normal">(opt.)</span>
                     </label>
                     <input
@@ -2023,13 +2064,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       placeholder="Opt. (ex: 8)"
                       value={exReps}
                       onChange={(e) => setExReps(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-center font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-400"
+                      className="w-full min-h-[44px] bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-center font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     />
                   </div>
 
                   {/* Poids / Charge (Optionnel) */}
                   <div className="sm:col-span-2">
-                    <label htmlFor="exercise-weight-input" className="text-xs font-semibold uppercase text-slate-300 block mb-1">
+                    <label htmlFor="exercise-weight-input" className="text-xs font-semibold uppercase text-slate-200 block mb-1">
                       Poids kg <span className="text-xs text-slate-400 font-normal">(opt.)</span>
                     </label>
                     <input
@@ -2040,7 +2081,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       placeholder="Opt. (ex: 80)"
                       value={exWeight}
                       onChange={(e) => setExWeight(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-center font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-400"
+                      className="w-full min-h-[44px] bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-center font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     />
                   </div>
 
@@ -2049,10 +2090,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                     <button
                       type="button"
                       onClick={handleAddExercise}
-                      className="w-full min-h-[38px] py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow-blue-500/25 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="w-full min-h-[44px] py-2.5 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:shadow-blue-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                       title="Ajouter cet exercice à la séance"
                     >
-                      <Plus size={14} aria-hidden="true" />
+                      <Plus size={16} aria-hidden="true" />
                       <span>Ajouter</span>
                     </button>
                   </div>
@@ -2062,15 +2103,15 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               {/* Liste des exercices ajoutés */}
               {exercises.length > 0 ? (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                    <span className="font-semibold text-slate-300">Exercices programmés ({exercises.length}) :</span>
-                    <span className="font-mono text-[11px]">{muscularAnalysis.totalSets} séries · RPE moy. {muscularAnalysis.weightedAvgRpe}</span>
+                  <div className="flex items-center justify-between text-xs text-slate-300 px-1">
+                    <span className="font-semibold text-slate-200">Exercices programmés ({exercises.length}) :</span>
+                    <span className="font-mono text-xs text-slate-300">{muscularAnalysis.totalSets} séries · RPE moy. {muscularAnalysis.weightedAvgRpe}</span>
                   </div>
 
-                  <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                  <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                     {exercises.map((ex, idx) => {
                       const rirVal = ex.rir !== undefined ? ex.rir : (ex.rpe ? Math.max(0, 10 - ex.rpe) : 2);
-                      let rirBadgeColor = 'bg-slate-800 text-slate-300 border-slate-700';
+                      let rirBadgeColor = 'bg-slate-800 text-slate-200 border-slate-700';
                       if (rirVal === 0) rirBadgeColor = 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold';
                       else if (rirVal <= 2) rirBadgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold';
                       else if (rirVal === 3) rirBadgeColor = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
@@ -2080,20 +2121,20 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       return (
                         <div
                           key={`${ex.id}-${idx}`}
-                          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.04] border border-white/5 hover:border-white/10 text-xs transition-colors"
+                          className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/20 text-xs transition-colors gap-2"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-mono font-bold text-slate-300 shrink-0">
+                            <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-mono font-bold text-slate-200 shrink-0">
                               {idx + 1}
                             </span>
                             <div className="truncate">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-white truncate">{ex.name}</span>
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono border ${rirBadgeColor}`}>
+                                <span className="font-bold text-white text-xs sm:text-sm truncate">{ex.name}</span>
+                                <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono border ${rirBadgeColor}`}>
                                   {rirVal} RIR (RPE {10 - rirVal})
                                 </span>
                               </div>
-                              <span className="text-[11px] text-slate-400 font-mono mt-0.5 block">
+                              <span className="text-xs text-slate-300 font-mono mt-0.5 block">
                                 {ex.sets} séries
                                 {ex.reps ? ` × ${ex.reps} reps` : ' effectives'}
                                 {ex.weightKg ? ` @ ${ex.weightKg} kg` : ''}
@@ -2105,10 +2146,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           <button
                             type="button"
                             onClick={() => handleRemoveExercise(idx)}
-                            className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors cursor-pointer shrink-0 ml-2"
+                            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-colors cursor-pointer shrink-0 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                             title="Supprimer cet exercice"
+                            aria-label={`Supprimer l'exercice ${ex.name}`}
                           >
-                            <Trash2 size={15} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       );
@@ -2117,10 +2159,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
                   {/* Synthèse visuelle de la charge par muscle avec bascule Mannequin */}
                   {muscularAnalysis.sortedMuscles.length > 0 && (
-                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <span className="text-xs font-bold uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
-                          <Layers size={13} className="text-blue-400" />
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3.5">
+                      <div className="flex items-center justify-between flex-wrap gap-2.5">
+                        <span className="text-xs font-bold uppercase text-slate-200 tracking-wider flex items-center gap-1.5">
+                          <Layers size={14} className="text-blue-400" />
                           Charge calculée par muscle :
                         </span>
                         
@@ -2129,8 +2171,8 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           <button
                             type="button"
                             onClick={() => setShowBodyMapInModal(false)}
-                            className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                              !showBodyMapInModal ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'
+                            className={`min-h-[40px] px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                              !showBodyMapInModal ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-300 hover:text-white'
                             }`}
                           >
                             Jauges
@@ -2138,11 +2180,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           <button
                             type="button"
                             onClick={() => setShowBodyMapInModal(true)}
-                            className={`px-3 py-1 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
-                              showBodyMapInModal ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white'
+                            className={`min-h-[40px] px-3.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                              showBodyMapInModal ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-300 hover:text-white'
                             }`}
                           >
-                            <Eye size={12} />
+                            <Eye size={14} />
                             <span>Mannequin Face & Dos</span>
                           </button>
                         </div>
@@ -2153,21 +2195,21 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                           <MuscleBodyMap muscleLoads={muscularAnalysis.muscleLoads} />
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
                           {muscularAnalysis.sortedMuscles.map(m => (
                             <div
                               key={m.muscleId}
-                              className="p-2 rounded-xl bg-white/[0.03] border border-white/5 flex flex-col justify-between"
+                              className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col justify-between"
                             >
                               <div className="flex items-center justify-between gap-1">
                                 <span className="text-xs font-semibold text-slate-200 truncate" title={m.name}>
                                   {m.name}
                                 </span>
-                                <span className="text-[10px] font-mono font-bold text-blue-300 shrink-0">
+                                <span className="text-xs font-mono font-bold text-blue-300 shrink-0">
                                   {m.effectiveSets} s
                                 </span>
                               </div>
-                              <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-1.5">
+                              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden mt-2">
                                 <div
                                   className="h-full rounded-full transition-all"
                                   style={{
@@ -2182,22 +2224,22 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                       )}
 
                       {/* Bouton Magique : Appliquer durée et RPE à la séance */}
-                      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap">
-                        <div className="text-xs text-slate-300 leading-tight">
+                      <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="text-xs sm:text-sm text-slate-300 leading-tight">
                           Estimation séance : <strong className="text-white font-mono">{muscularAnalysis.suggestedDuration} min</strong> à RPE <strong className="text-amber-300 font-mono">{muscularAnalysis.suggestedRpeMusc}</strong>
                         </div>
 
                         <button
                           type="button"
                           onClick={handleApplyToSession}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                          className={`min-h-[44px] px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                             appliedFeedback
                               ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-500/25'
                               : 'bg-white/10 hover:bg-white/20 text-blue-300 hover:text-white border-blue-500/30'
                           }`}
                           title="Synchronise la durée et le RPE de la séance selon vos exercices"
                         >
-                          <Sparkles size={13} className={appliedFeedback ? 'text-white' : 'text-blue-400'} />
+                          <Sparkles size={15} className={appliedFeedback ? 'text-white' : 'text-blue-400'} />
                           <span>{appliedFeedback ? 'Appliqué à la séance !' : 'Appliquer durée & RPE'}</span>
                         </button>
                       </div>
@@ -2205,12 +2247,12 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   )}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 text-slate-400 text-xs space-y-2">
-                  <div className="w-10 h-10 mx-auto rounded-full bg-white/5 flex items-center justify-center text-slate-400">
-                    <Dumbbell size={20} />
+                <div className="p-8 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 text-slate-300 text-xs space-y-2">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-white/5 flex items-center justify-center text-slate-400">
+                    <Dumbbell size={22} />
                   </div>
-                  <p className="font-semibold text-slate-300 m-0">Aucun exercice programmé pour le moment</p>
-                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto m-0">
+                  <p className="font-semibold text-slate-200 text-sm m-0">Aucun exercice programmé pour le moment</p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto m-0">
                     Sélectionnez un exercice ci-dessus ou cliquez sur « Dupliquer la dernière séance » pour insérer automatiquement vos séries et RIR.
                   </p>
                 </div>
@@ -2218,22 +2260,22 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             </div>
           )}
 
-          {/* PIED DE MODALE FIXE : ACTIONS */}
-          <div className="modal-actions pt-3 border-t border-white/10 flex items-center justify-between gap-3 flex-wrap">
+          {/* PIED DE MODALE FIXE : ACTIONS (WCAG 2.5.5 >= 44x44px) */}
+          <div className="modal-actions pt-4 border-t border-white/10 flex items-center justify-between gap-3 flex-wrap">
             {currentSessionData ? (
               confirmDelete ? (
                 <div className="flex items-center gap-2 animate-fadeIn p-1.5 rounded-xl bg-rose-950/40 border border-rose-500/40">
                   <span className="text-xs text-rose-200 font-semibold pl-1">Confirmer la suppression ?</span>
                   <button 
                     type="button" 
-                    className="min-h-[36px] px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-rose-600/30 transition-all focus:outline-none focus:ring-2 focus:ring-rose-400"
+                    className="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm cursor-pointer shadow-md shadow-rose-600/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                     onClick={handleTriggerDelete}
                   >
                     Oui, supprimer
                   </button>
                   <button 
                     type="button" 
-                    className="min-h-[36px] px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs cursor-pointer transition-all"
+                    className="min-h-[44px] px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white text-xs sm:text-sm cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                     onClick={() => setConfirmDelete(false)}
                   >
                     Annuler
@@ -2242,7 +2284,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               ) : (
                 <button 
                   type="button" 
-                  className="btn-delete min-h-[40px] px-3.5 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-400" 
+                  className="btn-delete min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400" 
                   onClick={() => setConfirmDelete(true)}
                   aria-label="Supprimer cette séance"
                 >
@@ -2251,20 +2293,20 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               )
             ) : <div />}
 
-            <div className="flex items-center gap-2.5 ml-auto">
+            <div className="flex items-center gap-3 ml-auto">
               <button 
                 type="button" 
-                className="btn-cancel min-h-[40px] px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-400" 
+                className="btn-cancel min-h-[44px] px-5 py-2.5 text-xs sm:text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" 
                 onClick={onClose}
               >
                 Annuler
               </button>
               <button 
                 type="submit" 
-                className="btn-save min-h-[40px] px-4 py-2 flex items-center gap-2 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-md shadow-blue-500/25"
+                className="btn-save min-h-[44px] px-5 py-2.5 flex items-center gap-2 font-bold text-xs sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 shadow-md shadow-blue-500/25"
               >
-                <CheckCircle2 size={16} aria-hidden="true" />
-                <span>Enregistrer ({selectedDate})</span>
+                <CheckCircle2 size={18} aria-hidden="true" />
+                <span>Enregistrer la séance · {formatFrenchDate(selectedDate)}</span>
               </button>
             </div>
           </div>
