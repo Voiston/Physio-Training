@@ -67,6 +67,44 @@ export default function Grid({
     return map;
   }, [timeline, events, qualities]);
 
+  // 1. Mémoïsation globale de l'état physiologique des cellules (14 qualités × 36 jours = ~500 calculs)
+  // Évite plus de 500 réévaluations lourdes à chaque render de Grid (drag, pan, scroll, onglets)
+  const cellStatesMap = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < qualities.length; i++) {
+      const q = qualities[i];
+      const qMap = {};
+      const qEvents = events[q.id] || {};
+      for (let j = 0; j < timeline.length; j++) {
+        const day = timeline[j];
+        const readiness = dailyMetrics[day.dateStr]?.readiness || 7;
+        qMap[day.dateStr] = computeCellState(q, day.dateStr, qEvents, readiness, trainingBlocks);
+      }
+      map[q.id] = qMap;
+    }
+    return map;
+  }, [events, qualities, timeline, dailyMetrics, trainingBlocks]);
+
+  // 2. Mémoïsation des analyses VFC (36 jours) évitant de re-parcourir dailyMetrics à chaque render
+  const vfcAnalysisMap = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < timeline.length; i++) {
+      const day = timeline[i];
+      map[day.dateStr] = computeVfcAnalysis(dailyMetrics, day.dateStr);
+    }
+    return map;
+  }, [dailyMetrics, timeline]);
+
+  // 3. Mémoïsation des analyses FC Repos (36 jours) évitant de re-parcourir dailyMetrics à chaque render
+  const hrRestAnalysisMap = useMemo(() => {
+    const map = {};
+    for (let i = 0; i < timeline.length; i++) {
+      const day = timeline[i];
+      map[day.dateStr] = computeHrRestAnalysis(dailyMetrics, day.dateStr);
+    }
+    return map;
+  }, [dailyMetrics, timeline]);
+
   const handleDragStart = (e, qId, index) => {
     setDraggedQualityId(qId);
     e.dataTransfer.setData('text/plain', qId);
@@ -457,7 +495,7 @@ export default function Grid({
                 Indicateur parasympathique
               </td>
               {timeline.map((day) => {
-                  const vfcAnalysis = computeVfcAnalysis(dailyMetrics, day.dateStr);
+                  const vfcAnalysis = vfcAnalysisMap[day.dateStr];
                   const rawVfc = dailyMetrics[day.dateStr]?.vfc;
                   const vfc = (rawVfc !== undefined && rawVfc !== null && rawVfc > 0) ? `${rawVfc}` : '-';
                   
@@ -521,7 +559,7 @@ export default function Grid({
                 Tonus cardiaque au réveil
               </td>
               {timeline.map((day) => {
-                const hrAnalysis = computeHrRestAnalysis(dailyMetrics, day.dateStr);
+                const hrAnalysis = hrRestAnalysisMap[day.dateStr];
                 const hrRest = hrAnalysis.currentValue !== null ? `${hrAnalysis.currentValue}` : '-';
                 
                 let badgeClass = 'text-slate-400 font-normal';
@@ -726,8 +764,7 @@ export default function Grid({
 
                     {/* Colonnes de timeline (J-X à J+Y) */}
                     {timeline.map((day) => {
-                      const readiness = dailyMetrics[day.dateStr]?.readiness || 7;
-                      const cellState = computeCellState(q, day.dateStr, events[q.id], readiness, trainingBlocks);
+                      const cellState = cellStatesMap[q.id]?.[day.dateStr] || computeCellState(q, day.dateStr, events[q.id], dailyMetrics[day.dateStr]?.readiness || 7, trainingBlocks);
                       const sessionData = events[q.id]?.[day.dateStr];
                       
                       let cellHeatmapStyle = 'bg-slate-900/30 border-white/[0.03] text-slate-600 hover:bg-white/[0.04] hover:border-white/10';

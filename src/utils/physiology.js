@@ -507,40 +507,45 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
   // pour éviter qu'une filière qui n'a que des impacts secondaires ne s'auto-calibre à doseScale=1.0
   const pastPrimaryLoads = [];
   let mostRecentSessionDays = null;
-  for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
-    const eventTime = new Date(eventDate).getTime();
-    const daysSince = Math.round((targetTime - eventTime) / (1000 * 3600 * 24));
+  const parsedSessions = [];
+
+  const entries = Object.entries(eventsForQuality || {});
+  for (let i = 0; i < entries.length; i++) {
+    const [eventDate, data] = entries[i];
+    const eventTime = Date.parse(eventDate);
+    const daysSince = Math.round((targetTime - eventTime) / 86400000);
+
     if (daysSince >= 0) {
-      if (isPrimary(data) && extractSessionLoad(data) > 0) {
+      const isPrim = isPrimary(data);
+      const load = extractSessionLoad(data);
+
+      if (isPrim && load > 0) {
         if (mostRecentSessionDays === null || daysSince < mostRecentSessionDays) {
           mostRecentSessionDays = daysSince;
         }
+        if (daysSince <= 60) {
+          pastPrimaryLoads.push(load);
+        }
       }
-      if (daysSince <= 60 && isPrimary(data)) {
-        const l = extractSessionLoad(data);
-        if (l > 0) pastPrimaryLoads.push(l);
-      }
+
+      parsedSessions.push({ daysSince, load, isSec: !isPrim });
     }
   }
+
   pastPrimaryLoads.sort((a, b) => a - b);
   const defaultRefLoad = qDef.id === 'isolation' ? 80 : (qDef.category === 'force' ? 200 : (qDef.category === 'mixte' ? 180 : 250));
   const refLoad_q = pastPrimaryLoads.length > 0 ? pastPrimaryLoads[Math.floor(pastPrimaryLoads.length / 2)] : defaultRefLoad;
 
-  for (const [eventDate, data] of Object.entries(eventsForQuality || {})) {
-    const eventTime = new Date(eventDate).getTime();
-    const daysSince = Math.round((targetTime - eventTime) / (1000 * 3600 * 24));
+  for (let i = 0; i < parsedSessions.length; i++) {
+    const { daysSince, load, isSec } = parsedSessions[i];
 
-    if (daysSince >= 0) {
-      const load = extractSessionLoad(data);
-      const isSec = !isPrimary(data);
-
-      if (daysSince <= 3) {
-        recent3DaysLoad += load;
-      }
-      if (daysSince <= 28) {
-        total28dLoad += load;
-        if (load > 0) sessionCount28d++;
-      }
+    if (daysSince <= 3) {
+      recent3DaysLoad += load;
+    }
+    if (daysSince <= 28) {
+      total28dLoad += load;
+      if (load > 0) sessionCount28d++;
+    }
 
       // Dose-réponse continue avec seuil minimal effectif (load >= 15 UA)
       let doseScale = 0;
@@ -607,7 +612,6 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
         }
       }
     }
-  }
 
   // Décroissance continue monotone au-delà de la fenêtre de rappel (statut rouge)
   // Raccordement continu au seuil d'expiration (35% pour physio, 30% pour prescription)
