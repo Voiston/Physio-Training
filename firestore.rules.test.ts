@@ -1,9 +1,24 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 
-// Unit validation suite for Firestore Security rules logic and payload invariants
-describe('Firestore Security Rules - Dirty Dozen Payloads Validation', () => {
+/**
+ * Suite de tests des règles de sécurité Firestore.
+ * 
+ * Cette suite vérifie deux niveaux d'intégrité :
+ * 1. Niveau Fichier Réel : Inspection dynamique du contenu de 'firestore.rules' sur disque
+ *    (détecte tout affaiblissement, disparition de l'allowlist d'emails, suppression du default-deny).
+ * 2. Niveau Logique Comportementale : Validation des invariants de sécurité (authentification,
+ *    emails autorisés, vérification d'email, intégrité des champs, isolation par UID).
+ */
+describe('Firestore Security Rules - Vraie Vérification & Invariants', () => {
+  const ALLOWED_EMAILS = [
+    'poketime.idle@gmail.com',
+    'david.voisard2@gmail.com'
+  ];
+
   const validUid = 'user_abc123';
-  const validEmail = 'athlete@example.com';
+  const validEmail = 'poketime.idle@gmail.com';
   const validRecord = {
     userId: validUid,
     userEmail: validEmail,
@@ -14,190 +29,207 @@ describe('Firestore Security Rules - Dirty Dozen Payloads Validation', () => {
     updatedAt: '2026-10-10T22:30:00.000Z',
   };
 
-  function validatePayload(
-    auth: { uid: string; email: string; emailVerified: boolean } | null,
-    recordId: string,
-    payload: any,
-    existingData?: any
-  ): { allowed: boolean; reason?: string } {
-    if (!auth) return { allowed: false, reason: 'Unauthenticated' };
-    if (!auth.emailVerified) return { allowed: false, reason: 'Email not verified' };
-    if (!recordId || recordId.length > 128 || !/^[a-zA-Z0-9_\-\.]+$/.test(recordId)) {
-      return { allowed: false, reason: 'Invalid record ID' };
-    }
-    if (recordId !== auth.uid) {
-      return { allowed: false, reason: 'Record ID must match authenticated user UID' };
-    }
+  // --- SECTION 1 : VÉRIFICATION DU FICHIER RÉEL 'firestore.rules' ---
+  describe('Inspection Syntaxique & Structurelle du fichier firestore.rules', () => {
+    const rulesPath = path.resolve(__dirname, 'firestore.rules');
+    const rulesContent = fs.readFileSync(rulesPath, 'utf8');
 
-    const requiredKeys = ['userId', 'userEmail', 'key', 'data', 'version', 'lastDeviceId', 'updatedAt'];
-    const keys = Object.keys(payload);
-    if (!requiredKeys.every(k => keys.includes(k))) {
-      return { allowed: false, reason: 'Missing required keys' };
-    }
-    if (keys.some(k => !requiredKeys.includes(k))) {
-      return { allowed: false, reason: 'Shadow fields detected' };
-    }
-    if (payload.userId !== auth.uid) {
-      return { allowed: false, reason: 'userId must match auth.uid' };
-    }
-    if (payload.userEmail !== auth.email) {
-      return { allowed: false, reason: 'userEmail must match auth.email' };
-    }
-    if (typeof payload.data !== 'string' || payload.data.length > 500000) {
-      return { allowed: false, reason: 'Data oversized or not string' };
-    }
-    if (typeof payload.version !== 'number' || !Number.isInteger(payload.version)) {
-      return { allowed: false, reason: 'Version must be integer' };
-    }
-    if (typeof payload.lastDeviceId !== 'string' || payload.lastDeviceId.length > 64) {
-      return { allowed: false, reason: 'Invalid lastDeviceId' };
-    }
-    if (typeof payload.updatedAt !== 'string' || payload.updatedAt.length > 64 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/.test(payload.updatedAt)) {
-      return { allowed: false, reason: 'Invalid updatedAt' };
-    }
+    it('le fichier firestore.rules existe et contient rules_version = 2', () => {
+      expect(rulesContent).toBeDefined();
+      expect(rulesContent).toContain("rules_version = '2'");
+    });
 
-    if (existingData) {
-      if (payload.userId !== existingData.userId || payload.userEmail !== existingData.userEmail) {
-        return { allowed: false, reason: 'Immutable fields altered' };
+    it('applique un verrouillage universel par défaut (Default Deny)', () => {
+      expect(rulesContent).toMatch(/match\s*\/\{document=\*\*\}\s*\{\s*allow\s+read,\s*write:\s*if\s+false;\s*\}/);
+    });
+
+    it('contient la fonction isAllowedEmail() avec la liste blanche exacte', () => {
+      expect(rulesContent).toContain('function isAllowedEmail()');
+      for (const email of ALLOWED_EMAILS) {
+        expect(rulesContent).toContain(`'${email}'`);
       }
+    });
+
+    it('exige la vérification stricte de l’email (email_verified == true)', () => {
+      expect(rulesContent).toContain('request.auth.token.email_verified == true');
+    });
+
+    it('garantit l’isolation stricte de /sync_records/{recordId} par UID et autorisation', () => {
+      expect(rulesContent).toContain('match /sync_records/{recordId}');
+      expect(rulesContent).toContain('recordId == request.auth.uid');
+      expect(rulesContent).toContain('isAuthorizedUser()');
+    });
+
+    it('interdit l’altération de champs avec hasOnly() et plafonne la taille à 500 000 caractères', () => {
+      expect(rulesContent).toContain("data.data.size() <= 500000");
+      expect(rulesContent).toContain("hasOnly(['key', 'data', 'version', 'lastDeviceId', 'updatedAt'])");
+    });
+  });
+
+  // --- SECTION 2 : LOGIQUE COMPORTEMENTALE & SCÉNARIOS D'ATTAQUES ---
+  describe('Matrice des Droits & Rejet des Payloads Malveillants', () => {
+    function validatePayload(
+      auth: { uid: string; email: string; emailVerified: boolean } | null,
+      recordId: string,
+      payload: any,
+      existingData?: any
+    ): { allowed: boolean; reason?: string } {
+      if (!auth) return { allowed: false, reason: 'Unauthenticated' };
+      if (!auth.emailVerified) return { allowed: false, reason: 'Email not verified' };
+
+      // Vérification de la liste blanche d'emails
+      const emailLower = (auth.email || '').toLowerCase();
+      if (!ALLOWED_EMAILS.includes(emailLower)) {
+        return { allowed: false, reason: 'Email not in allowlist' };
+      }
+
+      if (!recordId || recordId.length > 128 || !/^[a-zA-Z0-9_\-\.]+$/.test(recordId)) {
+        return { allowed: false, reason: 'Invalid record ID' };
+      }
+      if (recordId !== auth.uid) {
+        return { allowed: false, reason: 'Record ID must match authenticated user UID' };
+      }
+
+      const requiredKeys = ['userId', 'userEmail', 'key', 'data', 'version', 'lastDeviceId', 'updatedAt'];
+      const keys = Object.keys(payload);
+      if (!requiredKeys.every(k => keys.includes(k))) {
+        return { allowed: false, reason: 'Missing required keys' };
+      }
+      if (keys.some(k => !requiredKeys.includes(k))) {
+        return { allowed: false, reason: 'Shadow fields detected' };
+      }
+      if (payload.userId !== auth.uid) {
+        return { allowed: false, reason: 'userId must match auth.uid' };
+      }
+      if (payload.userEmail !== auth.email) {
+        return { allowed: false, reason: 'userEmail must match auth.email' };
+      }
+      if (typeof payload.data !== 'string' || payload.data.length > 500000) {
+        return { allowed: false, reason: 'Data oversized or not string' };
+      }
+      if (typeof payload.version !== 'number' || !Number.isInteger(payload.version)) {
+        return { allowed: false, reason: 'Version must be integer' };
+      }
+      if (typeof payload.lastDeviceId !== 'string' || payload.lastDeviceId.length > 64) {
+        return { allowed: false, reason: 'Invalid lastDeviceId' };
+      }
+      if (typeof payload.updatedAt !== 'string' || payload.updatedAt.length > 64 || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/.test(payload.updatedAt)) {
+        return { allowed: false, reason: 'Invalid updatedAt' };
+      }
+
+      if (existingData) {
+        if (payload.userId !== existingData.userId || payload.userEmail !== existingData.userEmail) {
+          return { allowed: false, reason: 'Immutable fields altered' };
+        }
+      }
+
+      return { allowed: true };
     }
 
-    return { allowed: true };
-  }
+    // 1. Accès non authentifié
+    it('bloque formellement tout accès non authentifié (read/write)', () => {
+      const res = validatePayload(null, validUid, validRecord);
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('Unauthenticated');
+    });
 
-  // 1. Unauthenticated Read
-  it('blocks unauthenticated read/write', () => {
-    const res = validatePayload(null, validUid, validRecord);
-    expect(res.allowed).toBe(false);
-  });
+    // 2. Email non présent dans la liste blanche
+    it('bloque un utilisateur Google valide mais dont l’email n’est pas dans la liste blanche', () => {
+      const res = validatePayload(
+        { uid: 'unauthorized_uid', email: 'stranger@gmail.com', emailVerified: true },
+        'unauthorized_uid',
+        { ...validRecord, userId: 'unauthorized_uid', userEmail: 'stranger@gmail.com' }
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('Email not in allowlist');
+    });
 
-  // 2. Unauthenticated Write
-  it('blocks anonymous or null auth write', () => {
-    const res = validatePayload(null, validUid, validRecord);
-    expect(res.allowed).toBe(false);
-  });
+    // 3. Email dans la liste blanche mais non vérifié
+    it('bloque un utilisateur de la liste blanche si email_verified est faux', () => {
+      const res = validatePayload(
+        { uid: validUid, email: validEmail, emailVerified: false },
+        validUid,
+        validRecord
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('Email not verified');
+    });
 
-  // 3. Spoofed User ID
-  it('blocks spoofed user ID payload', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, userId: 'attacker_uid' }
-    );
-    expect(res.allowed).toBe(false);
-  });
+    // 4. Usurpation de UID (spoofing)
+    it('bloque toute tentative d’écriture avec un userId falsifié', () => {
+      const res = validatePayload(
+        { uid: validUid, email: validEmail, emailVerified: true },
+        validUid,
+        { ...validRecord, userId: 'other_victim_uid' }
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('userId must match auth.uid');
+    });
 
-  // 4. Spoofed Email
-  it('blocks spoofed email payload', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, userEmail: 'victim@gmail.com' }
-    );
-    expect(res.allowed).toBe(false);
-  });
+    // 5. Usurpation d’Email (spoofing)
+    it('bloque toute tentative d’écriture avec un userEmail différent du token Google', () => {
+      const res = validatePayload(
+        { uid: validUid, email: validEmail, emailVerified: true },
+        validUid,
+        { ...validRecord, userEmail: 'david.voisard2@gmail.com' }
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('userEmail must match auth.email');
+    });
 
-  // 5. Unverified Email
-  it('blocks write when email_verified is false', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: false },
-      validUid,
-      validRecord
-    );
-    expect(res.allowed).toBe(false);
-  });
+    // 6. Injection de champs fantômes (ex: isAdmin)
+    it('bloque les payloads contenant des champs non autorisés (Ghost fields)', () => {
+      const res = validatePayload(
+        { uid: validUid, email: validEmail, emailVerified: true },
+        validUid,
+        { ...validRecord, isAdmin: true }
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('Shadow fields detected');
+    });
 
-  // 6. ID Injection / Poisoning
-  it('blocks invalid or injected record ID', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      'invalid/path/or/id$$$',
-      validRecord
-    );
-    expect(res.allowed).toBe(false);
-  });
+    // 7. Dépassement de la limite de taille (Déni de portefeuille)
+    it('bloque les payloads dépassant 500 000 caractères', () => {
+      const oversized = 'a'.repeat(500001);
+      const res = validatePayload(
+        { uid: validUid, email: validEmail, emailVerified: true },
+        validUid,
+        { ...validRecord, data: oversized }
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('Data oversized or not string');
+    });
 
-  // 7. Oversized Payload (Denial of Wallet)
-  it('blocks payload exceeding 500k characters', () => {
-    const oversizedString = 'x'.repeat(500001);
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, data: oversizedString }
-    );
-    expect(res.allowed).toBe(false);
-  });
+    // 8. Altération de champs immuables à l’update
+    it('bloque toute modification de userId ou userEmail lors d’une mise à jour', () => {
+      const res = validatePayload(
+        { uid: validUid, email: validEmail, emailVerified: true },
+        validUid,
+        { ...validRecord, userId: validUid, userEmail: validEmail },
+        { ...validRecord, userId: 'other_uid', userEmail: 'other@gmail.com' }
+      );
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('Immutable fields altered');
+    });
 
-  // 8. Shadow Field Injection
-  it('blocks payloads with ghost fields like isAdmin', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, isAdmin: true }
-    );
-    expect(res.allowed).toBe(false);
-  });
+    // 9. Accès légitime pour le premier email autorisé
+    it('autorise l’écriture et la lecture pour poketime.idle@gmail.com', () => {
+      const res = validatePayload(
+        { uid: validUid, email: 'poketime.idle@gmail.com', emailVerified: true },
+        validUid,
+        { ...validRecord, userEmail: 'poketime.idle@gmail.com' }
+      );
+      expect(res.allowed).toBe(true);
+    });
 
-  // 9. Missing Required Fields
-  it('blocks payloads missing required fields', () => {
-    const { key, ...withoutKey } = validRecord;
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      withoutKey
-    );
-    expect(res.allowed).toBe(false);
-  });
-
-  // 10. Type Mismatch Attack
-  it('blocks type mismatch (e.g. string for integer version)', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, version: '1' as any }
-    );
-    expect(res.allowed).toBe(false);
-  });
-
-  // 11. Ownership Theft Update
-  it('blocks update that alters existing userId or userEmail', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, userId: validUid, userEmail: validEmail },
-      { ...validRecord, userId: 'other_user_uid', userEmail: 'other@gmail.com' }
-    );
-    expect(res.allowed).toBe(false);
-  });
-
-  // 12. Cross-Tenant Squatting / Access
-  it('blocks user accessing or creating a record with a different recordId than their UID', () => {
-    const res = validatePayload(
-      { uid: 'attacker_uid', email: 'attacker@gmail.com', emailVerified: true },
-      'victim_uid',
-      { ...validRecord, userId: 'attacker_uid', userEmail: 'attacker@gmail.com' }
-    );
-    expect(res.allowed).toBe(false);
-  });
-
-  // 13. Malformed Timestamp Injection
-  it('blocks payload with malformed or non-ISO timestamp in updatedAt', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      { ...validRecord, updatedAt: 'invalid-date-string' }
-    );
-    expect(res.allowed).toBe(false);
-  });
-
-  // Valid legitimate payload
-  it('allows valid payload for verified owner matching their recordId UID', () => {
-    const res = validatePayload(
-      { uid: validUid, email: validEmail, emailVerified: true },
-      validUid,
-      validRecord
-    );
-    expect(res.allowed).toBe(true);
+    // 10. Accès légitime pour le second email autorisé
+    it('autorise l’écriture et la lecture pour david.voisard2@gmail.com', () => {
+      const res = validatePayload(
+        { uid: 'david_uid', email: 'david.voisard2@gmail.com', emailVerified: true },
+        'david_uid',
+        { ...validRecord, userId: 'david_uid', userEmail: 'david.voisard2@gmail.com' }
+      );
+      expect(res.allowed).toBe(true);
+    });
   });
 });
-

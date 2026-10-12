@@ -110,18 +110,98 @@ export function sanitizeSessionData(rawSession: any): any | null {
     safeSession.parentQId = rawSession.parentQId;
   }
 
+  if (typeof rawSession.originalLoad === 'number' && Number.isFinite(rawSession.originalLoad)) {
+    safeSession.originalLoad = Math.max(0, Math.round(rawSession.originalLoad));
+  }
+
+  if (typeof rawSession.tonnageKg === 'number' && Number.isFinite(rawSession.tonnageKg)) {
+    safeSession.tonnageKg = Math.max(0, Math.round(rawSession.tonnageKg));
+  }
+
+  if (typeof rawSession.notes === 'string') {
+    safeSession.notes = rawSession.notes.slice(0, 1000);
+  }
+
+  if (typeof rawSession.source === 'string') {
+    safeSession.source = rawSession.source.slice(0, 64);
+  }
+
+  if (typeof rawSession.completedAt === 'string') {
+    safeSession.completedAt = rawSession.completedAt.slice(0, 64);
+  }
+
+  // Préservation des contributions parentes (pour les séances secondaires calculées)
+  if (rawSession.parentContributions && typeof rawSession.parentContributions === 'object') {
+    const safeContribs: Record<string, any> = createSafeNullDict();
+    for (const [pKey, pVal] of Object.entries(rawSession.parentContributions)) {
+      if (!isSafeId(pKey) || !pVal || typeof pVal !== 'object') continue;
+      safeContribs[pKey] = {
+        load: Math.max(0, Number((pVal as any).load) || 0),
+        loadCardio: typeof (pVal as any).loadCardio === 'number' ? Math.max(0, Number((pVal as any).loadCardio)) : undefined,
+        loadMusc: typeof (pVal as any).loadMusc === 'number' ? Math.max(0, Number((pVal as any).loadMusc)) : undefined,
+        ratio: Math.max(0, Math.min(1, Number((pVal as any).ratio) || 0)),
+        parentName: typeof (pVal as any).parentName === 'string' ? String((pVal as any).parentName).slice(0, 50) : undefined
+      };
+    }
+    safeSession.parentContributions = Object.assign({}, safeContribs);
+  }
+
+  // Préservation détaillée des exercices de musculation (Mode Salle & Tracker)
   if (Array.isArray(rawSession.exercises)) {
     safeSession.exercises = rawSession.exercises
       .filter((ex: any) => ex && typeof ex === 'object' && typeof ex.name === 'string')
       .slice(0, 50)
-      .map((ex: any) => ({
-        id: typeof ex.id === 'string' && isSafeId(ex.id) ? ex.id : `ex_${Date.now()}`,
-        name: String(ex.name).slice(0, 100),
-        sets: Math.max(0, Math.min(100, Number(ex.sets) || 0)),
-        reps: Math.max(0, Math.min(1000, Number(ex.reps) || 0)),
-        weight: Math.max(0, Math.min(1000, Number(ex.weight) || 0)),
-        rir: typeof ex.rir === 'number' ? Math.max(0, Math.min(10, ex.rir)) : undefined,
-      }));
+      .map((ex: any) => {
+        const item: any = {
+          id: typeof ex.id === 'string' ? ex.id.slice(0, 64) : `ex_${Date.now()}`,
+          name: String(ex.name).slice(0, 100),
+          sets: Math.max(0, Math.min(100, Number(ex.sets) || 0)),
+        };
+
+        if (typeof ex.exerciseCatalogId === 'string') {
+          item.exerciseCatalogId = ex.exerciseCatalogId.slice(0, 64);
+        }
+
+        // Poids en kg (correction critique : weightKg utilisé partout dans l'application)
+        const rawWeight = ex.weightKg !== undefined ? ex.weightKg : ex.weight;
+        if (typeof rawWeight === 'number' && Number.isFinite(rawWeight)) {
+          item.weightKg = Math.max(0, Math.min(1000, Math.round(rawWeight * 10) / 10));
+        }
+
+        if (typeof ex.reps === 'number' && Number.isFinite(ex.reps)) {
+          item.reps = Math.max(0, Math.min(1000, Math.round(ex.reps)));
+        }
+
+        if (typeof ex.rpe === 'number' && Number.isFinite(ex.rpe)) {
+          item.rpe = Math.max(0, Math.min(10, ex.rpe));
+        }
+
+        if (typeof ex.rir === 'number' && Number.isFinite(ex.rir)) {
+          item.rir = Math.max(0, Math.min(10, ex.rir));
+        }
+
+        // Préservation des séries détaillées saisies en Mode Salle
+        if (Array.isArray(ex.detailSets)) {
+          item.detailSets = ex.detailSets.slice(0, 50).map((s: any) => ({
+            weightKg: typeof s.weightKg === 'number' ? Math.max(0, Math.min(1000, s.weightKg)) : undefined,
+            reps: typeof s.reps === 'number' ? Math.max(0, Math.min(1000, s.reps)) : undefined,
+            rir: typeof s.rir === 'number' ? Math.max(0, Math.min(10, s.rir)) : undefined,
+            completed: Boolean(s.completed)
+          }));
+        }
+
+        if (ex.customRatios && typeof ex.customRatios === 'object') {
+          const ratios: Record<string, number> = {};
+          for (const [mId, rVal] of Object.entries(ex.customRatios)) {
+            if (isSafeId(mId) && typeof rVal === 'number') {
+              ratios[mId] = Math.max(0, Math.min(1, rVal));
+            }
+          }
+          item.customRatios = ratios;
+        }
+
+        return item;
+      });
   }
 
   // Convertir en objet standard sécurisé pour compatibilité JSON / React
@@ -400,8 +480,9 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
           focusQualities: Array.isArray(b.focusQualities) 
             ? b.focusQualities.filter((q: any) => typeof q === 'string' && isSafeId(q)).slice(0, 10)
             : [],
-          targetMultiplier: Math.max(0.1, Math.min(3, Number(b.targetMultiplier) || 1.2)),
-          maintenanceMultiplier: Math.max(0.1, Math.min(3, Number(b.maintenanceMultiplier) || 0.8)),
+          // Multiplicateurs conformes au modèle d'Issurin (0.45 cible / 1.0 maintien par défaut)
+          targetMultiplier: Math.max(0.1, Math.min(3, Number(b.targetMultiplier) || 0.45)),
+          maintenanceMultiplier: Math.max(0.1, Math.min(3, Number(b.maintenanceMultiplier) || 1.0)),
           color: typeof b.color === 'string' ? b.color.slice(0, 30) : undefined,
           notes: typeof b.notes === 'string' ? b.notes.slice(0, 500) : undefined,
         }));
@@ -449,8 +530,8 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
             ? t.focusQualities.filter((q: any) => typeof q === 'string' && isSafeId(q)).slice(0, 10)
             : [],
           description: String(t.description || '').slice(0, 200),
-          targetMultiplier: Math.max(0.1, Math.min(3, Number(t.targetMultiplier) || 1.2)),
-          maintenanceMultiplier: Math.max(0.1, Math.min(3, Number(t.maintenanceMultiplier) || 0.8)),
+          targetMultiplier: Math.max(0.1, Math.min(3, Number(t.targetMultiplier) || 0.45)),
+          maintenanceMultiplier: Math.max(0.1, Math.min(3, Number(t.maintenanceMultiplier) || 1.0)),
           color: typeof t.color === 'string' ? t.color.slice(0, 30) : undefined,
           badge: typeof t.badge === 'string' ? t.badge.slice(0, 30) : undefined,
         }));
@@ -474,33 +555,49 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
       }
     }
 
-    // 7. Validation des réglages physiologiques (physioSettings)
+    // 7. Validation des réglages physiologiques (physioSettings) avec initialCtl
     if (imported.physioSettings && typeof imported.physioSettings === 'object') {
       const ps = imported.physioSettings;
-      const safePs = {
+      const safePs: Record<string, any> = {
         tauFatigue: Math.max(3, Math.min(20, Number(ps.tauFatigue) || 7)),
         tauFitness: Math.max(15, Math.min(60, Number(ps.tauFitness) || 28)),
-        kFatigue: Math.max(0.5, Math.min(5, Number(ps.kFatigue) || 2)),
-        kFitness: Math.max(0.5, Math.min(5, Number(ps.kFitness) || 1)),
+        profileName: typeof ps.profileName === 'string' ? ps.profileName.slice(0, 50) : 'Standard',
       };
+      if (typeof ps.initialCtl === 'number' && Number.isFinite(ps.initialCtl)) {
+        safePs.initialCtl = Math.max(0, Math.min(300, Math.round(ps.initialCtl)));
+      }
       entriesToSet.set('physio_settings', JSON.stringify(safePs));
     }
 
-    // 8. Validation des exercices personnalisés (customExercises)
+    // 8. Validation des exercices personnalisés (customExercises) au format réel { id, name, category, muscleRatios, isCompound }
     if (Array.isArray(imported.customExercises)) {
       const safeEx = imported.customExercises
-        .filter((ex: any) => ex && typeof ex === 'object' && typeof ex.id === 'string' && isSafeId(ex.id))
+        .filter((ex: any) => ex && typeof ex === 'object' && typeof ex.name === 'string')
         .slice(0, 200)
-        .map((ex: any) => ({
-          id: ex.id,
-          name: String(ex.name || ex.id).slice(0, 100),
-          primaryMuscles: Array.isArray(ex.primaryMuscles)
-            ? ex.primaryMuscles.filter((m: any) => typeof m === 'string' && isSafeId(m)).slice(0, 10)
-            : [],
-          secondaryMuscles: Array.isArray(ex.secondaryMuscles)
-            ? ex.secondaryMuscles.filter((m: any) => typeof m === 'string' && isSafeId(m)).slice(0, 10)
-            : [],
-        }));
+        .map((ex: any) => {
+          const item: any = {
+            id: typeof ex.id === 'string' ? ex.id.slice(0, 64) : `custom_ex_${Date.now()}`,
+            name: String(ex.name).slice(0, 100),
+            category: typeof ex.category === 'string' ? ex.category.slice(0, 30) : 'upper_push',
+            isCompound: Boolean(ex.isCompound),
+            defaultReps: Math.max(1, Math.min(100, Number(ex.defaultReps) || 10)),
+            isCustom: true,
+          };
+
+          if (ex.muscleRatios && typeof ex.muscleRatios === 'object') {
+            const ratios: Record<string, number> = {};
+            for (const [mKey, mRatio] of Object.entries(ex.muscleRatios)) {
+              if (isSafeId(mKey) && typeof mRatio === 'number') {
+                ratios[mKey] = Math.max(0, Math.min(1, mRatio));
+              }
+            }
+            item.muscleRatios = ratios;
+          } else {
+            item.muscleRatios = { pectoraux: 1.0 };
+          }
+
+          return item;
+        });
       entriesToSet.set('physio_custom_exercises', JSON.stringify(safeEx));
     }
 

@@ -29,7 +29,9 @@ import {
   sanitizeSessionData, 
   sanitizeEventsPayload, 
   sanitizeDailyMetricsPayload,
-  validateAndStageImportPayload 
+  validateAndStageImportPayload,
+  mergeEventsNonDestructive,
+  mergeDailyMetricsNonDestructive
 } from '../utils/security';
 
 export interface QualityImpact {
@@ -499,74 +501,96 @@ export function useData() {
     try {
       const imported = migrateData(remoteData);
 
-      // SÉCURITÉ : Nettoyer les clés de dates existantes pour éviter que des séances
-      // orphelines d'un profil précédent ne polluent les données du nouvel utilisateur
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && /^\d{4}-\d{2}-\d{2}_/.test(key)) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-      } catch (err) {
-        console.warn('Erreur lors du nettoyage préalable des clés de séances:', err);
+      // 1. Validation intégrale et sécurisée de l'ensemble du payload distant
+      const staged = validateAndStageImportPayload(imported);
+      if (!staged.isValid) {
+        console.warn('[Cloud Sync] Payload distant rejeté pour non conformité:', staged.error);
+        return;
       }
 
-      if (imported.events) {
-        const cleanEvents = sanitizeEventsPayload(imported.events);
-        setEvents(cleanEvents);
-        Object.entries(cleanEvents).forEach(([qId, dates]) => {
+      // 2. FUSION NON DESTRUCTRICE DES SÉANCES (Préserve impérativement les séances saisies hors-ligne en salle)
+      setEvents(prevLocalEvents => {
+        const incomingRemoteEvents = imported.events ? sanitizeEventsPayload(imported.events) : {};
+        const { merged, hasNewLocalData } = mergeEventsNonDestructive(prevLocalEvents, incomingRemoteEvents);
+
+        // Répercuter dans le stockage local sans détruire les séances hors-ligne
+        Object.entries(merged).forEach(([qId, dates]) => {
           if (!isSafeId(qId)) return;
           Object.entries(dates).forEach(([date, data]) => {
             if (!isSafeDate(date)) return;
             localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));
           });
         });
-      }
-      if (imported.dailyMetrics) {
-        const cleanMetrics = sanitizeDailyMetricsPayload(imported.dailyMetrics);
-        setDailyMetrics(cleanMetrics);
-        Object.entries(cleanMetrics).forEach(([dateStr, metrics]) => {
+
+        // Si l'athlète avait des séances locales plus complètes créées hors-ligne,
+        // déclencher un push automatique vers le cloud pour consolider la base distante
+        if (hasNewLocalData) {
+          setTimeout(() => triggerSyncPush(), 1000);
+        }
+
+        return merged;
+      });
+
+      // 3. FUSION NON DESTRUCTRICE DES MÉTRIQUES JOURNALIÈRES
+      setDailyMetrics(prevLocalMetrics => {
+        const incomingRemoteMetrics = imported.dailyMetrics ? sanitizeDailyMetricsPayload(imported.dailyMetrics) : {};
+        const { merged } = mergeDailyMetricsNonDestructive(prevLocalMetrics, incomingRemoteMetrics);
+
+        Object.entries(merged).forEach(([dateStr, metrics]) => {
           if (!isSafeDate(dateStr)) return;
           Object.entries(metrics).forEach(([type, value]) => {
             if (!['readiness', 'vfc', 'hrRest'].includes(type)) return;
             localStorage.setItem(`${dateStr}_${type}`, String(value));
           });
         });
+
+        return merged;
+      });
+
+      // 4. APPLICATION VALIDÉE DES BLOCS, QUALITÉS, COMPÉTITION ET RÉGLAGES
+      const stagedEntries = staged.entriesToSet;
+
+      if (stagedEntries.has('physio_training_blocks')) {
+        const val = JSON.parse(stagedEntries.get('physio_training_blocks')!);
+        setTrainingBlocks(val);
+        localStorage.setItem('physio_training_blocks', JSON.stringify(val));
       }
-      if (imported.trainingBlocks) {
-        setTrainingBlocks(imported.trainingBlocks);
-        localStorage.setItem('physio_training_blocks', JSON.stringify(imported.trainingBlocks));
+
+      if (stagedEntries.has('physio_qualities')) {
+        const val = JSON.parse(stagedEntries.get('physio_qualities')!);
+        setQualitiesState(val);
+        localStorage.setItem('physio_qualities', JSON.stringify(val));
       }
-      if (imported.qualities) {
-        setQualitiesState(imported.qualities);
-        localStorage.setItem('physio_qualities', JSON.stringify(imported.qualities));
+
+      if (stagedEntries.has('physio_block_templates')) {
+        const val = JSON.parse(stagedEntries.get('physio_block_templates')!);
+        setBlockTemplates(val);
+        localStorage.setItem('physio_block_templates', JSON.stringify(val));
       }
-      if (imported.blockTemplates) {
-        setBlockTemplates(imported.blockTemplates);
-        localStorage.setItem('physio_block_templates', JSON.stringify(imported.blockTemplates));
+
+      if (stagedEntries.has('physio_target_competition')) {
+        const val = JSON.parse(stagedEntries.get('physio_target_competition')!);
+        setTargetCompetitionState(val);
+        localStorage.setItem('physio_target_competition', JSON.stringify(val));
+      } else if (imported.targetCompetition === null) {
+        setTargetCompetitionState(null);
+        localStorage.removeItem('physio_target_competition');
       }
-      if (imported.targetCompetition !== undefined) {
-        setTargetCompetitionState(imported.targetCompetition);
-        if (imported.targetCompetition) {
-          localStorage.setItem('physio_target_competition', JSON.stringify(imported.targetCompetition));
-        } else {
-          localStorage.removeItem('physio_target_competition');
-        }
+
+      if (stagedEntries.has('physio_settings')) {
+        const val = JSON.parse(stagedEntries.get('physio_settings')!);
+        setPhysioSettingsState(val);
+        localStorage.setItem('physio_settings', JSON.stringify(val));
       }
-      if (imported.physioSettings) {
-        setPhysioSettingsState(imported.physioSettings);
-        localStorage.setItem('physio_settings', JSON.stringify(imported.physioSettings));
-      }
-      if (Array.isArray(imported.customExercises)) {
-        localStorage.setItem('physio_custom_exercises', JSON.stringify(imported.customExercises));
+
+      if (stagedEntries.has('physio_custom_exercises')) {
+        const val = stagedEntries.get('physio_custom_exercises')!;
+        localStorage.setItem('physio_custom_exercises', val);
       }
     } catch (e) {
-      console.error('Error applying remote data:', e);
+      console.error('[Cloud Sync] Error applying remote data:', e);
     }
-  }, []);
+  }, [triggerSyncPush]);
 
   const getExportableData = useCallback(() => {
     return {
