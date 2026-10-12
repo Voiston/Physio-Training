@@ -23,6 +23,14 @@ import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
 import { isPrimary } from '../utils/loadHelpers';
 import { SessionExercise, getSavedCustomExercises } from '../utils/muscleHelpers';
+import { 
+  isSafeId, 
+  isSafeDate, 
+  sanitizeSessionData, 
+  sanitizeEventsPayload, 
+  sanitizeDailyMetricsPayload,
+  validateAndStageImportPayload 
+} from '../utils/security';
 
 export interface QualityImpact {
   id: string;
@@ -200,7 +208,12 @@ function getInitialEvents(): Record<string, Record<string, SessionData>> {
     console.warn('Migration error during initial events loading:', err);
   }
   const loadedEvents: Record<string, Record<string, SessionData>> = {};
-  DEFAULT_QUALITIES.forEach(q => (loadedEvents[q.id] = {}));
+  DEFAULT_QUALITIES.forEach(q => {
+    if (isSafeId(q.id)) {
+      loadedEvents[q.id] = {};
+    }
+  });
+
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -209,17 +222,29 @@ function getInitialEvents(): Record<string, Record<string, SessionData>> {
       if (match) {
         const dateStr = match[1];
         const category = match[2];
+
+        // SÉCURITÉ : Rejeter strictement les clés toxiques, prototype et identifiants invalides
+        if (!isSafeDate(dateStr) || !isSafeId(category)) continue;
         if (category === 'readiness' || category === 'vfc' || category === 'hrRest') continue;
+
         try {
           const rawItem = localStorage.getItem(key);
           if (!rawItem) continue;
           const parsed = JSON.parse(rawItem);
-          if (!loadedEvents[category]) loadedEvents[category] = {};
-          loadedEvents[category][dateStr] = parsed;
+          const cleanedSession = sanitizeSessionData(parsed);
+          if (!cleanedSession) continue;
+
+          if (!loadedEvents[category]) {
+            loadedEvents[category] = {};
+          }
+          loadedEvents[category][dateStr] = cleanedSession;
         } catch {
           const rawVal = localStorage.getItem(key);
-          if (!loadedEvents[category]) loadedEvents[category] = {};
-          loadedEvents[category][dateStr] = { load: parseInt(rawVal || '0', 10) * 5 };
+          const fallbackLoad = parseInt(rawVal || '0', 10) * 5;
+          if (!Number.isNaN(fallbackLoad) && fallbackLoad >= 0) {
+            if (!loadedEvents[category]) loadedEvents[category] = {};
+            loadedEvents[category][dateStr] = { load: fallbackLoad };
+          }
         }
       }
     }
@@ -229,6 +254,8 @@ function getInitialEvents(): Record<string, Record<string, SessionData>> {
 
 function getInitialDailyMetrics(): Record<string, DailyMetrics> {
   const loadedMetrics: Record<string, DailyMetrics> = {};
+  const ALLOWED_METRICS = new Set(['readiness', 'vfc', 'hrRest']);
+
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -237,16 +264,23 @@ function getInitialDailyMetrics(): Record<string, DailyMetrics> {
       if (match) {
         const dateStr = match[1];
         const category = match[2];
-        if (category === 'readiness' || category === 'vfc' || category === 'hrRest') {
-          try {
-            const rawItem = localStorage.getItem(key);
-            if (!rawItem) continue;
+
+        if (!isSafeDate(dateStr) || !ALLOWED_METRICS.has(category)) continue;
+
+        try {
+          const rawItem = localStorage.getItem(key);
+          if (!rawItem) continue;
+          const parsedNum = Number(JSON.parse(rawItem));
+          if (Number.isFinite(parsedNum) && parsedNum >= 0 && parsedNum <= 1000) {
             if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
-            loadedMetrics[dateStr][category] = Number(JSON.parse(rawItem));
-          } catch {
-            const rawVal = localStorage.getItem(key);
+            loadedMetrics[dateStr][category] = parsedNum;
+          }
+        } catch {
+          const rawVal = localStorage.getItem(key);
+          const parsedNum = parseInt(rawVal || '0', 10);
+          if (Number.isFinite(parsedNum) && parsedNum >= 0 && parsedNum <= 1000) {
             if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
-            loadedMetrics[dateStr][category] = parseInt(rawVal || '0', 10);
+            loadedMetrics[dateStr][category] = parsedNum;
           }
         }
       }
@@ -481,17 +515,23 @@ export function useData() {
       }
 
       if (imported.events) {
-        setEvents(imported.events);
-        Object.entries(imported.events as Record<string, Record<string, SessionData>>).forEach(([qId, dates]) => {
+        const cleanEvents = sanitizeEventsPayload(imported.events);
+        setEvents(cleanEvents);
+        Object.entries(cleanEvents).forEach(([qId, dates]) => {
+          if (!isSafeId(qId)) return;
           Object.entries(dates).forEach(([date, data]) => {
+            if (!isSafeDate(date)) return;
             localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));
           });
         });
       }
       if (imported.dailyMetrics) {
-        setDailyMetrics(imported.dailyMetrics);
-        Object.entries(imported.dailyMetrics as Record<string, Record<string, number>>).forEach(([dateStr, metrics]) => {
+        const cleanMetrics = sanitizeDailyMetricsPayload(imported.dailyMetrics);
+        setDailyMetrics(cleanMetrics);
+        Object.entries(cleanMetrics).forEach(([dateStr, metrics]) => {
+          if (!isSafeDate(dateStr)) return;
           Object.entries(metrics).forEach(([type, value]) => {
+            if (!['readiness', 'vfc', 'hrRest'].includes(type)) return;
             localStorage.setItem(`${dateStr}_${type}`, String(value));
           });
         });
@@ -841,17 +881,19 @@ export function useData() {
 
     const inputElement = event.target;
 
-    // 1. Validation de la taille maximale (max 5 Mo pour prévenir tout déni de service / gel du navigateur)
-    const MAX_FILE_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
+    // 1. Plafond de taille strict aligné sur les règles de sécurité Firestore (450 Ko max)
+    // Firestore limite le champ stringifié à 500 000 caractères. Un import au-dessus de 450 Ko bloquerait la synchronisation.
+    const MAX_FILE_SIZE_BYTES = 450 * 1024; // 460 800 octets
+    if (file.size > MAX_FILE_SIZE_BYTES) {
       inputElement.value = '';
-      const msg = `Fichier trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Limite autorisée : 5 Mo.`;
+      const sizeKo = (file.size / 1024).toFixed(0);
+      const msg = `Fichier trop volumineux (${sizeKo} Ko). La limite maximale est fixée à 450 Ko afin de garantir la synchronisation automatique vers Google Cloud sans saturation.`;
       console.warn('[Import Security]', msg);
       if (onError) onError(msg);
       return;
     }
 
-    // 2. Validation du type de fichier
+    // 2. Validation stricte du type de fichier
     if (!file.name.toLowerCase().endsWith('.json') && file.type && !file.type.includes('json')) {
       inputElement.value = '';
       const msg = 'Format invalide : seuls les fichiers de sauvegarde .json sont acceptés.';
@@ -871,64 +913,70 @@ export function useData() {
       try {
         const content = e.target?.result as string;
         if (!content || typeof content !== 'string') {
-          throw new Error('Fichier vide ou illisible');
+          throw new Error('Fichier de sauvegarde vide ou illisible');
         }
 
-        const rawImported = JSON.parse(content);
-        if (!rawImported || typeof rawImported !== 'object') {
-          throw new Error('Structure JSON non valide');
+        // Vérification de la longueur brute de chaîne
+        if (content.length > 500000) {
+          throw new Error('Le contenu dépasse le plafond de sécurité de 500 000 caractères.');
         }
 
-        const imported = migrateData(rawImported);
-        if (imported.events) {
-          // Préservation des clés système (appairage device, session compte Google et brouillon en cours)
-          const savedDeviceId = localStorage.getItem('physio_device_id');
-          const savedUserAccount = localStorage.getItem('physio_user_account');
-          const savedGymDraft = localStorage.getItem('training_live_session_draft_v1');
-
-          localStorage.clear();
-
-          // Restauration immédiate des identifiants système et de session
-          if (savedDeviceId) localStorage.setItem('physio_device_id', savedDeviceId);
-          if (savedUserAccount) localStorage.setItem('physio_user_account', savedUserAccount);
-          if (savedGymDraft) localStorage.setItem('training_live_session_draft_v1', savedGymDraft);
-
-          Object.entries(imported.events as Record<string, Record<string, SessionData>>).forEach(([qId, dates]) => {
-            Object.entries(dates).forEach(([date, data]) => {
-              localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));
-            });
-          });
-          if (imported.dailyMetrics) {
-            Object.entries(imported.dailyMetrics as Record<string, Record<string, number>>).forEach(([dateStr, metrics]) => {
-              Object.entries(metrics).forEach(([type, value]) => {
-                localStorage.setItem(`${dateStr}_${type}`, String(value));
-              });
-            });
-          }
-          if (imported.trainingBlocks) {
-            localStorage.setItem('physio_training_blocks', JSON.stringify(imported.trainingBlocks));
-          }
-          if (imported.qualities) {
-            localStorage.setItem('physio_qualities', JSON.stringify(imported.qualities));
-          }
-          if (imported.blockTemplates) {
-            localStorage.setItem('physio_block_templates', JSON.stringify(imported.blockTemplates));
-          }
-          if (imported.targetCompetition) {
-            localStorage.setItem('physio_target_competition', JSON.stringify(imported.targetCompetition));
-          }
-          if (imported.physioSettings) {
-            localStorage.setItem('physio_settings', JSON.stringify(imported.physioSettings));
-          }
-          if (Array.isArray(imported.customExercises)) {
-            localStorage.setItem('physio_custom_exercises', JSON.stringify(imported.customExercises));
-          }
-
-          if (onSuccess) onSuccess();
-          window.location.reload();
-        } else {
-          throw new Error('Aucune donnée valide trouvée dans la sauvegarde');
+        let rawImported: any;
+        try {
+          rawImported = JSON.parse(content);
+        } catch {
+          throw new Error('Structure JSON corrompue : syntaxe invalide.');
         }
+
+        if (!rawImported || typeof rawImported !== 'object' || Array.isArray(rawImported)) {
+          throw new Error('Structure JSON invalide : objet attendu.');
+        }
+
+        // 3. Migration descendante / ascendante en mémoire
+        const migrated = migrateData(rawImported);
+
+        // 4. VALIDATION TRANSACTIONNELLE STRICTE EN MÉMOIRE (Pattern Tout-ou-Rien)
+        // Aucune clé locale n'est altérée ou supprimée tant que l'ensemble du payload n'est pas validé.
+        const staged = validateAndStageImportPayload(migrated);
+        if (!staged.isValid || staged.entriesToSet.size === 0) {
+          throw new Error(staged.error || 'Aucune donnée valide trouvée dans la sauvegarde.');
+        }
+
+        // 5. COMMIT ATOMIQUE : Remplacement d'un bloc sans destruction des identifiants système
+        // Conserver les métadonnées vitales de la machine et de session
+        const savedDeviceId = localStorage.getItem('physio_device_id');
+        const savedUserAccount = localStorage.getItem('physio_user_account');
+        const savedGymDraft = localStorage.getItem('training_live_session_draft_v1');
+
+        // Identifier et purger UNIQUEMENT les anciennes données de santé (clés de dates et réglages physio)
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+          if (
+            /^\d{4}-\d{2}-\d{2}_/.test(key) || 
+            (key.startsWith('physio_') && key !== 'physio_device_id' && key !== 'physio_user_account')
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+
+        // Écriture atomique du lot validé
+        staged.entriesToSet.forEach((value, key) => {
+          localStorage.setItem(key, value);
+        });
+
+        // Restauration garantie des clés système
+        if (savedDeviceId) localStorage.setItem('physio_device_id', savedDeviceId);
+        if (savedUserAccount) localStorage.setItem('physio_user_account', savedUserAccount);
+        if (savedGymDraft) localStorage.setItem('training_live_session_draft_v1', savedGymDraft);
+
+        inputElement.value = '';
+        if (onSuccess) onSuccess();
+
+        // Rechargement propre pour hydrater immédiatement tous les contextes et hooks
+        window.location.reload();
       } catch (err: any) {
         inputElement.value = '';
         const msg = err?.message || 'Erreur lors du décodage du fichier JSON';

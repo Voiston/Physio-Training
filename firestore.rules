@@ -26,6 +26,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
 
+    function isAllowedEmail() {
+      return request.auth.token.email.lower() in [
+        'poketime.idle@gmail.com',
+        'david.voisard2@gmail.com'
+      ];
+    }
+
+    function isAuthorizedUser() {
+      return isVerifiedUser() && isAllowedEmail();
+    }
+
     function isValidSyncRecord(data) {
       return data.keys().hasAll(['userId', 'userEmail', 'key', 'data', 'version', 'lastDeviceId', 'updatedAt'])
         && data.keys().hasOnly(['userId', 'userEmail', 'key', 'data', 'version', 'lastDeviceId', 'updatedAt'])
@@ -40,21 +51,21 @@ service cloud.firestore {
     }
 
     match /sync_records/{recordId} {
-      // Document isolation strictly anchored to authenticated user UID
-      allow get: if isVerifiedUser()
+      // Document isolation strictly anchored to authenticated user UID & whitelist
+      allow get: if isAuthorizedUser()
         && isValidId(recordId)
         && recordId == request.auth.uid
         && (resource == null || resource.data.userId == request.auth.uid);
 
-      allow list: if isVerifiedUser()
+      allow list: if isAuthorizedUser()
         && resource.data.userId == request.auth.uid;
 
-      allow create: if isVerifiedUser()
+      allow create: if isAuthorizedUser()
         && isValidId(recordId)
         && recordId == request.auth.uid
         && isValidSyncRecord(incoming());
 
-      allow update: if isVerifiedUser()
+      allow update: if isAuthorizedUser()
         && isValidId(recordId)
         && recordId == request.auth.uid
         && isValidSyncRecord(incoming())
@@ -62,7 +73,7 @@ service cloud.firestore {
         && incoming().userEmail == existing().userEmail
         && incoming().diff(existing()).affectedKeys().hasOnly(['key', 'data', 'version', 'lastDeviceId', 'updatedAt']);
 
-      allow delete: if isVerifiedUser()
+      allow delete: if isAuthorizedUser()
         && isValidId(recordId)
         && recordId == request.auth.uid
         && existing().userId == request.auth.uid;

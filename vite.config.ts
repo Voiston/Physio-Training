@@ -1,12 +1,29 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+/**
+ * Plugin de sécurité : Éradique le mock WebSocket et tout script inline de dev
+ * lors du build de production (élimine la nécessité de 'unsafe-inline' et prévient
+ * toute fuite de code de débug en prod).
+ */
+function stripDevOnlyScriptsPlugin(): Plugin {
+  return {
+    name: 'strip-dev-only-scripts',
+    apply: 'build',
+    transformIndexHtml(html: string) {
+      // Supprime le bloc encadré par <!-- DEV_ONLY_START --> et <!-- DEV_ONLY_END -->
+      return html.replace(/<!--\s*DEV_ONLY_START\s*-->[\s\S]*?<!--\s*DEV_ONLY_END\s*-->/g, '');
+    },
+  };
+}
 
 export default defineConfig({
   base: './',
   plugins: [
+      stripDevOnlyScriptsPlugin(),
       react(),
       tailwindcss(),
       VitePWA({
@@ -60,7 +77,12 @@ export default defineConfig({
     server: {
       port: 3000,
       host: '0.0.0.0',
-      allowedHosts: true,
+      allowedHosts: [
+        'localhost',
+        '127.0.0.1',
+        '.run.app',
+        '.google.com',
+      ],
       hmr: false,
     },
 });

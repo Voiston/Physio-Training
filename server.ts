@@ -11,21 +11,27 @@ const PORT = Number(process.env.PORT) || 3000;
 async function startServer() {
   const app = express();
 
-  // 1. Enforce strict payload limits (prevent memory exhaustion DoS)
+  // 1. Obfuscation & suppression de l'empreinte serveur
+  app.disable('x-powered-by');
+
+  // 2. Limites strictes sur les requêtes pour prévenir les DoS par épuisement mémoire
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 
-  // 2. Defensive HTTP Security Headers
+  // 3. Defensive HTTP Security Headers
   const CSP_POLICY = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://accounts.google.com",
+    "script-src 'self' https://apis.google.com https://www.gstatic.com https://*.firebaseapp.com https://accounts.google.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://*.google.com https://www.gstatic.com",
-    "connect-src 'self' https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://accounts.google.com ws: wss:",
+    "connect-src 'self' https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://accounts.google.com",
     "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://apis.google.com https://*.google.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
   ].join('; ');
 
   app.use((_req, res, next) => {
@@ -33,7 +39,11 @@ async function startServer() {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // HSTS (HTTP Strict Transport Security) : force HTTPS pendant 1 an
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    // X-XSS-Protection: 0 désactive l'ancien filtre XSS faillible et vulnérable aux attaques par injection
+    res.setHeader('X-XSS-Protection', '0');
     next();
   });
 

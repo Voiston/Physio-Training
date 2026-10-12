@@ -57,26 +57,34 @@ export class ErrorBoundary extends React.Component<Props, State> {
               </p>
             </div>
 
-            {this.state.error && (
-              <div className="p-3 bg-black/50 border border-white/5 rounded-xl text-left overflow-x-auto text-[11px] font-mono text-red-300 max-h-32">
-                {this.state.error.toString()}
+            {/* Affichage assaini et anonymisé : aucune PII (email, UID, JSON brut) n'est exposée */}
+            <div className="p-3.5 bg-black/60 border border-white/10 rounded-xl text-left space-y-1.5">
+              <div className="text-xs font-mono font-bold text-red-300">
+                Incident applicatif intercepté
               </div>
-            )}
+              <p className="text-xs text-slate-300 m-0 leading-relaxed">
+                Les données locales sont sécurisées. Vous pouvez rafraîchir l'application ou réinitialiser le cache local si le problème persiste.
+              </p>
+            </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
               <button
+                type="button"
                 onClick={this.handleReload}
-                className="flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                className="min-h-[44px] flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
-                <RefreshCw size={14} /> Recharger la page
+                <RefreshCw size={15} aria-hidden="true" /> 
+                <span>Recharger la page</span>
               </button>
 
               <button
+                type="button"
                 onClick={this.handleResetData}
-                className="flex items-center justify-center gap-2 py-2 px-3 bg-white/5 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-white/10 hover:border-red-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                className="min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-white/5 hover:bg-red-500/20 text-slate-200 hover:text-red-200 border border-white/10 hover:border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
                 title="Vider le stockage local pour réparer une structure corrompue"
               >
-                <Trash2 size={14} /> Réinitialiser
+                <Trash2 size={15} aria-hidden="true" /> 
+                <span>Réinitialiser</span>
               </button>
             </div>
           </div>

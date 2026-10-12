@@ -1,4 +1,5 @@
 export const CURRENT_SCHEMA_VERSION = 2;
+import { isSafeDate, isSafeId } from './security';
 
 export interface AppExportData {
   schemaVersion?: number;
@@ -176,7 +177,9 @@ export function migrateLocalStorage(): void {
       if (!key) continue;
       const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
       if (match) {
+        const dateStr = match[1];
         const qualityId = match[2];
+        if (!isSafeDate(dateStr) || !isSafeId(qualityId)) continue;
         if (CARDIO_QUALITIES.has(qualityId) || FORCE_QUALITIES.has(qualityId) || qualityId === 'sprint') {
           const raw = localStorage.getItem(key);
           if (raw) {
