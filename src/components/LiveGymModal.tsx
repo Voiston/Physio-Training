@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, memo, useCallback, useReducer } from 'react';
 import { 
   Play, Pause, RotateCcw, Plus, Trash2, Check, Clock, Dumbbell, 
   ChevronDown, ChevronUp, AlertCircle, Sparkles, Volume2, VolumeX,
@@ -51,17 +51,23 @@ export interface LiveExercise {
 export interface LiveSessionDraft {
   qualityId: string;
   dateStr: string;
-  startedAt: number; // timestamp
-  elapsedSeconds: number;
-  isPaused: boolean;
+  startedAt: number; // timestamp ms
+  elapsedSeconds?: number; // rétrocompatibilité ancien format
+  pausedAt?: number | null;
+  pausedTotalMs?: number;
+  isPaused?: boolean;
   exercises: LiveExercise[];
-  restTimer: {
+  restTimer?: {
     running: boolean;
     remainingSeconds: number;
     targetSeconds: number;
     exerciseName?: string;
     setNumber?: number;
   } | null;
+  restEndsAt?: number | null;
+  restTotalSeconds?: number;
+  restLabel?: string;
+  restPausedRemainingMs?: number | null;
 }
 
 function isValidLiveDraft(data: unknown): data is LiveSessionDraft {
@@ -73,6 +79,177 @@ function isValidLiveDraft(data: unknown): data is LiveSessionDraft {
     ex && typeof ex === 'object' && typeof ex.name === 'string' && Array.isArray(ex.sets)
   ));
 }
+
+// Module-level pure time formatter
+function formatTime(secs: number): string {
+  const mins = Math.floor(secs / 60);
+  const remSecs = secs % 60;
+  return `${mins.toString().padStart(2, '0')}:${remSecs.toString().padStart(2, '0')}`;
+}
+
+// Composant autonome pour le chronomètre de séance :
+// Seul ce composant se re-rend chaque seconde, isolant les 1800 lignes du modal parent
+const ElapsedClock = memo(function ElapsedClock({ 
+  startedAt, 
+  pausedAt, 
+  pausedTotalMs 
+}: { 
+  startedAt: number; 
+  pausedAt: number | null; 
+  pausedTotalMs: number; 
+}) {
+  const [, tick] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => {
+    if (pausedAt !== null) return;
+    const interval = setInterval(() => tick(), 1000);
+    return () => clearInterval(interval);
+  }, [pausedAt]);
+
+  const effectiveNow = pausedAt !== null ? pausedAt : Date.now();
+  const secs = Math.max(0, Math.floor((effectiveNow - startedAt - pausedTotalMs) / 1000));
+  return <>{formatTime(secs)}</>;
+});
+
+// Composant autonome pour le minuteur de repos :
+// Se recale sur l'horloge absolue (pas de dérive en arrière-plan) et isole les re-rendus
+interface RestBannerProps {
+  timerState: {
+    endsAt: number;
+    targetSeconds: number;
+    label?: string;
+    pausedRemainingMs: number | null;
+  };
+  soundEnabled: boolean;
+  onDone: () => void;
+  onAdjust: (deltaSecs: number) => void;
+  onTogglePause: () => void;
+  onSkip: () => void;
+}
+
+const RestBanner = memo(function RestBanner({
+  timerState,
+  soundEnabled,
+  onDone,
+  onAdjust,
+  onTogglePause,
+  onSkip,
+}: RestBannerProps) {
+  const isPaused = timerState.pausedRemainingMs !== null;
+
+  const calculateRemaining = useCallback(() => {
+    if (timerState.pausedRemainingMs !== null) {
+      return Math.max(0, Math.ceil(timerState.pausedRemainingMs / 1000));
+    }
+    return Math.max(0, Math.ceil((timerState.endsAt - Date.now()) / 1000));
+  }, [timerState.endsAt, timerState.pausedRemainingMs]);
+
+  const [remainingSecs, setRemainingSecs] = useState<number>(calculateRemaining);
+
+  useEffect(() => {
+    if (isPaused) {
+      setRemainingSecs(calculateRemaining());
+      return;
+    }
+
+    let timeoutId: number;
+    const tick = () => {
+      const now = Date.now();
+      const left = Math.max(0, Math.ceil((timerState.endsAt - now) / 1000));
+      setRemainingSecs(left);
+
+      if (left <= 0) {
+        if (soundEnabled) {
+          playRestCompleteChime();
+          triggerVibration([200, 100, 200, 100, 400]);
+        }
+        onDone();
+        return;
+      }
+
+      if (soundEnabled && left <= 3 && left >= 1) {
+        playCountdownBeep(left === 1 ? 660 : 520, 80);
+        triggerVibration(40);
+      }
+
+      // Recalage précis sur la seconde pour éviter les dérives de throttle
+      const msUntilNextSecond = Math.max(30, (timerState.endsAt - now) - (left - 1) * 1000);
+      timeoutId = window.setTimeout(tick, msUntilNextSecond);
+    };
+
+    tick();
+    return () => clearTimeout(timeoutId);
+  }, [timerState.endsAt, isPaused, soundEnabled, onDone, calculateRemaining]);
+
+  return (
+    <div 
+      role="timer"
+      aria-label={`Minuteur de repos : ${Math.floor(remainingSecs / 60)} minutes et ${remainingSecs % 60} secondes restantes`}
+      className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-indigo-500/40 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 animate-fadeIn shrink-0 shadow-lg"
+    >
+      <div className="flex items-center gap-3">
+        <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-indigo-500/30 border border-indigo-400/50" aria-hidden="true">
+          <Timer size={18} className="text-indigo-200 animate-pulse" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">Repos en cours</span>
+            {timerState.label && (
+              <span className="text-[11px] text-indigo-300/80 truncate max-w-[150px] sm:max-w-xs">
+                {timerState.label}
+              </span>
+            )}
+          </div>
+          <div 
+            className="font-mono font-black text-xl sm:text-2xl text-white tracking-tight tabular-nums"
+            aria-hidden="true"
+          >
+            {formatTime(remainingSecs)}
+          </div>
+        </div>
+      </div>
+
+      {/* Commandes rapides de repos (+30s, -15s, pause, passer) avec cibles tactiles 44px */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <button
+          type="button"
+          onClick={() => onAdjust(-15)}
+          className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform cursor-pointer"
+          title="Enlever 15 secondes"
+          aria-label="Enlever 15 secondes au minuteur de repos"
+        >
+          -15s
+        </button>
+        <button
+          type="button"
+          onClick={() => onAdjust(30)}
+          className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform cursor-pointer"
+          title="Ajouter 30 secondes"
+          aria-label="Ajouter 30 secondes au minuteur de repos"
+        >
+          +30s
+        </button>
+        <button
+          type="button"
+          onClick={onTogglePause}
+          className="min-h-[44px] min-w-[44px] p-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-indigo-200 flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+          title={isPaused ? 'Reprendre le repos' : 'Mettre le repos en pause'}
+          aria-label={isPaused ? 'Reprendre le chronomètre de repos' : 'Mettre le chronomètre de repos en pause'}
+        >
+          {isPaused ? <Play size={16} /> : <Pause size={16} />}
+        </button>
+        <button
+          type="button"
+          onClick={onSkip}
+          className="min-h-[44px] px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors active:scale-95 flex items-center justify-center cursor-pointer"
+          aria-label="Passer le minuteur de repos et reprendre l'entraînement"
+        >
+          Passer
+        </button>
+      </div>
+    </div>
+  );
+});
 
 interface QualityOption {
   id: string;
@@ -129,17 +306,37 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   const [draftExists, setDraftExists] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Chrono général de séance
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isWorkoutPaused, setIsWorkoutPaused] = useState(false);
+  // Chrono général de séance basé sur timestamps absolus (zéro re-rendu du parent chaque seconde)
+  const [startedAt, setStartedAt] = useState<number>(() => Date.now());
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const [pausedTotalMs, setPausedTotalMs] = useState<number>(0);
 
-  // Minuteur de repos
-  const [restTimer, setRestTimer] = useState<{
-    running: boolean;
-    remaining: number;
-    total: number;
+  // Minuteur de repos basé sur timestamps absolus (recalé sur l'horloge système sans dérive)
+  const [restTimerState, setRestTimerState] = useState<{
+    endsAt: number;
+    targetSeconds: number;
     label?: string;
+    pausedRemainingMs: number | null;
   } | null>(null);
+
+  const isWorkoutPaused = pausedAt !== null;
+
+  const handleToggleWorkoutPause = useCallback(() => {
+    if (pausedAt !== null) {
+      // Reprise
+      const pauseDuration = Date.now() - pausedAt;
+      setPausedTotalMs(prev => prev + pauseDuration);
+      setPausedAt(null);
+    } else {
+      // Pause
+      setPausedAt(Date.now());
+    }
+  }, [pausedAt]);
+
+  const getElapsedSeconds = useCallback(() => {
+    const effectiveNow = pausedAt !== null ? pausedAt : Date.now();
+    return Math.max(0, Math.floor((effectiveNow - startedAt - pausedTotalMs) / 1000));
+  }, [startedAt, pausedAt, pausedTotalMs]);
 
   // Exercices actifs
   const [activeExercises, setActiveExercises] = useState<LiveExercise[]>([]);
@@ -212,6 +409,22 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       session: qEvents[date]
     };
   }, [events, selectedQualityId]);
+
+  // Mémoïsation des calculs de progression adaptative par exercice pour éviter de scanner l'historique complet à chaque render
+  const exerciseIdsKey = useMemo(() => {
+    return activeExercises.map(e => e.exerciseCatalogId).join('|');
+  }, [activeExercises]);
+
+  const adaptiveProgressionMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeAdaptiveProgression>>();
+    for (const id of exerciseIdsKey.split('|').filter(Boolean)) {
+      if (!map.has(id)) {
+        const lastPerf = findLastExercisePerformance(events, id, initialDateStr);
+        map.set(id, computeAdaptiveProgression(lastPerf, 4));
+      }
+    }
+    return map;
+  }, [events, initialDateStr, exerciseIdsKey]);
 
   // Gestion du Wake Lock API pour empêcher l'écran du smartphone de se verrouiller
   const wakeLockRef = useRef<any>(null);
@@ -297,71 +510,59 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, showAddExercisePicker, stage, onClose]);
 
-  // Sauvegarde automatique du brouillon en continu pendant la séance active
-  useEffect(() => {
+  // Sauvegarde automatique du brouillon avec debounce de 1 seconde
+  // Ne s'exécute QUE si la structure change (exercices, séries, pause), JAMAIS à chaque seconde du chrono
+  const saveDraftToStorage = useCallback(() => {
     if (stage !== 'active' || activeExercises.length === 0) return;
     try {
       const draft: LiveSessionDraft = {
         qualityId: selectedQualityId,
         dateStr: initialDateStr,
-        startedAt: Date.now() - (elapsedSeconds * 1000),
-        elapsedSeconds,
-        isPaused: isWorkoutPaused,
+        startedAt,
+        pausedAt,
+        pausedTotalMs,
+        isPaused: pausedAt !== null,
         exercises: activeExercises,
-        restTimer: restTimer ? {
-          running: restTimer.running,
-          remainingSeconds: restTimer.remaining,
-          targetSeconds: restTimer.total,
-          exerciseName: restTimer.label
-        } : null
+        restTimer: restTimerState ? {
+          running: restTimerState.pausedRemainingMs === null,
+          remainingSeconds: restTimerState.pausedRemainingMs !== null 
+            ? Math.ceil(restTimerState.pausedRemainingMs / 1000)
+            : Math.max(0, Math.ceil((restTimerState.endsAt - Date.now()) / 1000)),
+          targetSeconds: restTimerState.targetSeconds,
+          exerciseName: restTimerState.label
+        } : null,
+        restEndsAt: restTimerState ? restTimerState.endsAt : null,
+        restTotalSeconds: restTimerState ? restTimerState.targetSeconds : undefined,
+        restLabel: restTimerState ? restTimerState.label : undefined,
+        restPausedRemainingMs: restTimerState ? restTimerState.pausedRemainingMs : null
       };
       localStorage.setItem(STORAGE_DRAFT_KEY, JSON.stringify(draft));
     } catch (e) {
       // Ignore
     }
-  }, [stage, activeExercises, elapsedSeconds, isWorkoutPaused, restTimer, selectedQualityId, initialDateStr]);
+  }, [stage, activeExercises, startedAt, pausedAt, pausedTotalMs, restTimerState, selectedQualityId, initialDateStr]);
 
-  // Timer principal : Chronomètre de la séance
+  // Debounce l'autosave lors des changements de données réels
   useEffect(() => {
-    if (stage !== 'active' || isWorkoutPaused) return;
-    const interval = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
+    if (stage !== 'active' || activeExercises.length === 0) return;
+    const timerId = setTimeout(() => {
+      saveDraftToStorage();
     }, 1000);
-    return () => clearInterval(interval);
-  }, [stage, isWorkoutPaused]);
+    return () => clearTimeout(timerId);
+  }, [saveDraftToStorage, stage, activeExercises]);
 
-  // Minuteur de repos : Décompte, bips sonores et carillon final
+  // Flush immédiat du brouillon sur pagehide / avant fermeture du navigateur
   useEffect(() => {
-    if (stage !== 'active' || !restTimer || !restTimer.running) return;
-
-    if (restTimer.remaining <= 0) {
-      // Fin du repos atteinte !
-      if (soundEnabled) {
-        playRestCompleteChime();
-        triggerVibration([200, 100, 200, 100, 400]);
-      }
-      setRestTimer(null);
-      return;
-    }
-
-    // Bips d'avertissement aux 3 dernières secondes
-    if (soundEnabled && restTimer.remaining <= 3 && restTimer.remaining >= 1) {
-      playCountdownBeep(restTimer.remaining === 1 ? 660 : 520, 80);
-      triggerVibration(40);
-    }
-
-    const timer = setTimeout(() => {
-      setRestTimer(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          remaining: prev.remaining - 1
-        };
-      });
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [stage, restTimer, soundEnabled]);
+    const handlePageHide = () => {
+      saveDraftToStorage();
+    };
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+    };
+  }, [saveDraftToStorage]);
 
   // Calculs en direct : Tonnage cumulé & Séries validées
   const { totalCompletedSets, totalPlannedSets, totalTonnageKg } = useMemo(() => {
@@ -386,19 +587,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     };
   }, [activeExercises]);
 
-  // Formattage temps
-  const formatTime = (secs: number) => {
-    const mins = Math.floor(secs / 60);
-    const remSecs = secs % 60;
-    return `${mins.toString().padStart(2, '0')}:${remSecs.toString().padStart(2, '0')}`;
-  };
-
   // --- ACTIONS INITIALISATION ---
   const handleStartBlank = () => {
     // Démarrer séance vierge
-    setElapsedSeconds(0);
-    setIsWorkoutPaused(false);
-    setRestTimer(null);
+    setStartedAt(Date.now());
+    setPausedAt(null);
+    setPausedTotalMs(0);
+    setRestTimerState(null);
     // On ajoute un premier exercice par défaut selon la filière
     let initialExId = 'bench_press';
     if (selectedQualityId === 'pull') initialExId = 'pull_ups';
@@ -466,9 +661,10 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     });
 
     setActiveExercises(clonedExercises);
-    setElapsedSeconds(0);
-    setIsWorkoutPaused(false);
-    setRestTimer(null);
+    setStartedAt(Date.now());
+    setPausedAt(null);
+    setPausedTotalMs(0);
+    setRestTimerState(null);
     haptics.modeSwitch();
     setStage('active');
   };
@@ -484,19 +680,47 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
           return;
         }
         if (parsed.qualityId) setSelectedQualityId(parsed.qualityId);
-        if (typeof parsed.elapsedSeconds === 'number') setElapsedSeconds(parsed.elapsedSeconds);
-        if (parsed.isPaused !== undefined) setIsWorkoutPaused(parsed.isPaused);
+
+        if (typeof parsed.startedAt === 'number') {
+          setStartedAt(parsed.startedAt);
+          setPausedAt(parsed.pausedAt ?? null);
+          setPausedTotalMs(parsed.pausedTotalMs || 0);
+        } else if (typeof parsed.elapsedSeconds === 'number') {
+          const computedStartedAt = Date.now() - (parsed.elapsedSeconds * 1000);
+          setStartedAt(computedStartedAt);
+          setPausedAt(parsed.isPaused ? Date.now() : null);
+          setPausedTotalMs(0);
+        }
+
         if (parsed.exercises && parsed.exercises.length > 0) {
           setActiveExercises(parsed.exercises);
         }
-        if (parsed.restTimer && parsed.restTimer.remainingSeconds > 0) {
-          setRestTimer({
-            running: parsed.restTimer.running,
-            remaining: parsed.restTimer.remainingSeconds,
-            total: parsed.restTimer.targetSeconds,
-            label: parsed.restTimer.exerciseName
+
+        if (parsed.restEndsAt && parsed.restEndsAt > Date.now()) {
+          setRestTimerState({
+            endsAt: parsed.restEndsAt,
+            targetSeconds: parsed.restTotalSeconds || 90,
+            label: parsed.restLabel,
+            pausedRemainingMs: parsed.restPausedRemainingMs ?? null
           });
+        } else if (parsed.restPausedRemainingMs !== null && parsed.restPausedRemainingMs !== undefined && parsed.restPausedRemainingMs > 0) {
+          setRestTimerState({
+            endsAt: Date.now() + parsed.restPausedRemainingMs,
+            targetSeconds: parsed.restTotalSeconds || 90,
+            label: parsed.restLabel,
+            pausedRemainingMs: parsed.restPausedRemainingMs
+          });
+        } else if (parsed.restTimer && parsed.restTimer.remainingSeconds > 0) {
+          setRestTimerState({
+            endsAt: Date.now() + parsed.restTimer.remainingSeconds * 1000,
+            targetSeconds: parsed.restTimer.targetSeconds,
+            label: parsed.restTimer.exerciseName,
+            pausedRemainingMs: parsed.restTimer.running ? null : parsed.restTimer.remainingSeconds * 1000
+          });
+        } else {
+          setRestTimerState(null);
         }
+
         haptics.modeSwitch();
         setStage('active');
       }
@@ -521,13 +745,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       }
       triggerVibration(60);
 
-      // Lancement automatique du minuteur de repos
+      // Lancement automatique du minuteur de repos basé sur timestamps
       const restSecs = currentSet.restSeconds || 90;
-      setRestTimer({
-        running: true,
-        remaining: restSecs,
-        total: restSecs,
-        label: `${ex.name} (Série ${currentSet.setNumber})`
+      setRestTimerState({
+        endsAt: Date.now() + restSecs * 1000,
+        targetSeconds: restSecs,
+        label: `${ex.name} (Série ${currentSet.setNumber})`,
+        pausedRemainingMs: null
       });
     }
 
@@ -651,27 +875,42 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   };
 
   // --- ACTIONS MINUTEUR DE REPOS ---
-  const handleAdjustRestTimer = (deltaSecs: number) => {
-    if (!restTimer) return;
-    setRestTimer(prev => {
+  const handleAdjustRestTimer = useCallback((deltaSecs: number) => {
+    setRestTimerState(prev => {
       if (!prev) return null;
-      const nextRemaining = Math.max(0, prev.remaining + deltaSecs);
-      return {
-        ...prev,
-        remaining: nextRemaining,
-        total: Math.max(prev.total, nextRemaining)
-      };
+      if (prev.pausedRemainingMs !== null) {
+        const nextMs = Math.max(0, prev.pausedRemainingMs + deltaSecs * 1000);
+        return { ...prev, pausedRemainingMs: nextMs };
+      }
+      const nextEndsAt = Math.max(Date.now(), prev.endsAt + deltaSecs * 1000);
+      return { ...prev, endsAt: nextEndsAt };
     });
-  };
+  }, []);
 
-  const handleToggleRestPause = () => {
-    if (!restTimer) return;
-    setRestTimer(prev => prev ? { ...prev, running: !prev.running } : null);
-  };
+  const handleToggleRestPause = useCallback(() => {
+    setRestTimerState(prev => {
+      if (!prev) return null;
+      if (prev.pausedRemainingMs !== null) {
+        // Reprise du repos
+        return {
+          ...prev,
+          endsAt: Date.now() + prev.pausedRemainingMs,
+          pausedRemainingMs: null
+        };
+      } else {
+        // Mise en pause du repos
+        const remainingMs = Math.max(0, prev.endsAt - Date.now());
+        return {
+          ...prev,
+          pausedRemainingMs: remainingMs
+        };
+      }
+    });
+  }, []);
 
-  const handleSkipRestTimer = () => {
-    setRestTimer(null);
-  };
+  const handleSkipRestTimer = useCallback(() => {
+    setRestTimerState(null);
+  }, []);
 
   // --- FIN DE SÉANCE ET ENREGISTREMENT ---
   const handleOpenSummary = () => {
@@ -692,7 +931,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     haptics.success();
 
     // Conversion en structure compatible avec le reste de l'application
-    const sessionDurationMin = Math.max(5, Math.round(elapsedSeconds / 60));
+    const elapsedSecs = getElapsedSeconds();
+    const sessionDurationMin = Math.max(5, Math.round(elapsedSecs / 60));
     const isIso = selectedQualityId === 'isolation';
 
     // Synthétiser les exercices
@@ -772,11 +1012,20 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     }
   };
 
+  // Suspension des animations GPU de la grille d'arrière-plan pendant que la modale de salle est ouverte
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.classList.add('gym-open');
+    return () => {
+      document.body.classList.remove('gym-open');
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-4 overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-0 sm:p-4 overflow-hidden"
       role="dialog"
       aria-modal="true"
       aria-labelledby="live-gym-title"
@@ -960,9 +1209,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               {/* Chrono et Filière */}
               <div className="flex items-center gap-2.5 sm:gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                  <span className="font-mono font-black text-lg sm:text-2xl text-emerald-400 tabular-nums">
-                    {formatTime(elapsedSeconds)}
+                  <div className={`w-2.5 h-2.5 rounded-full ${isWorkoutPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-ping'}`} />
+                  <span className={`font-mono font-black text-lg sm:text-2xl tabular-nums ${isWorkoutPaused ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    <ElapsedClock 
+                      startedAt={startedAt} 
+                      pausedAt={pausedAt} 
+                      pausedTotalMs={pausedTotalMs} 
+                    />
                   </span>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 border-l border-slate-700 pl-3">
@@ -991,13 +1244,14 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsWorkoutPaused(!isWorkoutPaused)}
-                  className={`p-2 rounded-xl border transition-colors ${
+                  onClick={handleToggleWorkoutPause}
+                  className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                     isWorkoutPaused 
                       ? 'bg-amber-500/20 border-amber-500 text-amber-300' 
                       : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
                   }`}
-                  title={isWorkoutPaused ? 'Reprendre' : 'Mettre en pause'}
+                  title={isWorkoutPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
+                  aria-label={isWorkoutPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
                 >
                   {isWorkoutPaused ? <Play size={16} /> : <Pause size={16} />}
                 </button>
@@ -1012,82 +1266,23 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               </div>
             </div>
 
-            {/* BANNIÈRE MINUTEUR DE REPOS FLOTTANTE / ACTIVE */}
-            {restTimer && (
-              <div 
-                role="timer"
-                aria-label={`Minuteur de repos : ${Math.floor(restTimer.remaining / 60)} minutes et ${restTimer.remaining % 60} secondes restantes`}
-                className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-indigo-500/40 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 animate-fadeIn shrink-0 shadow-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-indigo-500/30 border border-indigo-400/50" aria-hidden="true">
-                    <Timer size={18} className="text-indigo-200 animate-pulse" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">Repos en cours</span>
-                      {restTimer.label && (
-                        <span className="text-[11px] text-indigo-300/80 truncate max-w-[150px] sm:max-w-xs">
-                          {restTimer.label}
-                        </span>
-                      )}
-                    </div>
-                    <div 
-                      className="font-mono font-black text-xl sm:text-2xl text-white tracking-tight tabular-nums"
-                      aria-hidden="true"
-                    >
-                      {formatTime(restTimer.remaining)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Commandes rapides de repos (+30s, -15s, pause, passer) avec cibles tactiles 44px */}
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleAdjustRestTimer(-15)}
-                    className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform"
-                    title="Enlever 15 secondes"
-                    aria-label="Enlever 15 secondes au minuteur de repos"
-                  >
-                    -15s
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAdjustRestTimer(30)}
-                    className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform"
-                    title="Ajouter 30 secondes"
-                    aria-label="Ajouter 30 secondes au minuteur de repos"
-                  >
-                    +30s
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleToggleRestPause}
-                    className="min-h-[44px] min-w-[44px] p-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-indigo-200 flex items-center justify-center active:scale-95 transition-transform"
-                    title={restTimer.running ? 'Mettre le repos en pause' : 'Reprendre le repos'}
-                    aria-label={restTimer.running ? 'Mettre le chronomètre de repos en pause' : 'Reprendre le chronomètre de repos'}
-                  >
-                    {restTimer.running ? <Pause size={16} /> : <Play size={16} />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSkipRestTimer}
-                    className="min-h-[44px] px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors active:scale-95 flex items-center justify-center"
-                    aria-label="Passer le minuteur de repos et reprendre l'entraînement"
-                  >
-                    Passer
-                  </button>
-                </div>
-              </div>
+            {/* BANNIÈRE MINUTEUR DE REPOS AUTONOME (Zéro dérive, aucun re-rendu du parent) */}
+            {restTimerState && (
+              <RestBanner
+                timerState={restTimerState}
+                soundEnabled={soundEnabled}
+                onDone={handleSkipRestTimer}
+                onAdjust={handleAdjustRestTimer}
+                onTogglePause={handleToggleRestPause}
+                onSkip={handleSkipRestTimer}
+              />
             )}
 
             {/* CONTENU PRINCIPAL : LISTE DES EXERCICES ET SÉRIES */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
               {activeExercises.map((ex, exIdx) => {
-                // Recherche de la dernière performance et progression adaptative pour cet exercice
-                const lastPerf = findLastExercisePerformance(events, ex.exerciseCatalogId, initialDateStr);
-                const adaptive = computeAdaptiveProgression(lastPerf, 4);
+                // Progression adaptative récupérée depuis la table mémoïsée (zéro recalcul redondant)
+                const adaptive = adaptiveProgressionMap.get(ex.exerciseCatalogId);
 
                 return (
                   <div 
@@ -1423,7 +1618,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Durée réelle</span>
                 <span className="font-mono font-black text-xl text-white">
-                  {Math.max(5, Math.round(elapsedSeconds / 60))} <span className="text-xs font-normal text-slate-400">min</span>
+                  {Math.max(5, Math.round(getElapsedSeconds() / 60))} <span className="text-xs font-normal text-slate-400">min</span>
                 </span>
               </div>
               <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
@@ -1556,7 +1751,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         {/* ==================================================================== */}
         {showAddExercisePicker && (
           <div 
-            className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 flex flex-col justify-end sm:justify-center"
+            className="absolute inset-0 z-50 bg-black/90 p-4 flex flex-col justify-end sm:justify-center"
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-exercise-modal-title"

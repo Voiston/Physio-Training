@@ -1,4 +1,6 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { disableNetwork, enableNetwork } from 'firebase/firestore';
+import { db } from './firebase';
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
 import { useData } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
@@ -108,6 +110,15 @@ function AppContent() {
   const [showMobileTools, setShowMobileTools] = useState<boolean>(false);
   const [mobileGridTab, setMobileGridTab] = useState<'grid' | 'athlete'>('grid');
 
+  // Coupure réseau Firestore pendant la séance live : le modem radio peut dormir, toutes les données sont locales
+  useEffect(() => {
+    if (showLiveGymModal) {
+      disableNetwork(db).catch(() => {});
+    } else {
+      enableNetwork(db).catch(() => {});
+    }
+  }, [showLiveGymModal]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const todayStr = useMemo(() => getLocalYYYYMMDD(new Date()), []);
@@ -137,7 +148,7 @@ function AppContent() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-slate-100 font-sans p-2 sm:p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#0a0a0c] bg-[radial-gradient(ellipse_80%_80%_at_10%_-20%,rgba(30,58,138,0.18),transparent),radial-gradient(ellipse_80%_80%_at_90%_120%,rgba(153,27,27,0.12),transparent)] text-slate-100 font-sans p-2 sm:p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden relative">
       {/* Skip-link d'accès direct au contenu pour navigation clavier et lecteurs d'écran */}
       <a 
         href="#main-content" 
@@ -145,10 +156,6 @@ function AppContent() {
       >
         Passer au contenu principal
       </a>
-
-      {/* Background Mesh Gradients */}
-      <div className="fixed top-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-900/20 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[150px] pointer-events-none"></div>
 
       {/* Indicateur mode hors-ligne */}
       <OfflineIndicator />
