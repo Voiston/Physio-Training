@@ -1,8 +1,5 @@
-import { useState, useRef, useEffect, useMemo, Fragment } from 'react';
-import { 
-  LineChart, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
+import { useState, useRef, useEffect, useMemo, Fragment, lazy, Suspense } from 'react';
+const GridQualityChart = lazy(() => import('./GridQualityChart'));
 import { computeCellState, getActiveBlockForDate } from '../utils/physiology';
 import { computeAllWeeksStats, formatMinutes } from '../utils/weekHelpers';
 import { computeHrRestAnalysis, computeVfcAnalysis } from '../utils/vfcHelpers';
@@ -21,6 +18,7 @@ export default function Grid({
   dailyMetrics, 
   qualitiesEMA, 
   trainingBlocks = [],
+  currentWeekStats: propCurrentWeekStats = null,
   moveQuality,
   reorderQualities,
   onCellClick, 
@@ -41,11 +39,12 @@ export default function Grid({
   const [panStartX, setPanStartX] = useState(0);
   const [panScrollLeft, setPanScrollLeft] = useState(0);
 
-  // Calcul des statistiques de la semaine en cours
+  // Statistiques de la semaine en cours (injectées depuis useData ou calculées en fallback)
   const currentWeekStats = useMemo(() => {
+    if (propCurrentWeekStats) return propCurrentWeekStats;
     const weeks = computeAllWeeksStats(events, qualities, 1, 0);
     return weeks.find(w => w.isCurrentWeek) || weeks[weeks.length - 1];
-  }, [events, qualities]);
+  }, [propCurrentWeekStats, events, qualities]);
 
   // Totaux quotidiens pour chaque colonne jour de la timeline
   const dailyTotals = useMemo(() => {
@@ -77,13 +76,12 @@ export default function Grid({
       const qEvents = events[q.id] || {};
       for (let j = 0; j < timeline.length; j++) {
         const day = timeline[j];
-        const readiness = dailyMetrics[day.dateStr]?.readiness || 7;
-        qMap[day.dateStr] = computeCellState(q, day.dateStr, qEvents, readiness, trainingBlocks);
+        qMap[day.dateStr] = computeCellState(q, day.dateStr, qEvents, trainingBlocks);
       }
       map[q.id] = qMap;
     }
     return map;
-  }, [events, qualities, timeline, dailyMetrics, trainingBlocks]);
+  }, [events, qualities, timeline, trainingBlocks]);
 
   // 2. Mémoïsation des analyses VFC (36 jours) évitant de re-parcourir dailyMetrics à chaque render
   const vfcAnalysisMap = useMemo(() => {
@@ -216,29 +214,6 @@ export default function Grid({
     setExpandedQualityId(prev => prev === qId ? null : qId);
   };
 
-  const CustomInlineTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const dataPoint = payload[0]?.payload;
-      return (
-        <div className="bg-slate-950/95 backdrop-blur-md p-3 border border-white/15 rounded-xl shadow-2xl text-xs min-w-[170px]">
-          <p className="m-0 mb-1.5 font-bold text-white uppercase text-[10px] tracking-wider border-b border-white/10 pb-1 flex items-center justify-between">
-            <span>{dataPoint?.dateStr}</span>
-            <span className="text-slate-400 font-mono">Jour {label}</span>
-          </p>
-          {payload.map((p, i) => (
-            <div key={i} className="flex justify-between items-center gap-3 py-0.5 text-[11px] font-medium">
-              <span className="flex items-center gap-1.5" style={{ color: p.color }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.color }} />
-                {p.name}
-              </span>
-              <span className="font-bold font-mono text-white">{p.value}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   const firstDay = timeline[0];
   const lastDay = timeline[timeline.length - 1];
@@ -867,20 +842,9 @@ export default function Grid({
                             </div>
                           </div>
 
-                          <div className="h-44 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <ComposedChart data={emaInfo?.series || []} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                                <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} />
-                                <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} />
-                                <Tooltip content={<CustomInlineTooltip />} />
-                                <Bar dataKey="load" fill="#3b82f6" opacity={0.35} radius={[3, 3, 0, 0]} name="Charge" />
-                                <Line type="monotone" dataKey="ema3" stroke="#38bdf8" strokeWidth={2} dot={false} name="EMA 3j" />
-                                <Line type="monotone" dataKey="ema7" stroke="#3b82f6" strokeWidth={2} dot={false} name="EMA 7j" />
-                                <Line type="monotone" dataKey="ema21" stroke="#818cf8" strokeWidth={2} strokeDasharray="4 4" dot={false} name="EMA 21j" />
-                              </ComposedChart>
-                            </ResponsiveContainer>
-                          </div>
+                          <Suspense fallback={<div className="h-44 w-full flex items-center justify-center text-xs text-slate-500 font-mono">Chargement de la courbe...</div>}>
+                            <GridQualityChart series={emaInfo?.series || []} />
+                          </Suspense>
                         </div>
                       </td>
                     </tr>

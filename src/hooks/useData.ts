@@ -19,6 +19,7 @@ import {
   computePerceivedFatigueAnalysis
 } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
+import { computeAllWeeksStats, WeekStats } from '../utils/weekHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
 import { isPrimary, computeSessionLoad, getAthleteBaselineDailyLoad } from '../utils/loadHelpers';
@@ -716,25 +717,34 @@ export function useData() {
     return computeAllQualitiesEMA(qualities, effectiveEvents, 45, isSimulationActive ? 14 : 0) as QualitiesEMAMap;
   }, [qualities, effectiveEvents, isSimulationActive]);
 
-  // Modèle Banister prédictif
+  // Modèle Banister prédictif (couvre la projection de simulation ou de compétition)
   const banisterPerformance = useMemo(() => {
+    let futureDays = isSimulationActive ? 14 : 7;
+    if (targetCompetition?.date) {
+      const today = new Date();
+      const [ty, tm, td] = targetCompetition.date.split('-').map(Number);
+      const compDate = new Date(ty, tm - 1, td);
+      const daysRemaining = Math.ceil((compDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+      futureDays = Math.max(futureDays, Math.min(180, Math.max(0, daysRemaining) + 3));
+    }
+
     return computeBanisterPerformance(
       effectiveEvents, 
       dailyMetrics, 
       30, 
-      isSimulationActive ? 14 : 7,
+      futureDays,
       physioSettings.tauFatigue,
       physioSettings.tauFitness,
       physioSettings.initialCtl
     );
-  }, [effectiveEvents, dailyMetrics, isSimulationActive, physioSettings]);
+  }, [effectiveEvents, dailyMetrics, isSimulationActive, physioSettings, targetCompetition]);
 
   // Métriques de Foster (Monotonie & Strain)
   const fosterMetrics = useMemo(() => {
     return computeFosterMetrics(effectiveEvents);
   }, [effectiveEvents]);
 
-  // Analyse d'affûtage & Compétition
+  // Analyse d'affûtage & Compétition (réutilise directement le calcul Banister existant)
   const taperingAnalysis = useMemo(() => {
     return getTaperingAnalysis(
       targetCompetition, 
@@ -742,9 +752,19 @@ export function useData() {
       dailyMetrics,
       physioSettings.tauFatigue,
       physioSettings.tauFitness,
-      physioSettings.initialCtl
+      physioSettings.initialCtl,
+      banisterPerformance
     );
-  }, [targetCompetition, effectiveEvents, dailyMetrics, physioSettings]);
+  }, [targetCompetition, effectiveEvents, dailyMetrics, physioSettings, banisterPerformance]);
+
+  // Synthèse hebdomadaire mémoïsée (-6 semaines passées à +2 semaines futures)
+  const allWeeksStats = useMemo<WeekStats[]>(() => {
+    return computeAllWeeksStats(effectiveEvents, qualities, 6, 2);
+  }, [effectiveEvents, qualities]);
+
+  const currentWeekStats = useMemo<WeekStats | undefined>(() => {
+    return allWeeksStats.find(w => w.isCurrentWeek) || allWeeksStats[allWeeksStats.length - 1];
+  }, [allWeeksStats]);
 
   // Balance de charge (Cardio vs Musculaire, Dual-Tau, Excentrique)
   const cardioMuscularBalance = useMemo(() => {
@@ -1283,6 +1303,9 @@ export function useData() {
     clearSimulation,
     commitSimulation,
     // Synchronisation Cloud Smartphone ↔ PC
-    cloudSync
+    cloudSync,
+    // Synthèse hebdomadaire mémoïsée unique
+    allWeeksStats,
+    currentWeekStats
   };
 }

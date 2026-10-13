@@ -37,6 +37,17 @@ export interface HrRestAnalysisResult {
   dataPointsCount: number;
 }
 
+import { getLocalYYYYMMDD } from './dateHelpers.js';
+
+function parseRefDate(referenceDateStr: string | null): Date {
+  if (!referenceDateStr) return new Date();
+  const parts = referenceDateStr.split('-');
+  if (parts.length === 3) {
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+  return new Date(referenceDateStr);
+}
+
 /**
  * Calcule les statistiques VFC avec bande de normalité (Smallest Worthwhile Change sur ln(rMSSD)).
  * Méthodologie scientifique : Plews et al. 2013, Buchheit 2014.
@@ -50,38 +61,36 @@ export function computeVfcAnalysis(
   referenceDateStr: string | null = null,
   baselineWindowDays: number = 60
 ): VfcAnalysisResult {
-  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
-  const refTime = refDate.getTime();
+  const refDate = parseRefDate(referenceDateStr);
 
-  // Extraire les mesures valides des 60 derniers jours
+  // Extraire les mesures valides des 60 derniers jours par accès direct O(1) aux clés
   const allPastValues: { dateStr: string; val: number; lnVal: number; daysDiff: number }[] = [];
   const acute7dValues: number[] = [];
   const acute7dLnValues: number[] = [];
   let currentValue: number | null = null;
 
-  Object.entries(dailyMetrics || {}).forEach(([dateStr, metrics]) => {
-    if (!metrics || metrics.vfc === undefined || metrics.vfc === null || metrics.vfc <= 0) return;
-    const itemDate = new Date(dateStr);
-    const daysDiff = Math.round((refTime - itemDate.getTime()) / (1000 * 3600 * 24));
+  for (let daysDiff = 0; daysDiff <= baselineWindowDays; daysDiff++) {
+    const curDate = new Date(refDate);
+    curDate.setDate(refDate.getDate() - daysDiff);
+    const dateStr = getLocalYYYYMMDD(curDate);
+    const metrics = dailyMetrics?.[dateStr];
 
-    if (daysDiff >= 0 && daysDiff <= baselineWindowDays) {
-      const val = Number(metrics.vfc);
-      const lnVal = Math.log(val);
-      allPastValues.push({ dateStr, val, lnVal, daysDiff });
+    if (!metrics || metrics.vfc === undefined || metrics.vfc === null || metrics.vfc <= 0) continue;
+    const val = Number(metrics.vfc);
+    const lnVal = Math.log(val);
+    allPastValues.push({ dateStr, val, lnVal, daysDiff });
 
-      if (daysDiff <= 7) {
-        acute7dValues.push(val);
-        acute7dLnValues.push(lnVal);
-      }
-      if (daysDiff === 0) {
-        currentValue = val;
-      }
+    if (daysDiff <= 7) {
+      acute7dValues.push(val);
+      acute7dLnValues.push(lnVal);
     }
-  });
+    if (daysDiff === 0) {
+      currentValue = val;
+    }
+  }
 
-  // Si aucune valeur aujourd'hui, prendre la dernière valeur réelle enregistrée
+  // Si aucune valeur aujourd'hui, prendre la dernière valeur réelle enregistrée (la plus proche dans le temps)
   if (currentValue === null && allPastValues.length > 0) {
-    allPastValues.sort((a, b) => a.daysDiff - b.daysDiff);
     currentValue = allPastValues[0].val;
   }
 
@@ -240,24 +249,24 @@ export function computeHrRestAnalysis(
   dailyMetrics: Record<string, { hrRest?: number; [key: string]: any }>,
   referenceDateStr: string | null = null
 ): HrRestAnalysisResult {
-  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
-  const refTime = refDate.getTime();
+  const refDate = parseRefDate(referenceDateStr);
 
   const values28d: number[] = [];
   let currentValue: number | null = null;
 
-  Object.entries(dailyMetrics || {}).forEach(([dateStr, metrics]) => {
-    if (!metrics || metrics.hrRest === undefined || metrics.hrRest === null || metrics.hrRest <= 0) return;
-    const itemDate = new Date(dateStr);
-    const daysDiff = Math.round((refTime - itemDate.getTime()) / (1000 * 3600 * 24));
+  for (let daysDiff = 0; daysDiff <= 28; daysDiff++) {
+    const curDate = new Date(refDate);
+    curDate.setDate(refDate.getDate() - daysDiff);
+    const dateStr = getLocalYYYYMMDD(curDate);
+    const metrics = dailyMetrics?.[dateStr];
 
-    if (daysDiff >= 0 && daysDiff <= 28) {
-      values28d.push(Number(metrics.hrRest));
-      if (daysDiff === 0) {
-        currentValue = Number(metrics.hrRest);
-      }
+    if (!metrics || metrics.hrRest === undefined || metrics.hrRest === null || metrics.hrRest <= 0) continue;
+    const val = Number(metrics.hrRest);
+    values28d.push(val);
+    if (daysDiff === 0) {
+      currentValue = val;
     }
-  });
+  }
 
   const n = values28d.length;
 

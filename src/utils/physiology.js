@@ -479,8 +479,25 @@ export function extractSessionLoad(data) {
   return isNaN(parsed) ? 0 : parsed * 5;
 }
 
-export function computeCellState(qDef, targetDateStr, eventsForQuality, readinessForDate = 7, blocks = []) {
-  const targetTime = new Date(targetDateStr).getTime();
+// Cache WeakMap pour pré-indexer les dates de séances principales par qualité
+const primaryDatesCache = new WeakMap();
+function getSortedPrimaryDates(eventsForQuality) {
+  if (!eventsForQuality || typeof eventsForQuality !== 'object') return [];
+  let cached = primaryDatesCache.get(eventsForQuality);
+  if (!cached) {
+    cached = Object.keys(eventsForQuality)
+      .filter(k => isPrimary(eventsForQuality[k]) && extractSessionLoad(eventsForQuality[k]) > 0)
+      .sort(); // Le tri lexicographique des clés 'YYYY-MM-DD' équivaut au tri chronologique
+    primaryDatesCache.set(eventsForQuality, cached);
+  }
+  return cached;
+}
+
+export function computeCellState(qDef, targetDateStr, eventsForQuality, readinessOrBlocks = 7, maybeBlocks = []) {
+  const blocks = Array.isArray(readinessOrBlocks) ? readinessOrBlocks : (maybeBlocks || []);
+  const [ty, tm, td] = targetDateStr.split('-').map(Number);
+  const targetDateObj = new Date(ty, tm - 1, td);
+  const targetTime = targetDateObj.getTime();
 
   // Détection du bloc de préparation spécifique actif pour la date cible
   const activeBlock = getActiveBlockForDate(targetDateStr, blocks);
@@ -506,29 +523,54 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
   // Calcul de la charge de référence pour doseScale : EXCLUSIVEMENT sur les séances directes (principales)
   // pour éviter qu'une filière qui n'a que des impacts secondaires ne s'auto-calibre à doseScale=1.0
   const pastPrimaryLoads = [];
-  let mostRecentSessionDays = null;
   const parsedSessions = [];
 
-  const entries = Object.entries(eventsForQuality || {});
-  for (let i = 0; i < entries.length; i++) {
-    const [eventDate, data] = entries[i];
-    const eventTime = Date.parse(eventDate);
-    const daysSince = Math.round((targetTime - eventTime) / 86400000);
+  // 1. Accès direct O(1) aux clés sur la fenêtre glissante de 90 jours (couvre 3 x tau21 = 63j)
+  if (eventsForQuality && typeof eventsForQuality === 'object') {
+    const iterDate = new Date(targetDateObj);
+    for (let daysSince = 0; daysSince <= 90; daysSince++) {
+      if (daysSince > 0) {
+        iterDate.setDate(iterDate.getDate() - 1);
+      }
+      const y = iterDate.getFullYear();
+      const m = String(iterDate.getMonth() + 1).padStart(2, '0');
+      const d = String(iterDate.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${d}`;
 
-    if (daysSince >= 0) {
-      const isPrim = isPrimary(data);
-      const load = extractSessionLoad(data);
+      const sessData = eventsForQuality[dateKey];
+      if (!sessData) continue;
 
-      if (isPrim && load > 0) {
-        if (mostRecentSessionDays === null || daysSince < mostRecentSessionDays) {
-          mostRecentSessionDays = daysSince;
-        }
-        if (daysSince <= 60) {
-          pastPrimaryLoads.push(load);
-        }
+      const isPrim = isPrimary(sessData);
+      const load = extractSessionLoad(sessData);
+
+      if (isPrim && load > 0 && daysSince <= 60) {
+        pastPrimaryLoads.push(load);
       }
 
       parsedSessions.push({ daysSince, load, isSec: !isPrim });
+    }
+  }
+
+  // 2. Recherche binaire O(log K) de la séance principale la plus récente (sur tout l'historique)
+  let mostRecentSessionDays = null;
+  const sortedPrimaryDates = getSortedPrimaryDates(eventsForQuality);
+  if (sortedPrimaryDates.length > 0) {
+    let low = 0;
+    let high = sortedPrimaryDates.length - 1;
+    let latestDateKey = null;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (sortedPrimaryDates[mid] <= targetDateStr) {
+        latestDateKey = sortedPrimaryDates[mid];
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    if (latestDateKey) {
+      const [ly, lm, ld] = latestDateKey.split('-').map(Number);
+      const latestTime = new Date(ly, lm - 1, ld).getTime();
+      mostRecentSessionDays = Math.round((targetTime - latestTime) / 86400000);
     }
   }
 
@@ -1115,7 +1157,8 @@ export function getTaperingAnalysis(
   dailyMetrics = {},
   tauFatigue = 7,
   tauFitness = 28,
-  initialCtl = null
+  initialCtl = null,
+  existingBanister = null
 ) {
   if (!targetCompetition || !targetCompetition.date) return null;
 
@@ -1128,7 +1171,9 @@ export function getTaperingAnalysis(
 
   // Modèle PMC sur 30j passés et projection jusqu'à la compétition (jusqu'à 180 jours)
   const projectionDays = Math.max(7, Math.min(180, Math.max(0, daysRemaining) + 3));
-  const banister = computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness, initialCtl);
+  const banister = (existingBanister && existingBanister.series?.some(s => s.dateStr === targetCompetition.date))
+    ? existingBanister
+    : computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness, initialCtl);
 
   const compDayData = banister.series.find(s => s.dateStr === targetCompetition.date) || 
                       banister.futureSeries[banister.futureSeries.length - 1] || 

@@ -1,21 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  db, 
-  auth, 
-  googleProvider, 
-  signInWithPopup, 
-  signOut, 
-  onAuthStateChanged, 
-  handleFirestoreError,
-  OperationType,
-  type User 
-} from '../firebase';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  onSnapshot 
-} from 'firebase/firestore';
+import type { User } from 'firebase/auth';
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error' | 'unpaired';
 
@@ -30,6 +14,15 @@ export interface CloudSyncOptions {
   onRemoteDataReceived: (remoteData: any, senderDeviceId?: string) => void;
   getExportableData: () => any;
   onClearLocalHealthData?: () => void;
+}
+
+// Singleton de chargement différé : Firebase n'est importé que si un compte existe ou sur action utilisateur
+let firebaseModulePromise: Promise<typeof import('../firebase')> | null = null;
+function getFirebase() {
+  if (!firebaseModulePromise) {
+    firebaseModulePromise = import('../firebase');
+  }
+  return firebaseModulePromise;
 }
 
 /**
@@ -103,7 +96,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // 2. Google User Account & Status
-  const [currentUser, setCurrentUser] = useState<User | null>(() => auth.currentUser);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userAccount, setUserAccount] = useState<UserAccount | null>(() => {
     try {
       const raw = localStorage.getItem('physio_user_account');
@@ -112,7 +105,14 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     return null;
   });
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => (auth.currentUser ? 'syncing' : 'unpaired'));
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {
+    try {
+      return localStorage.getItem('physio_user_account') ? 'syncing' : 'unpaired';
+    } catch {
+      return 'unpaired';
+    }
+  });
+
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [syncNotification, setSyncNotification] = useState<string | null>(null);
@@ -149,21 +149,23 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         setSyncStatus('offline');
         return;
       }
-      if (!auth.currentUser) {
+      
+      const fb = await getFirebase();
+      if (!fb.auth.currentUser) {
         setSyncStatus('unpaired');
         return;
       }
 
       setSyncStatus('syncing');
-      const user = auth.currentUser;
+      const user = fb.auth.currentUser;
       const path = `sync_records/${user.uid}`;
 
       try {
         const dataToSend = overrideData || getExportableDataRef.current();
         const stringified = typeof dataToSend === 'string' ? dataToSend : JSON.stringify(dataToSend);
 
-        const docRef = doc(db, 'sync_records', user.uid);
-        await setDoc(
+        const docRef = fb.doc(fb.db, 'sync_records', user.uid);
+        await fb.setDoc(
           docRef,
           {
             userId: user.uid,
@@ -184,7 +186,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         console.warn('Firestore push error:', err);
         setSyncStatus(navigator.onLine ? 'error' : 'offline');
         try {
-          handleFirestoreError(err, OperationType.WRITE, path);
+          fb.handleFirestoreError(err, fb.OperationType.WRITE, path);
         } catch {
           // handled
         }
@@ -201,7 +203,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   // Debounced push for interactive user edits
   const triggerDebouncedPush = useCallback(() => {
     if (isRemoteUpdatingRef.current) return;
-    if (!auth.currentUser) return;
+    if (!localStorage.getItem('physio_user_account')) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       pushToCloudRef.current();
@@ -214,18 +216,19 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       setSyncStatus('offline');
       return;
     }
-    if (!auth.currentUser) {
+    const fb = await getFirebase();
+    if (!fb.auth.currentUser) {
       setSyncStatus('unpaired');
       return;
     }
 
     setSyncStatus('syncing');
-    const user = auth.currentUser;
+    const user = fb.auth.currentUser;
     const path = `sync_records/${user.uid}`;
 
     try {
-      const docRef = doc(db, 'sync_records', user.uid);
-      const docSnap = await getDoc(docRef);
+      const docRef = fb.doc(fb.db, 'sync_records', user.uid);
+      const docSnap = await fb.getDoc(docRef);
 
       if (docSnap.exists()) {
         const record = docSnap.data();
@@ -248,7 +251,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       console.warn('Firestore pull notice:', err);
       setSyncStatus('error');
       try {
-        handleFirestoreError(err, OperationType.GET, path);
+        fb.handleFirestoreError(err, fb.OperationType.GET, path);
       } catch {}
     }
   }, []);
@@ -262,7 +265,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   const loginWithGoogle = useCallback(async () => {
     try {
       setSyncStatus('syncing');
-      const result = await signInWithPopup(auth, googleProvider);
+      const fb = await getFirebase();
+      const result = await fb.signInWithPopup(fb.auth, fb.googleProvider);
       const user = result.user;
       const email = (user.email || '').toLowerCase();
       const account: UserAccount = {
@@ -280,7 +284,12 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       pullFromCloudRef.current();
     } catch (err: any) {
       console.warn('Google sign-in exception:', err?.message || err);
-      setSyncStatus(auth.currentUser ? 'synced' : 'unpaired');
+      try {
+        const fb = await getFirebase();
+        setSyncStatus(fb.auth.currentUser ? 'synced' : 'unpaired');
+      } catch {
+        setSyncStatus('unpaired');
+      }
       if (err?.code === 'auth/popup-closed-by-user') {
         setSyncNotification('Connexion Google annulée');
       } else if (err?.code === 'auth/cancelled-popup-request') {
@@ -294,7 +303,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   // Logout avec PURGE SÉCURISÉE du localStorage pour cloisonner les données de santé sur appareil partagé
   const logout = useCallback(async () => {
     try {
-      await signOut(auth);
+      const fb = await getFirebase();
+      await fb.signOut(fb.auth);
     } catch {}
 
     // 1. Purge du compte Google enregistré
@@ -332,111 +342,147 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     setSyncNotification('Données locales associées avec succès à votre compte Cloud');
   }, []);
 
-  // Listen to Auth State and Real-Time Firestore changes
+  // Coupure ou réactivation du réseau Firestore pendant les séances hors-ligne
+  const setNetworkState = useCallback(async (enabled: boolean) => {
+    if (firebaseModulePromise) {
+      try {
+        const fb = await firebaseModulePromise;
+        if (enabled) {
+          await fb.enableNetwork(fb.db);
+        } else {
+          await fb.disableNetwork(fb.db);
+        }
+      } catch {}
+    }
+  }, []);
+
+  // Listen to Auth State and Real-Time Firestore changes UNIQUEMENT si un compte est enregistré
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
+    let unsubAuth: (() => void) | null = null;
+    let isCancelled = false;
 
-    const setupListenerForUser = (user: User | null) => {
-      if (unsubscribeSnapshot) {
-        unsubscribeSnapshot();
-        unsubscribeSnapshot = null;
-      }
-
-      if (!user) {
-        setCurrentUser(null);
-        setUserAccount(null);
+    const initSync = async () => {
+      // Si aucun compte n'est enregistré dans localStorage, ne pas initialiser Firebase
+      const raw = localStorage.getItem('physio_user_account');
+      if (!raw) {
         setSyncStatus('unpaired');
-        setConfirmFirstPush(false);
         return;
       }
 
-      setCurrentUser(user);
-      const email = (user.email || '').toLowerCase();
-      const account: UserAccount = {
-        email,
-        name: user.displayName || email.split('@')[0],
-        avatar: user.photoURL || undefined,
-        provider: 'google',
-      };
-      setUserAccount(account);
-      localStorage.setItem('physio_user_account', JSON.stringify(account));
+      try {
+        const fb = await getFirebase();
+        if (isCancelled) return;
 
-      if (!navigator.onLine) {
-        setSyncStatus('offline');
-        return;
-      }
-
-      // Attach Firestore onSnapshot listener
-      const docRef = doc(db, 'sync_records', user.uid);
-      unsubscribeSnapshot = onSnapshot(
-        docRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            setConfirmFirstPush(false);
-            const record = snapshot.data();
-            if (record && record.data) {
-              // Ignore self-echo
-              if (record.lastDeviceId === deviceId) {
-                setSyncStatus('synced');
-                setLastSyncedAt(new Date(record.updatedAt || Date.now()));
-                return;
-              }
-
-              try {
-                const parsed = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
-                isRemoteUpdatingRef.current = true;
-                onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
-                setTimeout(() => {
-                  isRemoteUpdatingRef.current = false;
-                }, 600);
-
-                setSyncStatus('synced');
-                setLastSyncedAt(new Date(record.updatedAt || Date.now()));
-
-                const senderDevice = record.lastDeviceId?.startsWith('mobile')
-                  ? 'Smartphone'
-                  : record.lastDeviceId?.startsWith('pc')
-                  ? 'PC'
-                  : 'Appareil distant';
-                setSyncNotification(`⚡ Synchronisation en direct depuis votre ${senderDevice}`);
-              } catch (err) {
-                console.error('Error parsing Firestore remote payload:', err);
-              }
-            }
-          } else {
-            // First time user (document cloud vierge)
-            // SÉCURITÉ : Ne pas pousser aveuglément les données locales si elles sont présentes !
-            if (hasLocalHealthData()) {
-              setConfirmFirstPush(true);
-              setSyncStatus('synced');
-              setSyncNotification('Nouveau compte détecté : confirmation requise pour la synchronisation');
-            } else {
-              // Aucun historique local résiduel : initialisation normale
-              pushToCloudRef.current();
-            }
+        const setupListenerForUser = (user: User | null) => {
+          if (unsubscribeSnapshot) {
+            unsubscribeSnapshot();
+            unsubscribeSnapshot = null;
           }
-        },
-        (error) => {
-          console.warn('Firestore onSnapshot notice:', error.message);
-          setSyncStatus('error');
-        }
-      );
+
+          if (!user) {
+            setCurrentUser(null);
+            setUserAccount(null);
+            setSyncStatus('unpaired');
+            setConfirmFirstPush(false);
+            return;
+          }
+
+          setCurrentUser(user);
+          const email = (user.email || '').toLowerCase();
+          const account: UserAccount = {
+            email,
+            name: user.displayName || email.split('@')[0],
+            avatar: user.photoURL || undefined,
+            provider: 'google',
+          };
+          setUserAccount(account);
+          localStorage.setItem('physio_user_account', JSON.stringify(account));
+
+          if (!navigator.onLine) {
+            setSyncStatus('offline');
+            return;
+          }
+
+          // Attach Firestore onSnapshot listener
+          const docRef = fb.doc(fb.db, 'sync_records', user.uid);
+          unsubscribeSnapshot = fb.onSnapshot(
+            docRef,
+            (snapshot) => {
+              if (snapshot.exists()) {
+                setConfirmFirstPush(false);
+                const record = snapshot.data();
+                if (record && record.data) {
+                  // Ignore self-echo
+                  if (record.lastDeviceId === deviceId) {
+                    setSyncStatus('synced');
+                    setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+                    return;
+                  }
+
+                  try {
+                    const parsed = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
+                    isRemoteUpdatingRef.current = true;
+                    onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
+                    setTimeout(() => {
+                      isRemoteUpdatingRef.current = false;
+                    }, 600);
+
+                    setSyncStatus('synced');
+                    setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+
+                    const senderDevice = record.lastDeviceId?.startsWith('mobile')
+                      ? 'Smartphone'
+                      : record.lastDeviceId?.startsWith('pc')
+                      ? 'PC'
+                      : 'Appareil distant';
+                    setSyncNotification(`⚡ Synchronisation en direct depuis votre ${senderDevice}`);
+                  } catch (err) {
+                    console.error('Error parsing Firestore remote payload:', err);
+                  }
+                }
+              } else {
+                // First time user (document cloud vierge)
+                if (hasLocalHealthData()) {
+                  setConfirmFirstPush(true);
+                  setSyncStatus('synced');
+                  setSyncNotification('Nouveau compte détecté : confirmation requise pour la synchronisation');
+                } else {
+                  pushToCloudRef.current();
+                }
+              }
+            },
+            (error) => {
+              console.warn('Firestore onSnapshot notice:', error.message);
+              setSyncStatus('error');
+            }
+          );
+        };
+
+        unsubAuth = fb.onAuthStateChanged(fb.auth, (user) => {
+          if (!isCancelled) {
+            setupListenerForUser(user);
+          }
+        });
+      } catch (err) {
+        console.warn('Erreur initialisation dynamique Firebase:', err);
+        setSyncStatus('error');
+      }
     };
 
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      setupListenerForUser(user);
-    });
+    initSync();
 
     return () => {
+      isCancelled = true;
       if (unsubscribeSnapshot) unsubscribeSnapshot();
-      unsubAuth();
+      if (unsubAuth) unsubAuth();
     };
   }, [deviceId]);
 
   // Handle online/offline network events
   useEffect(() => {
     const handleOnline = () => {
-      if (auth.currentUser) {
+      if (localStorage.getItem('physio_user_account')) {
         setSyncStatus('syncing');
         pullFromCloudRef.current();
       }
@@ -480,5 +526,6 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     pushToCloud,
     triggerDebouncedPush,
     pullFromCloud,
+    setNetworkState,
   };
 }

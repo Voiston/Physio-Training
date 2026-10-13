@@ -28,6 +28,7 @@ import { MuscleAlertsBanner } from './MuscleAlertsBanner';
 interface WeeklyAnalysisViewProps {
   events: Record<string, Record<string, SessionData>>;
   qualities: Quality[];
+  allWeeksStats?: WeekStats[];
   onOpenScoreModal?: (q: Quality, dateStr: string, sessionData?: any) => void;
   showToast?: (toast: { type: 'success' | 'info' | 'warning' | 'error'; title: string; message: string }) => void;
 }
@@ -35,12 +36,14 @@ interface WeeklyAnalysisViewProps {
 export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   events,
   qualities,
+  allWeeksStats,
   showToast
 }) => {
-  // Calcul de toutes les statistiques hebdomadaires (-6 semaines passées à +2 semaines futures)
+  // Statistiques hebdomadaires (injectées depuis useData ou calculées en fallback)
   const allWeeks = useMemo(() => {
+    if (allWeeksStats && allWeeksStats.length > 0) return allWeeksStats;
     return computeAllWeeksStats(events, qualities, 6, 2);
-  }, [events, qualities]);
+  }, [allWeeksStats, events, qualities]);
 
   // Semaine actuellement sélectionnée pour inspection détaillée (par défaut : semaine en cours S0)
   const currentWeek = useMemo(() => {

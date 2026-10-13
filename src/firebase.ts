@@ -80,5 +80,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+export { 
+  disableNetwork, 
+  enableNetwork, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
+
 export { signInWithPopup, signOut, onAuthStateChanged };
 export type { User };

@@ -4,6 +4,8 @@ import path from 'path';
 import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+import { visualizer } from 'rollup-plugin-visualizer';
+
 /**
  * Plugin de sécurité : Éradique le mock WebSocket et tout script inline de dev
  * lors du build de production (élimine la nécessité de 'unsafe-inline' et prévient
@@ -61,12 +63,19 @@ export default defineConfig({
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          globIgnores: ['**/stats.html'],
         },
         devOptions: {
           enabled: true,
           type: 'module',
         },
+      }),
+      visualizer({
+        filename: 'dist/stats.html',
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
       }),
     ],
     resolve: {

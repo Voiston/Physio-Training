@@ -1,11 +1,9 @@
 import { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
-import { disableNetwork, enableNetwork } from 'firebase/firestore';
-import { db } from './firebase';
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
 import { useData, BlockTemplate } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
 import Grid from './components/Grid';
-import RadarChart from './components/RadarChart';
+const RadarChart = lazy(() => import('./components/RadarChart'));
 import SmartSuggestions from './components/SmartSuggestions';
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
@@ -13,7 +11,8 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastProvider, useToast } from './components/Toast';
 
 // Vues découpées en code-splitting asynchrone (chargement à la demande par onglet)
-const MetricsDashboard = lazy(() => import('./components/MetricsDashboard'));
+const PhysiologyDashboard = lazy(() => import('./components/PhysiologyDashboard'));
+const QualitiesDashboard = lazy(() => import('./components/QualitiesDashboard'));
 const WeeklyAnalysisView = lazy(() => import('./components/WeeklyAnalysisView').then(m => ({ default: m.WeeklyAnalysisView })));
 const PeriodizationView = lazy(() => import('./components/PeriodizationView').then(m => ({ default: m.PeriodizationView })));
 
@@ -35,7 +34,6 @@ const ViewFallback = () => (
   </div>
 );
 import { haptics } from './utils/haptics';
-import { computeAllWeeksStats } from './utils/weekHelpers';
 import { 
   computeWeeklyMuscularSummary, 
   computeMuscularAlerts, 
@@ -93,7 +91,9 @@ function AppContent() {
     clearSimulation,
     commitSimulation,
     // Synchronisation Cloud Smartphone ↔ PC
-    cloudSync
+    cloudSync,
+    allWeeksStats,
+    currentWeekStats
   } = useData();
 
   const { showToast } = useToast();
@@ -124,12 +124,8 @@ function AppContent() {
 
   // Coupure réseau Firestore pendant la séance live : le modem radio peut dormir, toutes les données sont locales
   useEffect(() => {
-    if (showLiveGymModal) {
-      disableNetwork(db).catch(() => {});
-    } else {
-      enableNetwork(db).catch(() => {});
-    }
-  }, [showLiveGymModal]);
+    cloudSync.setNetworkState(!showLiveGymModal);
+  }, [showLiveGymModal, cloudSync]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,11 +168,6 @@ function AppContent() {
     return activeBlockToday ? getBlockProgress(activeBlockToday, todayStr) : null;
   }, [activeBlockToday, todayStr]);
 
-  // Statistiques de la semaine en cours
-  const currentWeekStats = useMemo(() => {
-    const weeks = computeAllWeeksStats(events, qualities, 1, 0, today);
-    return weeks.find(w => w.isCurrentWeek) || weeks[weeks.length - 1];
-  }, [events, qualities, today]);
 
   // Alertes biomécaniques et musculaires de la semaine courante (H:Q, Pull:Push, MRV)
   const currentMuscularAlerts = useMemo(() => {
@@ -696,12 +687,14 @@ function AppContent() {
               {(isSidebarOpen || mobileGridTab === 'athlete') && (
                 <aside className={`${mobileGridTab === 'athlete' ? 'flex' : 'hidden'} xl:flex xl:w-80 flex-col gap-5 shrink-0 transition-all`}>
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-xl">
-                    <RadarChart 
-                      qualities={qualities} 
-                      events={events} 
-                      dailyMetrics={dailyMetrics} 
-                      trainingBlocks={trainingBlocks}
-                    />
+                    <Suspense fallback={<div className="h-64 flex items-center justify-center text-xs text-slate-500 font-mono">Chargement du radar...</div>}>
+                      <RadarChart 
+                        qualities={qualities} 
+                        events={events} 
+                        dailyMetrics={dailyMetrics} 
+                        trainingBlocks={trainingBlocks}
+                      />
+                    </Suspense>
                   </div>
 
                   {/* Widget Bloc de Préparation Actif */}
@@ -872,6 +865,7 @@ function AppContent() {
                   dailyMetrics={dailyMetrics}
                   qualitiesEMA={qualitiesEMA}
                   trainingBlocks={trainingBlocks}
+                  currentWeekStats={currentWeekStats}
                   moveQuality={moveQuality}
                   reorderQualities={reorderQualities}
                   onCellClick={(q: any, dateStr: string, currentData: any) => setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData })}
@@ -929,6 +923,7 @@ function AppContent() {
               <WeeklyAnalysisView 
                 events={events} 
                 qualities={qualities}
+                allWeeksStats={allWeeksStats}
                 onOpenScoreModal={(q: any, dateStr: string, currentData: any) => {
                   setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
                 }}
@@ -942,11 +937,10 @@ function AppContent() {
         {activeTab === 'physiology' && (
           <Suspense fallback={<ViewFallback />}>
             <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
-              <MetricsDashboard 
+              <PhysiologyDashboard 
                 events={events} 
                 dailyMetrics={dailyMetrics} 
-                qualities={qualities}
-                qualitiesEMA={qualitiesEMA}
+                qualities={qualities} 
                 fosterMetrics={fosterMetrics}
                 banisterPerformance={banisterPerformance}
                 taperingAnalysis={taperingAnalysis}
@@ -955,8 +949,6 @@ function AppContent() {
                 perceivedFatigueAnalysis={perceivedFatigueAnalysis}
                 isSimulationActive={isSimulationActive}
                 physioSettings={physioSettings}
-                trainingBlocks={trainingBlocks}
-                viewMode="physiology"
                 onOpenCompetitionModal={() => setShowCompetitionModal(true)}
                 onOpenReportModal={() => setShowReportModal(true)}
                 onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
@@ -970,25 +962,11 @@ function AppContent() {
         {activeTab === 'qualities' && (
           <Suspense fallback={<ViewFallback />}>
             <div className="bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md w-full animate-fadeIn">
-              <MetricsDashboard 
+              <QualitiesDashboard 
                 events={events} 
-                dailyMetrics={dailyMetrics} 
                 qualities={qualities}
                 qualitiesEMA={qualitiesEMA}
-                fosterMetrics={fosterMetrics}
-                banisterPerformance={banisterPerformance}
-                taperingAnalysis={taperingAnalysis}
-                cardioMuscularBalance={cardioMuscularBalance}
-                intensityDistribution={intensityDistribution}
-                perceivedFatigueAnalysis={perceivedFatigueAnalysis}
-                isSimulationActive={isSimulationActive}
-                physioSettings={physioSettings}
                 trainingBlocks={trainingBlocks}
-                viewMode="qualities"
-                onOpenCompetitionModal={() => setShowCompetitionModal(true)}
-                onOpenReportModal={() => setShowReportModal(true)}
-                onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
-                onToggleSimulation={toggleSimulation}
               />
             </div>
           </Suspense>
@@ -1206,36 +1184,38 @@ function AppContent() {
       )}
 
       {/* Modal Synchronisation Cloud Smartphone ↔ PC */}
-      <CloudSyncModal
-        isOpen={showCloudSyncModal}
-        onClose={() => setShowCloudSyncModal(false)}
-        userAccount={cloudSync.userAccount}
-        syncStatus={cloudSync.syncStatus}
-        lastSyncedAt={cloudSync.lastSyncedAt}
-        pairingUrl={cloudSync.pairingUrl}
-        qrCodeUrl={cloudSync.qrCodeUrl}
-        confirmFirstPush={cloudSync.confirmFirstPush}
-        onAcceptFirstPush={cloudSync.acceptFirstPush}
-        onRejectFirstPush={cloudSync.rejectFirstPush}
-        onLoginWithGoogle={cloudSync.loginWithGoogle}
-        onLogout={cloudSync.logout}
-        onPushToCloud={() => {
-          cloudSync.pushToCloud();
-          showToast({
-            type: 'info',
-            title: 'Synchronisation Cloud',
-            message: 'Données locales envoyées vers Firebase Cloud.'
-          });
-        }}
-        onPullFromCloud={() => {
-          cloudSync.pullFromCloud();
-          showToast({
-            type: 'info',
-            title: 'Synchronisation Cloud',
-            message: 'Données rechargées depuis Firebase Cloud.'
-          });
-        }}
-      />
+      {showCloudSyncModal && (
+        <CloudSyncModal
+          isOpen={showCloudSyncModal}
+          onClose={() => setShowCloudSyncModal(false)}
+          userAccount={cloudSync.userAccount}
+          syncStatus={cloudSync.syncStatus}
+          lastSyncedAt={cloudSync.lastSyncedAt}
+          pairingUrl={cloudSync.pairingUrl}
+          qrCodeUrl={cloudSync.qrCodeUrl}
+          confirmFirstPush={cloudSync.confirmFirstPush}
+          onAcceptFirstPush={cloudSync.acceptFirstPush}
+          onRejectFirstPush={cloudSync.rejectFirstPush}
+          onLoginWithGoogle={cloudSync.loginWithGoogle}
+          onLogout={cloudSync.logout}
+          onPushToCloud={() => {
+            cloudSync.pushToCloud();
+            showToast({
+              type: 'info',
+              title: 'Synchronisation Cloud',
+              message: 'Données locales envoyées vers Firebase Cloud.'
+            });
+          }}
+          onPullFromCloud={() => {
+            cloudSync.pullFromCloud();
+            showToast({
+              type: 'info',
+              title: 'Synchronisation Cloud',
+              message: 'Données rechargées depuis Firebase Cloud.'
+            });
+          }}
+        />
+      )}
       </Suspense>
 
       {/* BARRE DE NAVIGATION INFÉRIEURE MOBILE (Sticky bottom tactile avec bouton central Mode Salle) */}
