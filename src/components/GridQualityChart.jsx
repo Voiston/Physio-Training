@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { 
   LineChart, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer 
 } from 'recharts';
 
-function CustomInlineTooltip({ active, payload, label }) {
+const CustomInlineTooltip = memo(function CustomInlineTooltip({ active, payload, label }) {
   if (active && payload && payload.length) {
     const dataPoint = payload[0]?.payload;
     return (
@@ -26,9 +26,9 @@ function CustomInlineTooltip({ active, payload, label }) {
     );
   }
   return null;
-}
+});
 
-export default function GridQualityChart({ series = [] }) {
+const GridQualityChart = memo(function GridQualityChart({ series = [] }) {
   return (
     <div className="h-44 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -45,4 +45,6 @@ export default function GridQualityChart({ series = [] }) {
       </ResponsiveContainer>
     </div>
   );
-}
+});
+
+export default GridQualityChart;

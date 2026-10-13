@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import { 
   Radar, RadarChart as RechartsRadar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   ResponsiveContainer, Tooltip 
@@ -27,6 +27,55 @@ const SHORT_NAMES: Record<string, string> = {
   abdos: 'Abdos',
   lombaires: 'Lombaires'
 };
+
+const CustomRadarTooltip = memo(function CustomRadarTooltip({ active, payload }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  const sets = Number(data.sets) || 0;
+  let statusText = 'Inactif (0 série)';
+  let statusColor = 'text-slate-500';
+
+  if (sets > 0) {
+    const landmark = getVolumeLandmark(sets);
+    if (landmark.status === 'mav') {
+      statusText = `✓ Zone Optimale ${landmark.shortLabel}`;
+      statusColor = 'text-emerald-400 font-bold';
+    } else if (landmark.status === 'mrv') {
+      statusText = `⚠️ Plafond ${landmark.shortLabel} Dépassé`;
+      statusColor = 'text-amber-400 font-bold';
+    } else if (landmark.status === 'mev') {
+      statusText = `Stimulus Minimal ${landmark.shortLabel}`;
+      statusColor = 'text-sky-400';
+    } else {
+      statusText = landmark.shortLabel;
+      statusColor = 'text-slate-400';
+    }
+  }
+
+  return (
+    <div className="p-3 bg-slate-900/95 border border-white/15 rounded-xl shadow-2xl backdrop-blur-md text-xs font-sans space-y-1 z-50">
+      <div className="font-bold text-white text-sm flex items-center justify-between gap-3">
+        <span>{data.fullName}</span>
+        <span className="text-[10px] font-normal text-slate-400 font-mono">
+          {data.category}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-4 pt-1 border-t border-white/10">
+        <span className="text-slate-300">Volume réalisé :</span>
+        <span className="font-mono font-extrabold text-blue-400 text-sm">{sets} séries</span>
+      </div>
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-slate-400 text-[11px]">Couloir MAV optimal :</span>
+        <span className="font-mono text-emerald-400 text-[11px]">10 - 20 séries</span>
+      </div>
+      <div className={`text-[11px] pt-1 ${statusColor}`}>
+        {statusText}
+      </div>
+    </div>
+  );
+});
 
 export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
   muscles,
@@ -67,56 +116,6 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
     const highest = Math.max(0, ...radarData.map(d => d.sets));
     return Math.max(22, highest + 2);
   }, [radarData]);
-
-  // Tooltip personnalisé pour expliquer le volume et les repères MAV
-  const CustomRadarTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const data = payload[0]?.payload;
-    if (!data) return null;
-
-    const sets = Number(data.sets) || 0;
-    let statusText = 'Inactif (0 série)';
-    let statusColor = 'text-slate-500';
-
-    if (sets > 0) {
-      const landmark = getVolumeLandmark(sets);
-      if (landmark.status === 'mav') {
-        statusText = `✓ Zone Optimale ${landmark.shortLabel}`;
-        statusColor = 'text-emerald-400 font-bold';
-      } else if (landmark.status === 'mrv') {
-        statusText = `⚠️ Plafond ${landmark.shortLabel} Dépassé`;
-        statusColor = 'text-amber-400 font-bold';
-      } else if (landmark.status === 'mev') {
-        statusText = `Stimulus Minimal ${landmark.shortLabel}`;
-        statusColor = 'text-sky-400';
-      } else {
-        statusText = landmark.shortLabel;
-        statusColor = 'text-slate-400';
-      }
-    }
-
-    return (
-      <div className="p-3 bg-slate-900/95 border border-white/15 rounded-xl shadow-2xl backdrop-blur-md text-xs font-sans space-y-1 z-50">
-        <div className="font-bold text-white text-sm flex items-center justify-between gap-3">
-          <span>{data.fullName}</span>
-          <span className="text-[10px] font-normal text-slate-400 font-mono">
-            {data.category}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-4 pt-1 border-t border-white/10">
-          <span className="text-slate-300">Volume réalisé :</span>
-          <span className="font-mono font-extrabold text-blue-400 text-sm">{sets} séries</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-slate-400 text-[11px]">Couloir MAV optimal :</span>
-          <span className="font-mono text-emerald-400 text-[11px]">10 - 20 séries</span>
-        </div>
-        <div className={`text-[11px] pt-1 ${statusColor}`}>
-          {statusText}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className={`p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950/90 border border-white/10 backdrop-blur-md shadow-xl flex flex-col justify-between ${className}`}>

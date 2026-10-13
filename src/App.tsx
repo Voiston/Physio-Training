@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
 import { useData, BlockTemplate } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
@@ -183,6 +183,57 @@ function AppContent() {
       display: formatDisplayDate(day.dateObj, day.offset)
     }));
   }, [today]);
+
+  const handleGridCellClick = useCallback((q: any, dateStr: string, currentData: any) => {
+    setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
+  }, []);
+
+  const handleGridQualityClick = useCallback((q: any) => {
+    setQualityChartInfo(q);
+  }, []);
+
+  const handleGridMetricClick = useCallback((dateStr: string, type: string, currentValue: any) => {
+    let title = 'Métrique Physiologique';
+    let label = 'Valeur';
+    let min = 1;
+    let max = 300;
+    let placeholder = 'Ex: 50';
+
+    if (type === 'readiness') {
+      title = 'Readiness Score';
+      label = 'Score de Forme (1 à 10)';
+      min = 1;
+      max = 10;
+      placeholder = 'Ex: 7';
+    } else if (type === 'vfc') {
+      title = 'VFC Matinale';
+      label = 'Valeur VFC RMSSD (ms)';
+      min = 10;
+      max = 300;
+      placeholder = 'Ex: 65';
+    } else if (type === 'hrRest') {
+      title = 'FC de Repos Matinale';
+      label = 'Fréquence Cardiaque de Repos (bpm)';
+      min = 30;
+      max = 150;
+      placeholder = 'Ex: 48';
+    }
+
+    setMetricModalInfo({
+      type,
+      dateStr,
+      currentValue,
+      title,
+      label,
+      min,
+      max,
+      placeholder
+    });
+  }, []);
+
+  const handleOpenWeeklyView = useCallback(() => {
+    setActiveTab('weeks');
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] bg-[radial-gradient(ellipse_80%_80%_at_10%_-20%,rgba(30,58,138,0.18),transparent),radial-gradient(ellipse_80%_80%_at_90%_120%,rgba(153,27,27,0.12),transparent)] text-slate-100 font-sans p-2 sm:p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden relative">

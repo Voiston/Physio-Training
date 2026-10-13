@@ -1,10 +1,30 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { 
   LineChart, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { computeQualityEMAData } from '../utils/physiology';
 import { X, TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
+
+const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    const dataPoint = payload[0]?.payload;
+    return (
+      <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.6)] text-xs">
+        <p className="m-0 mb-2 font-bold text-slate-200 uppercase text-[10px] tracking-wider border-b border-white/10 pb-1">
+          {dataPoint?.dateStr} (Jour {label})
+        </p>
+        {payload.map((p, i) => (
+          <div key={i} className="flex justify-between items-center gap-4 py-0.5 font-medium">
+            <span style={{ color: p.color }}>{p.name}</span>
+            <span className="font-bold text-slate-100">{p.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+});
 
 export default function QualityChartModal({ quality, events, onClose }) {
   const [timeframe, setTimeframe] = useState(30);
@@ -50,26 +70,6 @@ export default function QualityChartModal({ quality, events, onClose }) {
       };
     }
   }, [current.acwr]);
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const dataPoint = payload[0]?.payload;
-      return (
-        <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.6)] text-xs">
-          <p className="m-0 mb-2 font-bold text-slate-200 uppercase text-[10px] tracking-wider border-b border-white/10 pb-1">
-            {dataPoint?.dateStr} (Jour {label})
-          </p>
-          {payload.map((p, i) => (
-            <div key={i} className="flex justify-between items-center gap-4 py-0.5 font-medium">
-              <span style={{ color: p.color }}>{p.name}</span>
-              <span className="font-bold text-slate-100">{p.value}</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>

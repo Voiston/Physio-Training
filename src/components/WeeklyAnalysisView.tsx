@@ -33,6 +33,39 @@ interface WeeklyAnalysisViewProps {
   showToast?: (toast: { type: 'success' | 'info' | 'warning' | 'error'; title: string; message: string }) => void;
 }
 
+const WeeklyChartTooltip = React.memo(function WeeklyChartTooltip({ active, payload }: any) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-slate-950/95 backdrop-blur-md p-3 border border-white/15 rounded-xl shadow-2xl text-xs min-w-[200px]">
+        <div className="font-bold text-white border-b border-white/10 pb-1 mb-1.5 flex justify-between">
+          <span>{data.fullLabel}</span>
+          <span className="text-blue-400 font-mono">{data.relative}</span>
+        </div>
+        <div className="space-y-1 font-mono">
+          <div className="flex justify-between text-amber-300">
+            <span>Charge totale :</span>
+            <span className="font-bold">{data.totalLoad} UA</span>
+          </div>
+          <div className="flex justify-between text-sky-300">
+            <span>Temps total :</span>
+            <span className="font-bold">{data.durationHours} h ({Math.round(data.durationHours * 60)}m)</span>
+          </div>
+          <div className="flex justify-between text-slate-300">
+            <span>Séances :</span>
+            <span>{data.sessions}</span>
+          </div>
+          <div className="flex justify-between text-purple-300 border-t border-white/10 pt-1 mt-1">
+            <span>Ratio ACWR :</span>
+            <span className="font-bold">{data.acwr}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+});
+
 export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   events,
   qualities,
@@ -677,40 +710,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               <XAxis dataKey="label" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
               <YAxis yAxisId="left" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
               <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" tick={{ fill: '#38bdf8', fontSize: 11 }} unit="h" />
-              <Tooltip 
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-slate-950/95 backdrop-blur-md p-3 border border-white/15 rounded-xl shadow-2xl text-xs min-w-[200px]">
-                        <div className="font-bold text-white border-b border-white/10 pb-1 mb-1.5 flex justify-between">
-                          <span>{data.fullLabel}</span>
-                          <span className="text-blue-400 font-mono">{data.relative}</span>
-                        </div>
-                        <div className="space-y-1 font-mono">
-                          <div className="flex justify-between text-amber-300">
-                            <span>Charge totale :</span>
-                            <span className="font-bold">{data.totalLoad} UA</span>
-                          </div>
-                          <div className="flex justify-between text-sky-300">
-                            <span>Temps total :</span>
-                            <span className="font-bold">{data.durationHours} h ({Math.round(data.durationHours * 60)}m)</span>
-                          </div>
-                          <div className="flex justify-between text-slate-300">
-                            <span>Séances :</span>
-                            <span>{data.sessions}</span>
-                          </div>
-                          <div className="flex justify-between text-purple-300 border-t border-white/10 pt-1 mt-1">
-                            <span>Ratio ACWR :</span>
-                            <span className="font-bold">{data.acwr}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
+              <Tooltip content={<WeeklyChartTooltip />} />
               <Legend 
                 wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
                 formatter={(val) => val === 'totalLoad' ? 'Charge Totale (UA)' : 'Temps (Heures)'} 
