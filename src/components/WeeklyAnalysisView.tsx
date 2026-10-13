@@ -8,7 +8,7 @@ import {
   formatMinutes
 } from '../utils/weekHelpers';
 import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell
+  BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell
 } from 'recharts';
 import { 
   Calendar, Clock, Zap, TrendingUp, TrendingDown, ArrowRight, ArrowUpRight, 
@@ -187,8 +187,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   }, [activeWeek, comparisonTargetWeek]);
 
   return (
-    <main 
-      role="region" 
+    <section 
       aria-label="Synthèse et analyse hebdomadaire de la charge" 
       className="flex flex-col gap-6 animate-fadeIn pb-12"
     >
@@ -545,7 +544,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                         <th className="p-2.5">Qualité Physique</th>
                         <th className="p-2.5 text-right">{activeWeek.shortLabel} (Charge / Temps)</th>
                         <th className="p-2.5 text-right">{comparisonTargetWeek.shortLabel} (Charge / Temps)</th>
-                        <th className="p-2.5 text-right">Écart ($\Delta$)</th>
+                        <th className="p-2.5 text-right">Écart (Δ)</th>
                         <th className="p-2.5 text-center">Tendance</th>
                       </tr>
                     </thead>
@@ -670,7 +669,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
 
         <div className="h-64 sm:h-72 w-full" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" vertical={false} />
               <XAxis dataKey="label" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
               <YAxis yAxisId="left" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
@@ -735,7 +734,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
                 strokeWidth={2.5} 
                 dot={{ r: 4, fill: '#38bdf8' }} 
               />
-            </BarChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </section>
@@ -1245,6 +1244,6 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
           </div>
         )}
       </section>
-    </main>
+    </section>
   );
 };

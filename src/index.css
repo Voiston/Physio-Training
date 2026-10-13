@@ -9,6 +9,12 @@
 @import "@fontsource/jetbrains-mono/600.css";
 @import "@fontsource/jetbrains-mono/700.css";
 
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --breakpoint-xs: 30rem;
+}
+
 :root {
   --bg-color: #0a0a0c;
   --surface-color: rgba(255, 255, 255, 0.05);
@@ -264,10 +270,10 @@ body.gym-open .shimmer-bar::after {
 
 .burnout {
   border: 2px dashed #ffeb3b !important;
-  animation: pulse 2s infinite;
+  animation: burnout-pulse 2s infinite;
 }
 
-@keyframes pulse {
+@keyframes burnout-pulse {
   0% { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.4); }
   70% { box-shadow: 0 0 0 6px rgba(255, 235, 59, 0); }
   100% { box-shadow: 0 0 0 0 rgba(255, 235, 59, 0); }
@@ -303,7 +309,8 @@ body.gym-open .shimmer-bar::after {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fadeIn {
+.animate-fadeIn,
+.animate-fade-in {
   animation: fadeIn 0.25s ease-out forwards;
 }
 

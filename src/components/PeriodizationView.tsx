@@ -76,7 +76,8 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
   onOpenBlocksModal,
   onOpenCompetitionModal,
   onOpenReportModal,
-  onOpenPhysioSettingsModal
+  onOpenPhysioSettingsModal,
+  onApplyTemplate
 }) => {
   // Calcul de la progression du bloc de cycle actif
   const progress = React.useMemo(() => {
@@ -499,7 +500,13 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
               <button
                 key={tmpl.id}
                 type="button"
-                onClick={onOpenBlocksModal}
+                onClick={() => {
+                  if (onApplyTemplate) {
+                    onApplyTemplate(tmpl);
+                  } else {
+                    onOpenBlocksModal();
+                  }
+                }}
                 aria-label={`Modèle ${tmpl.name}, durée ${tmpl.durationWeeks} semaines. Description : ${tmpl.description}. Filières ciblées : ${focusNames}. Cliquer pour charger dans la programmation.`}
                 className="p-4 rounded-xl bg-black/40 border border-white/10 hover:border-blue-500/40 hover:bg-slate-800/30 transition-all cursor-pointer flex flex-col justify-between group shadow-md text-left min-h-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               >

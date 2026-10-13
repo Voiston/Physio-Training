@@ -527,7 +527,7 @@ export default function Grid({
                         className="flex justify-center items-center h-8.5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
                         role="button"
                         tabIndex={0}
-                        aria-label={`VFC du ${day.display} : ${vfc !== '-' ? `${vfc} millisecondes` : 'non renseignée'}. Cliquer pour modifier.`}
+                        aria-label={`VFC du ${day.display?.date || day.dateStr} : ${vfc !== '-' ? `${vfc} millisecondes` : 'non renseignée'}. Cliquer pour modifier.`}
                         onClick={() => onMetricClick(day.dateStr, 'vfc', vfc)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -588,7 +588,7 @@ export default function Grid({
                       className="flex justify-center items-center h-8.5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
                       role="button"
                       tabIndex={0}
-                      aria-label={`FC de repos du ${day.display} : ${hrRest !== '-' ? `${hrRest} battements par minute` : 'non renseignée'}. Cliquer pour modifier.`}
+                      aria-label={`FC de repos du ${day.display?.date || day.dateStr} : ${hrRest !== '-' ? `${hrRest} battements par minute` : 'non renseignée'}. Cliquer pour modifier.`}
                       onClick={() => onMetricClick(day.dateStr, 'hrRest', hrRest)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {

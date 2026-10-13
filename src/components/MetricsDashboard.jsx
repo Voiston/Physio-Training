@@ -1035,6 +1035,7 @@ export default function MetricsDashboard({
         fullTitle: 'Training Stress Balance (Forme & Fraîcheur)',
         formula: 'TSB = CTL − ATL (Condition durable − Fatigue aiguë, exprimé en % de la CTL)',
         color: '#10b981',
+        tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
         role: "Indicateur central de performance et de fraîcheur neuromusculaire. Il reflète l'équilibre dynamique entre les adaptations physiques de fond acquises (CTL) et la fatigue résiduelle immédiate (ATL). Un TSB positif indique un organisme frais et dispo pour la compétition ; un TSB négatif traduit une phase d'assimilation de charge.",
         currentValue: banisterSummary ? `${banisterSummary.tsb > 0 ? `+${banisterSummary.tsb}` : banisterSummary.tsb} pts${banisterSummary.tsbPercent !== null ? ` (${banisterSummary.tsbPercent > 0 ? `+${banisterSummary.tsbPercent}` : banisterSummary.tsbPercent}% CTL)` : ''}` : '0',
         currentInterpretation: 
@@ -1140,6 +1141,7 @@ export default function MetricsDashboard({
         fullTitle: 'Chronic Training Load (Charge Chronique / Fitness)',
         formula: `Moyenne Mobile Exponentielle sur ${tauFitness} jours (Condition)`,
         color: '#38bdf8',
+        tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
         role: "Représente votre condition physique de fond ('Fitness') et votre capacité à encaisser de gros volumes d'entraînement sans vous épuiser. La CTL se construit patiemment sur plusieurs semaines de travail continu.",
         currentValue: banisterSummary ? (
           banisterSummary.ctlRampPercent !== null
@@ -1194,8 +1196,7 @@ export default function MetricsDashboard({
   }, [banisterSummary, tauFatigue, tauFitness]);
 
   return (
-    <main 
-      role="region" 
+    <section 
       aria-label="Tableau de bord des métriques et dynamiques physiologiques" 
       className="p-4 md:p-6 w-full flex flex-col gap-6 pb-12"
     >
@@ -1873,7 +1874,7 @@ export default function MetricsDashboard({
                 <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/10 mb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-xs font-black font-mono border ${physioTooltips[activeTooltip].bgColor} ${physioTooltips[activeTooltip].color}`}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-black font-mono border ${physioTooltips[activeTooltip].tagClass || 'bg-white/10 text-white border-white/20'}`}>
                         {physioTooltips[activeTooltip].name}
                       </span>
                       <h4 className="text-sm font-bold text-white m-0">
@@ -3355,6 +3356,6 @@ export default function MetricsDashboard({
         </div>
       )}
 
-    </main>
+    </section>
   );
 }

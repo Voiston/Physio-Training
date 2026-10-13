@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { disableNetwork, enableNetwork } from 'firebase/firestore';
 import { db } from './firebase';
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
-import { useData } from './hooks/useData';
+import { useData, BlockTemplate } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
 import Grid from './components/Grid';
 import RadarChart from './components/RadarChart';
@@ -104,6 +104,7 @@ function AppContent() {
   const [metricModalInfo, setMetricModalInfo] = useState<any>(null);
   const [qualityChartInfo, setQualityChartInfo] = useState<any>(null);
   const [showBlocksModal, setShowBlocksModal] = useState<boolean>(false);
+  const [selectedTemplateForModal, setSelectedTemplateForModal] = useState<BlockTemplate | null>(null);
   const [showCompetitionModal, setShowCompetitionModal] = useState<boolean>(false);
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [showPhysioSettingsModal, setShowPhysioSettingsModal] = useState<boolean>(false);
@@ -685,7 +686,7 @@ function AppContent() {
               <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
                 <span>Matrice d'entraînement :</span>
                 <span className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-slate-300">
-                  {qualities.length} qualités · -14j à +14j
+                  {qualities.length} qualités · −21j à +14j
                 </span>
               </div>
             </div>
@@ -840,7 +841,10 @@ function AppContent() {
               )}
 
               {/* Center Content */}
-              <main className={`${mobileGridTab === 'grid' ? 'flex' : 'hidden'} xl:flex flex-1 min-w-0 flex-col gap-5`}>
+              <section 
+                aria-label="Grille de planification et suggestions" 
+                className={`${mobileGridTab === 'grid' ? 'flex' : 'hidden'} xl:flex flex-1 min-w-0 flex-col gap-5`}
+              >
                 {/* Suggestions & Priorités d'entraînement algorithmiques */}
                 <SmartSuggestions 
                   recommendations={trainingRecommendations}
@@ -913,7 +917,7 @@ function AppContent() {
                   onOpenWeeklyView={() => setActiveTab('weeks')}
                 />
               </div>
-            </main>
+            </section>
             </div>
           </div>
         )}
@@ -1005,7 +1009,14 @@ function AppContent() {
                 banisterPerformance={banisterPerformance}
                 cardioMuscularBalance={cardioMuscularBalance}
                 physioSettings={physioSettings}
-                onOpenBlocksModal={() => setShowBlocksModal(true)}
+                onOpenBlocksModal={() => {
+                  setSelectedTemplateForModal(null);
+                  setShowBlocksModal(true);
+                }}
+                onApplyTemplate={(template) => {
+                  setSelectedTemplateForModal(template);
+                  setShowBlocksModal(true);
+                }}
                 onOpenCompetitionModal={() => setShowCompetitionModal(true)}
                 onOpenReportModal={() => setShowReportModal(true)}
                 onOpenPhysioSettingsModal={() => setShowPhysioSettingsModal(true)}
@@ -1086,7 +1097,11 @@ function AppContent() {
           qualities={qualities}
           blocks={trainingBlocks}
           templates={blockTemplates}
-          onClose={() => setShowBlocksModal(false)}
+          initialTemplate={selectedTemplateForModal}
+          onClose={() => {
+            setShowBlocksModal(false);
+            setSelectedTemplateForModal(null);
+          }}
           onSaveBlock={(block, autoReorder) => {
             saveTrainingBlock(block);
             if (autoReorder) {

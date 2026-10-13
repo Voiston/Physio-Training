@@ -15,6 +15,7 @@ interface TrainingBlocksModalProps {
   qualities: Quality[];
   blocks: TrainingBlock[];
   templates: BlockTemplate[];
+  initialTemplate?: BlockTemplate | null;
   onClose: () => void;
   onSaveBlock: (block: TrainingBlock, autoReorder?: boolean) => void;
   onDeleteBlock: (blockId: string) => void;
@@ -27,6 +28,7 @@ export default function TrainingBlocksModal({
   qualities,
   blocks,
   templates,
+  initialTemplate,
   onClose,
   onSaveBlock,
   onDeleteBlock,
@@ -73,6 +75,21 @@ export default function TrainingBlocksModal({
 
   // Compute end date reactively
   const computedEndDate = computeBlockEndDate(startDate, durationWeeks);
+
+  // Pre-fill block form when an initial template is requested
+  useEffect(() => {
+    if (initialTemplate) {
+      setActiveTab('blocks');
+      setShowForm(true);
+      setEditingBlockId(null);
+      setSelectedPreset(initialTemplate.id);
+      setBlockName(initialTemplate.name);
+      setDurationWeeks(initialTemplate.durationWeeks);
+      setFocusQualities([...initialTemplate.focusQualities]);
+      setTargetMultiplier(initialTemplate.targetMultiplier);
+      setMaintenanceMultiplier(initialTemplate.maintenanceMultiplier);
+    }
+  }, [initialTemplate]);
 
   // Keyboard navigation on tablist (ArrowLeft / ArrowRight)
   const handleTabKeyDown = (e: React.KeyboardEvent) => {
