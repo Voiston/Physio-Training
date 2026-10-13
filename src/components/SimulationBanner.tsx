@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Quality, SessionData } from '../hooks/useData';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
+import { computeSessionLoad } from '../utils/loadHelpers';
 import { 
   Sparkles, Play, CheckCircle2, RotateCcw, X, Plus, 
   Calendar, Zap, Shield, ArrowRight, Activity 
@@ -37,6 +38,13 @@ export const SimulationBanner: React.FC<SimulationBannerProps> = ({
     return acc + Object.keys(qDates || {}).length;
   }, 0);
 
+  const currentCalculatedLoad = computeSessionLoad(
+    selectedQuality,
+    Number(duration),
+    Number(rpe),
+    Number(rpe)
+  );
+
   const handleAddCustom = (e: React.FormEvent) => {
     e.preventDefault();
     const today = new Date();
@@ -44,7 +52,12 @@ export const SimulationBanner: React.FC<SimulationBannerProps> = ({
     target.setDate(today.getDate() + Number(simDaysOffset));
     const dateStr = getLocalYYYYMMDD(target);
 
-    const calculatedLoad = Math.round(Number(duration) * Number(rpe));
+    const calculatedLoad = computeSessionLoad(
+      selectedQuality,
+      Number(duration),
+      Number(rpe),
+      Number(rpe)
+    );
     const sessionData: SessionData = {
       duration: Number(duration),
       rpeCardio: Number(rpe),
@@ -209,7 +222,7 @@ export const SimulationBanner: React.FC<SimulationBannerProps> = ({
           </div>
 
           <div className="text-[11px] font-mono text-purple-300 py-2">
-            Charge : <strong className="text-white">{duration * rpe}</strong>
+            Charge : <strong className="text-white">{currentCalculatedLoad} UA</strong>
           </div>
 
           <button

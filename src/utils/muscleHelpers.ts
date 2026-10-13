@@ -28,6 +28,7 @@ export const MUSCLE_GROUPS: Record<string, MuscleGroup> = {
   mollets: { id: 'mollets', name: 'Mollets', category: 'lower', categoryLabel: 'Bas du corps', color: '#a855f7' },
   pectoraux: { id: 'pectoraux', name: 'Pectoraux', category: 'upper_push', categoryLabel: 'Haut du corps (Push)', color: '#ef4444' },
   deltoides_ant: { id: 'deltoides_ant', name: 'Épaules (Antérieur / Latéral)', category: 'upper_push', categoryLabel: 'Haut du corps (Push)', color: '#f97316' },
+  deltoides_post: { id: 'deltoides_post', name: 'Deltoïdes Postérieurs', category: 'upper_pull', categoryLabel: 'Haut du corps (Pull)', color: '#0ea5e9' },
   triceps: { id: 'triceps', name: 'Triceps', category: 'upper_push', categoryLabel: 'Haut du corps (Push)', color: '#eab308' },
   dorsaux: { id: 'dorsaux', name: 'Grand Dorsal (Largeur dos)', category: 'upper_pull', categoryLabel: 'Haut du corps (Pull)', color: '#10b981' },
   trapezes: { id: 'trapezes', name: 'Trapèzes & Haut du dos', category: 'upper_pull', categoryLabel: 'Haut du corps (Pull)', color: '#14b8a6' },
@@ -607,7 +608,7 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     category: 'upper_pull',
     isCompound: false,
     defaultReps: 15,
-    muscleRatios: { trapezes: 0.85, deltoides_ant: 0.6 }
+    muscleRatios: { deltoides_post: 0.9, trapezes: 0.85 }
   },
   {
     id: 'rear_delt_fly',
@@ -615,7 +616,7 @@ export const EXERCISE_CATALOG: ExerciseDefinition[] = [
     category: 'upper_pull',
     isCompound: false,
     defaultReps: 15,
-    muscleRatios: { trapezes: 0.95, deltoides_ant: 0.55 }
+    muscleRatios: { deltoides_post: 1.0, trapezes: 0.6 }
   },
   {
     id: 'shrugs',
@@ -919,11 +920,12 @@ export function computeSessionMuscularBreakdown(
     totalReps += sets * reps;
     weightedRpeSum += sets * effectiveRpe;
 
-    const ratios = ex.customRatios || catalogItem?.muscleRatios || {
-      // Si exercice inconnu, essayer d'assigner selon son nom
-      quadriceps: 0.5,
-      ischios: 0.5
-    };
+    // Résolution des ratios : snapshot customRatios en priorité, sinon le catalogue, sinon aucun ratio
+    const ratios: Record<string, number> = (ex.customRatios && typeof ex.customRatios === 'object' && Object.keys(ex.customRatios).length > 0)
+      ? ex.customRatios
+      : (catalogItem?.muscleRatios && typeof catalogItem.muscleRatios === 'object' && Object.keys(catalogItem.muscleRatios).length > 0)
+        ? catalogItem.muscleRatios
+        : {};
 
     Object.entries(ratios).forEach(([muscleId, ratio]) => {
       if (!muscleMap[muscleId]) {
@@ -1023,33 +1025,54 @@ export interface WeeklyMuscularSummary {
 export function getVolumeLandmark(effectiveSets: number): {
   status: VolumeStatus;
   label: string;
+  shortLabel: string;
   badgeColor: string;
+  textColor: string;
+  hexColor: string;
+  gradientId: string;
 } {
-  if (effectiveSets < 6) {
+  const sets = Number(effectiveSets) || 0;
+  if (sets < 6) {
     return {
       status: 'under',
       label: 'Maintien / Sous-stimulé (< 6 séries)',
-      badgeColor: 'bg-slate-800 text-slate-300 border-slate-700'
+      shortLabel: 'Maintien (< 6s)',
+      badgeColor: 'bg-slate-800 text-slate-300 border-slate-700',
+      textColor: 'text-slate-400',
+      hexColor: sets === 0 ? '#1e293b' : '#475569',
+      gradientId: sets === 0 ? 'grad-inactive' : 'grad-maintien'
     };
   }
-  if (effectiveSets <= 10) {
+  if (sets < 10) {
     return {
       status: 'mev',
-      label: 'Volume Minimal Efficace (MEV : 6-10)',
-      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+      label: 'Volume Minimal Efficace (MEV : 6-9 séries)',
+      shortLabel: 'MEV Minimal (6-9s)',
+      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+      textColor: 'text-sky-400',
+      hexColor: '#0284c7',
+      gradientId: 'grad-mev'
     };
   }
-  if (effectiveSets <= 20) {
+  if (sets <= 20) {
     return {
       status: 'mav',
-      label: 'Volume Adaptatif Optimal (MAV : 10-20)',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+      label: 'Volume Adaptatif Optimal (MAV : 10-20 séries)',
+      shortLabel: 'MAV Optimal (10-20s)',
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      textColor: 'text-emerald-400',
+      hexColor: '#10b981',
+      gradientId: 'grad-mav'
     };
   }
   return {
     status: 'mrv',
-    label: 'Plafond Récupérable Dépassé (MRV : > 20)',
-    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+    label: 'Plafond Récupérable Dépassé (MRV : > 20 séries)',
+    shortLabel: 'MRV Plafond (> 20s)',
+    badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    textColor: 'text-amber-400',
+    hexColor: '#f59e0b',
+    gradientId: 'grad-mrv'
   };
 }
 
@@ -1302,15 +1325,15 @@ export function computeMuscularAlerts(summary: WeeklyMuscularSummary): MuscularA
     }
   }
 
-  // 3. Détection des groupes en MRV (> 22 séries - fatigue locale aiguë)
-  const overloaded = summary.sortedMuscles.filter(m => m.effectiveSets > 22);
+  // 3. Détection des groupes en MRV (> 20 séries - fatigue locale aiguë)
+  const overloaded = summary.sortedMuscles.filter(m => getVolumeLandmark(m.effectiveSets).status === 'mrv');
   if (overloaded.length > 0) {
     alerts.push({
       id: 'mrv_overload',
       type: 'warning',
-      title: 'Plafond Récupérable Dépassé (MRV)',
+      title: 'Plafond Récupérable Dépassé (MRV : > 20 séries)',
       metric: `${overloaded.map(m => `${m.name} (${m.effectiveSets}s)`).join(', ')}`,
-      message: 'Volume supérieur à 22 séries effectives. Risque de fatigue résiduelle prolongée ou surentraînement local.',
+      message: 'Volume supérieur à 20 séries effectives (> 20s). Risque de fatigue résiduelle prolongée ou surentraînement local.',
       recommendations: [
         'Réduire le volume direct sur ce groupe la semaine prochaine (semaine de décharge ou de maintien)'
       ]
@@ -1746,7 +1769,8 @@ export function getFrequentRecentExercises(
     }
   }
 
-  // 2. Fusionner avec le cache local (exercices récemment utilisés dans les sessions de travail de l'app)
+  // 2. Compléter avec le cache local uniquement pour les exercices non encore présents dans events
+  // (élimine tout double-comptage indéfini des exercices déjà enregistrés dans l'historique réel)
   const localUsage = getLocalExerciseUsage();
   for (const [exId, stats] of Object.entries(localUsage)) {
     if (!stats || !stats.count) continue;
@@ -1759,8 +1783,8 @@ export function getFrequentRecentExercises(
 
     const existing = map.get(canonicalId);
     if (existing) {
-      existing.count += stats.count;
-      existing.recentCount += stats.count;
+      // Déjà présent dans l'historique réel : on conserve le décompte réel de events sans le doubler,
+      // on met uniquement à jour la date de dernière séance si le cache est plus récent
       if (stats.lastUsed && (!existing.lastDate || stats.lastUsed > existing.lastDate)) {
         existing.lastDate = stats.lastUsed;
       }
@@ -1809,8 +1833,12 @@ export function getFrequentRecentExercises(
 /**
  * Détermine le groupe musculaire principal d'un exercice en trouvant le ratio le plus élevé dans muscleRatios.
  */
-export function getExercisePrimaryMuscle(exercise?: { category?: string; muscleRatios?: Record<string, number> } | null): string {
-  if (!exercise || !exercise.muscleRatios || Object.keys(exercise.muscleRatios).length === 0) {
+export function getExercisePrimaryMuscle(exercise?: { category?: string; muscleRatios?: Record<string, number>; customRatios?: Record<string, number> } | null): string {
+  const ratios = (exercise?.customRatios && Object.keys(exercise.customRatios).length > 0)
+    ? exercise.customRatios
+    : exercise?.muscleRatios;
+
+  if (!ratios || Object.keys(ratios).length === 0) {
     if (exercise?.category === 'lower') return 'quadriceps';
     if (exercise?.category === 'upper_push') return 'pectoraux';
     if (exercise?.category === 'upper_pull') return 'dorsaux';
@@ -1818,13 +1846,13 @@ export function getExercisePrimaryMuscle(exercise?: { category?: string; muscleR
   }
   let bestMuscle = '';
   let highestRatio = -1;
-  for (const [mId, ratio] of Object.entries(exercise.muscleRatios)) {
+  for (const [mId, ratio] of Object.entries(ratios)) {
     if (ratio > highestRatio) {
       highestRatio = ratio;
       bestMuscle = mId;
     }
   }
-  return bestMuscle || (exercise.category === 'lower' ? 'quadriceps' : exercise.category === 'upper_push' ? 'pectoraux' : exercise.category === 'upper_pull' ? 'dorsaux' : 'abdos');
+  return bestMuscle || (exercise?.category === 'lower' ? 'quadriceps' : exercise?.category === 'upper_push' ? 'pectoraux' : exercise?.category === 'upper_pull' ? 'dorsaux' : 'abdos');
 }
 
 /**
@@ -1833,7 +1861,8 @@ export function getExercisePrimaryMuscle(exercise?: { category?: string; muscleR
 export const ORDERED_PRIMARY_MUSCLES = [
   { id: 'pectoraux', name: 'Pectoraux', category: 'upper_push' },
   { id: 'dorsaux', name: 'Grand Dorsal & Dos', category: 'upper_pull' },
-  { id: 'deltoides_ant', name: 'Épaules (Deltoïdes)', category: 'upper_push' },
+  { id: 'deltoides_ant', name: 'Épaules (Antérieur / Latéral)', category: 'upper_push' },
+  { id: 'deltoides_post', name: 'Deltoïdes Postérieurs', category: 'upper_pull' },
   { id: 'trapezes', name: 'Trapèzes & Haut du dos', category: 'upper_pull' },
   { id: 'biceps', name: 'Biceps & Fléchisseurs', category: 'upper_pull' },
   { id: 'triceps', name: 'Triceps', category: 'upper_push' },

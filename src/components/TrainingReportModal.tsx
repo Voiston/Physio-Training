@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Quality, TrainingBlock, TargetCompetition } from '../hooks/useData';
 import { extractSessionLoad } from '../utils/physiology';
 import { isPrimary } from '../utils/loadHelpers';
@@ -40,7 +41,7 @@ export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
   );
   const [copied, setCopied] = useState(false);
 
-  // Fermeture accessible sur touche Escape
+  // Fermeture accessible sur touche Escape et classe pour isolation d'impression
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -48,7 +49,12 @@ export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.body.classList.add('has-print-modal');
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.classList.remove('has-print-modal');
+    };
   }, [onClose]);
 
   const today = useMemo(() => new Date(), []);
@@ -141,16 +147,16 @@ ${coachNotes}`;
     }
   };
 
-  return (
+  return createPortal(
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:overflow-visible"
+      className="report-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:overflow-visible print:inset-auto print:z-auto print:block print:w-full print:h-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="report-modal-title"
       aria-describedby="report-modal-desc"
     >
       <div 
-        className="w-full max-w-4xl bg-[#0d0d12] border border-white/20 rounded-2xl shadow-2xl text-slate-100 my-auto flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:bg-white print:text-black print:rounded-none"
+        className="report-modal-container w-full max-w-4xl bg-[#0d0d12] border border-white/20 rounded-2xl shadow-2xl text-slate-100 my-auto flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:bg-white print:text-black print:rounded-none print:w-full print:max-w-none print:m-0 print:p-0"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -457,6 +463,7 @@ ${coachNotes}`;
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

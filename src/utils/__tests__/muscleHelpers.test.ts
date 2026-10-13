@@ -60,9 +60,19 @@ describe('Muscle Helpers & Physiological Modeling', () => {
   });
 
   it('evaluates volume landmarks correctly (Israetel / Schoenfeld)', () => {
+    expect(getVolumeLandmark(0).status).toBe('under');
     expect(getVolumeLandmark(4).status).toBe('under');
+    expect(getVolumeLandmark(5.9).status).toBe('under');
+    expect(getVolumeLandmark(6).status).toBe('mev');
     expect(getVolumeLandmark(8).status).toBe('mev');
+    expect(getVolumeLandmark(9.9).status).toBe('mev');
+    // Exactement 10 séries : doit être MAV (Volume Adaptatif Optimal)
+    expect(getVolumeLandmark(10).status).toBe('mav');
     expect(getVolumeLandmark(15).status).toBe('mav');
+    // Exactement 20 séries : limite haute MAV
+    expect(getVolumeLandmark(20).status).toBe('mav');
+    // Strictement supérieur à 20 séries : MRV (Plafond Récupérable Dépassé)
+    expect(getVolumeLandmark(20.5).status).toBe('mrv');
     expect(getVolumeLandmark(24).status).toBe('mrv');
   });
 
@@ -397,16 +407,86 @@ describe('Muscle Helpers & Physiological Modeling', () => {
       expect(getExercisePrimaryMuscle(null)).toBe('abdos');
     });
 
-    it('contains all 12 key primary muscle groups in ORDERED_PRIMARY_MUSCLES', () => {
-      expect(ORDERED_PRIMARY_MUSCLES.length).toBe(12);
+    it('contains all 13 key primary muscle groups in ORDERED_PRIMARY_MUSCLES including deltoides_post', () => {
+      expect(ORDERED_PRIMARY_MUSCLES.length).toBe(13);
       const ids = ORDERED_PRIMARY_MUSCLES.map(m => m.id);
       expect(ids).toContain('pectoraux');
       expect(ids).toContain('dorsaux');
+      expect(ids).toContain('deltoides_ant');
+      expect(ids).toContain('deltoides_post');
       expect(ids).toContain('quadriceps');
       expect(ids).toContain('ischios');
       expect(ids).toContain('biceps');
       expect(ids).toContain('triceps');
       expect(ids).toContain('abdos');
+    });
+
+    it('credits deltoides_post in upper_pull for face_pull and rear_delt_fly', () => {
+      const facePull = EXERCISE_CATALOG.find(e => e.id === 'face_pull')!;
+      expect(facePull).toBeDefined();
+      expect(facePull.category).toBe('upper_pull');
+      expect(facePull.muscleRatios.deltoides_post).toBe(0.9);
+      expect(facePull.muscleRatios.deltoides_ant).toBeUndefined();
+
+      const rearDelt = EXERCISE_CATALOG.find(e => e.id === 'rear_delt_fly')!;
+      expect(rearDelt).toBeDefined();
+      expect(rearDelt.category).toBe('upper_pull');
+      expect(rearDelt.muscleRatios.deltoides_post).toBe(1.0);
+      expect(rearDelt.muscleRatios.deltoides_ant).toBeUndefined();
+
+      // Session avec face pull : doit créditer upper_pull, AUCUN volume push
+      const session = computeSessionMuscularBreakdown([
+        { id: 'face_pull', name: 'Face Pull', sets: 4 }
+      ]);
+      expect(session.muscleLoads['deltoides_post']?.effectiveSets).toBe(3.6);
+      expect(session.muscleLoads['deltoides_ant']?.effectiveSets || 0).toBe(0);
+    });
+
+    it('preserves customRatios snapshot and does NOT fall back to quadriceps/ischios for unknown exercises', () => {
+      // 1. Exercice personnalisé non présent dans le catalogue mais avec customRatios snapshotté
+      const customPecsEx = {
+        id: 'custom_incline_chest',
+        name: 'Incline Pec Press Perso',
+        sets: 3,
+        customRatios: { pectoraux: 1.0, triceps: 0.5 }
+      };
+      const breakdownCustom = computeSessionMuscularBreakdown([customPecsEx]);
+      expect(breakdownCustom.muscleLoads['pectoraux']?.effectiveSets).toBe(3);
+      expect(breakdownCustom.muscleLoads['triceps']?.effectiveSets).toBe(1.5);
+      expect(breakdownCustom.muscleLoads['quadriceps']?.effectiveSets || 0).toBe(0);
+      expect(breakdownCustom.muscleLoads['ischios']?.effectiveSets || 0).toBe(0);
+
+      // 2. Exercice complètement inconnu sans ratios : ne doit PAS injecter de faux quadriceps/ischios
+      const totallyUnknownEx = {
+        id: 'deleted_or_foreign_device_ex',
+        name: 'Appareil Exotique Supprimé',
+        sets: 3
+      };
+      const breakdownUnknown = computeSessionMuscularBreakdown([totallyUnknownEx]);
+      expect(breakdownUnknown.muscleLoads['quadriceps']?.effectiveSets || 0).toBe(0);
+      expect(breakdownUnknown.muscleLoads['ischios']?.effectiveSets || 0).toBe(0);
+    });
+
+    it('does NOT count exercises twice between events history and localUsage cache in getFrequentRecentExercises', () => {
+      // Préparation d'une séance dans events avec 1 squat
+      const testEvents = {
+        leg: {
+          '2026-10-10': {
+            exercises: [
+              { id: 'squat', name: 'Squat', sets: 4 }
+            ]
+          }
+        }
+      };
+
+      // Simulation du cache local enregistré pour ce même exercice
+      recordExerciseUsage('squat');
+
+      const frequent = getFrequentRecentExercises(testEvents);
+      const squatStat = frequent.find(f => f.exerciseId === 'squat');
+      expect(squatStat).toBeDefined();
+      // Doit être 1 (issu de events), et non 1 + 1 = 2 !
+      expect(squatStat?.count).toBe(1);
     });
   });
 });

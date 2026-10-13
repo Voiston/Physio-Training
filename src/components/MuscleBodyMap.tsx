@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { MUSCLE_GROUPS, VolumeStatus } from '../utils/muscleHelpers';
+import { MUSCLE_GROUPS, VolumeStatus, getVolumeLandmark } from '../utils/muscleHelpers';
 import { Layers, Dumbbell, Sparkles, Check, ChevronRight, Eye, Info, X, Activity, Target, Flame, ShieldAlert, Zap } from 'lucide-react';
 import { haptics } from '../utils/haptics';
 
@@ -31,6 +31,7 @@ const ANTAGONIST_PAIRS: Record<string, { partnerId: string; name: string; target
   ischios: { partnerId: 'quadriceps', name: 'Quadriceps', targetRatio: 0.60, label: 'Ratio H:Q (Ischios / Quad)' },
   pectoraux: { partnerId: 'dorsaux', name: 'Grand Dorsal', targetRatio: 1.0, label: 'Équilibre Poussée / Tirage' },
   deltoides_ant: { partnerId: 'dorsaux', name: 'Grand Dorsal', targetRatio: 1.0, label: 'Équilibre Poussée / Tirage' },
+  deltoides_post: { partnerId: 'deltoides_ant', name: 'Deltoïdes Antérieurs', targetRatio: 1.0, label: 'Équilibre Antérieur / Postérieur Épaules' },
   dorsaux: { partnerId: 'pectoraux', name: 'Pectoraux', targetRatio: 1.0, label: 'Équilibre Tirage / Poussée' },
   trapezes: { partnerId: 'pectoraux', name: 'Pectoraux', targetRatio: 1.0, label: 'Équilibre Tirage / Poussée' },
   biceps: { partnerId: 'triceps', name: 'Triceps', label: 'Fléchisseurs / Extenseurs bras' },
@@ -72,10 +73,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
     }
 
     if (sets === 0) return '#1e293b'; // Inactif - Slate 800
-    if (sets < 6) return '#475569';   // Maintien (<6s) - Slate 600
-    if (sets <= 10) return '#0284c7';  // MEV (6-10s) - Sky 600
-    if (sets <= 20) return '#10b981';  // MAV (10-20s, Optimal) - Emerald 500
-    return '#f59e0b';                 // MRV (>20s, Plafond) - Amber 500
+    return getVolumeLandmark(sets).hexColor;
   };
 
   const getMuscleGradientId = (muscleId: string) => {
@@ -92,10 +90,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
     }
 
     if (sets === 0) return 'grad-inactive';
-    if (sets < 6) return 'grad-maintien';
-    if (sets <= 10) return 'grad-mev';
-    if (sets <= 20) return 'grad-mav';
-    return 'grad-mrv';
+    return getVolumeLandmark(sets).gradientId;
   };
 
   const getMuscleGlow = (muscleId: string) => {
@@ -108,7 +103,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
       return 'drop-shadow(0 0 10px rgba(16, 185, 129, 0.9))';
     }
     const sets = muscleLoads[muscleId]?.effectiveSets || 0;
-    if (sets >= 10 && sets <= 20) {
+    if (getVolumeLandmark(sets).status === 'mav') {
       return 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.35))';
     }
     return 'none';
@@ -337,7 +332,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7] shadow-[0_0_6px_rgba(2,132,199,0.5)]" />
-              <span className="text-sky-300">6-10s : MEV Minimal</span>
+              <span className="text-sky-300">6-9s : MEV Minimal</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.8)] ring-1 ring-emerald-400" />
@@ -857,34 +852,34 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
               <g
                 role="button"
                 tabIndex={0}
-                aria-label={`Deltoïdes postérieurs : ${muscleLoads['deltoides_ant']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'deltoides_ant'}
-                onMouseEnter={() => setHoveredMuscle('deltoides_ant')}
+                aria-label={`Deltoïdes postérieurs : ${muscleLoads['deltoides_post']?.effectiveSets || 0} séries effectives`}
+                aria-pressed={selectedMuscleId === 'deltoides_post'}
+                onMouseEnter={() => setHoveredMuscle('deltoides_post')}
                 onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('deltoides_ant')}
+                onFocus={() => setHoveredMuscle('deltoides_post')}
                 onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('deltoides_ant')}
+                onClick={() => handleMuscleClick('deltoides_post')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    handleMuscleClick('deltoides_ant');
+                    handleMuscleClick('deltoides_post');
                   }
                 }}
-                style={{ filter: getMuscleGlow('deltoides_ant') }}
+                style={{ filter: getMuscleGlow('deltoides_post') }}
                 className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
               >
                 {/* Deltoïde post gauche */}
                 <path
                   d="M74 66 C64 68 48 76 46 90 C46 98 52 102 56 100 C62 92 68 82 72 72 Z"
-                  fill={`url(#${getMuscleGradientId('deltoides_ant')})`}
-                  stroke={selectedMuscleId === 'deltoides_ant' ? '#38bdf8' : '#ffffff20'}
+                  fill={`url(#${getMuscleGradientId('deltoides_post')})`}
+                  stroke={selectedMuscleId === 'deltoides_post' ? '#38bdf8' : '#ffffff20'}
                   strokeWidth="1.4"
                 />
                 {/* Deltoïde post droit */}
                 <path
                   d="M126 66 C136 68 152 76 154 90 C154 98 148 102 144 100 C138 92 132 82 128 72 Z"
-                  fill={`url(#${getMuscleGradientId('deltoides_ant')})`}
-                  stroke={selectedMuscleId === 'deltoides_ant' ? '#38bdf8' : '#ffffff20'}
+                  fill={`url(#${getMuscleGradientId('deltoides_post')})`}
+                  stroke={selectedMuscleId === 'deltoides_post' ? '#38bdf8' : '#ffffff20'}
                   strokeWidth="1.4"
                 />
               </g>
@@ -1227,23 +1222,22 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                     {inspectedData.data.effectiveSets || 0} <span className="text-xs font-normal text-slate-400">séries</span>
                   </div>
                   <div className="text-[10px] font-bold">
-                    {inspectedData.data.effectiveSets >= 10 && inspectedData.data.effectiveSets <= 20 ? (
-                      <span className="text-emerald-400 flex items-center gap-1 justify-end">
-                        <Check size={11} /> MAV Optimal (10-20s)
-                      </span>
-                    ) : inspectedData.data.effectiveSets > 20 ? (
-                      <span className="text-amber-400 flex items-center gap-1 justify-end">
-                        <ShieldAlert size={11} /> MRV Plafond (&gt;20s)
-                      </span>
-                    ) : inspectedData.data.effectiveSets >= 6 ? (
-                      <span className="text-sky-400 flex items-center gap-1 justify-end">
-                        <Zap size={11} /> MEV Minimal (6-10s)
-                      </span>
-                    ) : inspectedData.data.effectiveSets > 0 ? (
-                      <span className="text-slate-400">🛡️ Maintien (&lt;6s)</span>
-                    ) : (
-                      <span className="text-slate-600">0s : Inactif</span>
-                    )}
+                    {(() => {
+                      const sets = inspectedData.data.effectiveSets || 0;
+                      if (sets === 0) {
+                        return <span className="text-slate-600">0s : Inactif</span>;
+                      }
+                      const landmark = getVolumeLandmark(sets);
+                      return (
+                        <span className={`${landmark.textColor} flex items-center gap-1 justify-end`}>
+                          {landmark.status === 'mav' && <Check size={11} />}
+                          {landmark.status === 'mrv' && <ShieldAlert size={11} />}
+                          {landmark.status === 'mev' && <Zap size={11} />}
+                          {landmark.status === 'under' && <span>🛡️</span>}
+                          {landmark.shortLabel}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1287,11 +1281,11 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                 <div className="w-full bg-slate-950 rounded-full h-2 p-0.5 border border-white/10 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      inspectedData.data.effectiveSets > 20
+                      getVolumeLandmark(inspectedData.data.effectiveSets || 0).status === 'mrv'
                         ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
-                        : inspectedData.data.effectiveSets >= 10
+                        : getVolumeLandmark(inspectedData.data.effectiveSets || 0).status === 'mav'
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-sm shadow-emerald-500/50'
-                        : inspectedData.data.effectiveSets >= 6
+                        : getVolumeLandmark(inspectedData.data.effectiveSets || 0).status === 'mev'
                         ? 'bg-sky-500'
                         : 'bg-slate-600'
                     }`}

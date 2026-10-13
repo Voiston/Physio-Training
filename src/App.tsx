@@ -585,7 +585,14 @@ function AppContent() {
           onApplyScenario={applySimulationScenario}
           onAddSimulatedSession={addSimulatedEvent}
           onClear={clearSimulation}
-          onCommit={commitSimulation}
+          onCommit={() => {
+            commitSimulation();
+            showToast({
+              title: 'Simulation validée',
+              message: 'Séances intégrées au calendrier réel avec propagation des impacts.',
+              type: 'success'
+            });
+          }}
         />
 
         {/* CONTENU SELON L'ONGLET ACTIF (Encapsulé dans le repère sémantique main) */}

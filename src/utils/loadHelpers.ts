@@ -135,3 +135,77 @@ export function getQualityDayLoad(
   if (!includeSecondary && !isPrimary(session)) return 0;
   return extractSessionLoad(session);
 }
+
+export const CARDIO_QUALITIES = ['vo2max', 'seuil', 'ef', 'co2', 'gut'];
+export const FORCE_QUALITIES = ['pull', 'push', 'leg', 'plyo', 'descente', 'abdos', 'proprio', 'isolation'];
+
+/**
+ * Calcule la charge d'entraînement (en UA Foster) selon le domaine physiologique de la filière.
+ * - Filière Cardio : Durée * RPE Cardio (ex: VO2max 35 min @ RPE 8 = 280 UA)
+ * - Filière Force : Durée * RPE Musculaire * (1.15 si excentrique)
+ * - Filière Mixte : Moyenne Cardio & Musculaire
+ */
+export function computeSessionLoad(
+  qualityId: string,
+  duration: number,
+  rpeCardio: number,
+  rpeMusc: number,
+  isEccentric: boolean = false
+): number {
+  const numDur = Math.max(0, Number(duration) || 0);
+  if (numDur === 0) return 0;
+  const numCardio = Math.max(0, Math.min(10, Number(rpeCardio) || 5));
+  const numMusc = Math.max(0, Math.min(10, Number(rpeMusc) || 5));
+  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
+
+  const loadCardio = Math.round(numDur * numCardio);
+  const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier);
+
+  const isCardio = CARDIO_QUALITIES.includes(qualityId);
+  const isForce = FORCE_QUALITIES.includes(qualityId);
+
+  if (isCardio) return loadCardio;
+  if (isForce) return loadMusc;
+  return Math.round((loadCardio + loadMusc) / 2);
+}
+
+/**
+ * Calcule la charge quotidienne moyenne de référence de l'athlète sur les N derniers jours (par défaut 28 jours).
+ * Renvoie une charge standard réaliste si l'historique est vierge ou inférieur à un seuil minimal.
+ */
+export function getAthleteBaselineDailyLoad(
+  events: Record<string, Record<string, SessionData>> | null | undefined,
+  daysCount: number = 28,
+  referenceDate: Date = new Date()
+): { dailyAvg: number; weeklyAvg: number; hasHistoricalData: boolean } {
+  if (!events) {
+    return { dailyAvg: 350, weeklyAvg: 2450, hasHistoricalData: false };
+  }
+
+  let totalHistoricalLoad = 0;
+  let activeDays = 0;
+
+  for (let i = 1; i <= daysCount; i++) {
+    const d = new Date(referenceDate.getTime() - i * 86400000);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayLoad = getDailyAthleteLoad(events, dateStr);
+    if (dayLoad > 0) {
+      totalHistoricalLoad += dayLoad;
+      activeDays += 1;
+    }
+  }
+
+  // Si l'athlète a au moins 3 jours d'entraînement enregistrés sur la période
+  if (activeDays >= 3 && totalHistoricalLoad > 0) {
+    const dailyAvg = Math.round(totalHistoricalLoad / daysCount);
+    const effectiveDailyAvg = Math.max(150, dailyAvg);
+    return {
+      dailyAvg: effectiveDailyAvg,
+      weeklyAvg: effectiveDailyAvg * 7,
+      hasHistoricalData: true,
+    };
+  }
+
+  return { dailyAvg: 350, weeklyAvg: 2450, hasHistoricalData: false };
+}
+

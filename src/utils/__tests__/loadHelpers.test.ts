@@ -3,7 +3,9 @@ import {
   getDailyAthleteLoad, 
   getDailyAthleteDuration, 
   isPrimary, 
-  extractSessionLoad 
+  extractSessionLoad,
+  computeSessionLoad,
+  getAthleteBaselineDailyLoad
 } from '../loadHelpers';
 
 describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
@@ -63,5 +65,48 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
     };
     expect(getDailyAthleteLoad(events, '2026-10-02')).toBe(0);
     expect(getDailyAthleteDuration(events, '2026-10-02')).toBe(0);
+  });
+
+  it('computes session load according to physiological domain', () => {
+    // Filière Cardio : Durée * RPE Cardio (VO2max 35 min @ RPE 8 = 280 UA)
+    expect(computeSessionLoad('vo2max', 35, 8, 6)).toBe(280);
+    expect(computeSessionLoad('seuil', 50, 7, 5)).toBe(350);
+    expect(computeSessionLoad('ef', 60, 4, 3)).toBe(240);
+
+    // Filière Force : Durée * RPE Musc (* 1.15 si excentrique)
+    expect(computeSessionLoad('leg', 45, 6, 8)).toBe(360);
+    expect(computeSessionLoad('leg', 45, 6, 8, true)).toBe(414); // 45 * 8 * 1.15 = 414
+    expect(computeSessionLoad('pull', 30, 4, 7)).toBe(210);
+
+    // Filière Mixte : Moyenne Cardio & Musc
+    expect(computeSessionLoad('sprint', 20, 7, 6)).toBe(130); // (140 + 120) / 2 = 130
+    expect(computeSessionLoad('custom_quality', 40, 8, 6)).toBe(280); // (320 + 240) / 2 = 280
+
+    // Durée 0 -> Charge 0
+    expect(computeSessionLoad('vo2max', 0, 8, 8)).toBe(0);
+  });
+
+  it('calculates athlete baseline daily load from historical events', () => {
+    // Cas historique vierge -> fallback standard
+    const emptyBaseline = getAthleteBaselineDailyLoad(null);
+    expect(emptyBaseline.dailyAvg).toBe(350);
+    expect(emptyBaseline.weeklyAvg).toBe(2450);
+    expect(emptyBaseline.hasHistoricalData).toBe(false);
+
+    // Cas avec historique récent (ex: 4 séances de 350 UA sur les 7 derniers jours)
+    const refDate = new Date('2026-10-15T12:00:00Z');
+    const sampleEvents: Record<string, Record<string, any>> = {
+      vo2max: {
+        '2026-10-14': { load: 350, isSecondary: false },
+        '2026-10-12': { load: 350, isSecondary: false },
+        '2026-10-10': { load: 350, isSecondary: false },
+        '2026-10-08': { load: 350, isSecondary: false }
+      }
+    };
+    const baseline = getAthleteBaselineDailyLoad(sampleEvents, 14, refDate);
+    expect(baseline.hasHistoricalData).toBe(true);
+    // 4 * 350 = 1400 UA sur 14 jours = 100 UA/j, borné au minimum physiologique de 150 UA/j
+    expect(baseline.dailyAvg).toBe(150);
+    expect(baseline.weeklyAvg).toBe(1050);
   });
 });

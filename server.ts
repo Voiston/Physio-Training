@@ -24,7 +24,7 @@ async function startServer() {
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com",
     "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://festive-condition-nzbz0.firebaseapp.com https://apis.google.com https://accounts.google.com",
     "frame-src 'self' https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com https://apis.google.com",
-    "frame-ancestors 'self'",
+    "frame-ancestors 'self' https://*.google.com https://*.run.app https://aistudio.google.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
@@ -35,7 +35,6 @@ async function startServer() {
   app.use((_req, res, next) => {
     res.setHeader('Content-Security-Policy', CSP_POLICY);
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     // HSTS (HTTP Strict Transport Security) : force HTTPS pendant 1 an

@@ -312,18 +312,58 @@ body.gym-open .shimmer-bar::after {
   body {
     background: #ffffff !important;
     color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  .no-print, header, aside, .SimulationBanner, .fixed {
+
+  /* Si le modal de bilan/rapport est ouvert, on masque l'application sous-jacente pour n'imprimer QUE le rapport */
+  body.has-print-modal #root {
     display: none !important;
   }
+
+  /* Éléments d'interface non imprimables (boutons d'action, en-tête d'appli, bannières) */
+  .no-print, header, aside, .SimulationBanner {
+    display: none !important;
+  }
+
+  /* Portail dédié du rapport en pleine page d'impression */
+  body.has-print-modal .report-modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    inset: auto !important;
+    z-index: auto !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  body.has-print-modal .report-modal-container {
+    max-height: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
   .printable-report {
     background: #ffffff !important;
     color: #000000 !important;
     max-height: none !important;
     overflow: visible !important;
     padding: 0 !important;
+    margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
+    width: 100% !important;
   }
 }
 

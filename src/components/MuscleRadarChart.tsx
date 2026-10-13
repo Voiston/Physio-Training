@@ -3,7 +3,7 @@ import {
   Radar, RadarChart as RechartsRadar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   ResponsiveContainer, Tooltip 
 } from 'recharts';
-import { WeeklyMuscleItem, MUSCLE_GROUPS } from '../utils/muscleHelpers';
+import { WeeklyMuscleItem, MUSCLE_GROUPS, getVolumeLandmark } from '../utils/muscleHelpers';
 
 interface MuscleRadarChartProps {
   muscles: Record<string, WeeklyMuscleItem>;
@@ -18,7 +18,8 @@ const SHORT_NAMES: Record<string, string> = {
   glutes: 'Fessiers',
   mollets: 'Mollets',
   pectoraux: 'Pecs',
-  deltoides_ant: 'Épaules',
+  deltoides_ant: 'Delt. Ant/Lat',
+  deltoides_post: 'Delt. Post',
   triceps: 'Triceps',
   dorsaux: 'Dorsaux',
   trapezes: 'Trapèzes',
@@ -37,7 +38,7 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
   const orderedMuscleIds = [
     'quadriceps', 'glutes', 'ischios', 'mollets', 
     'lombaires', 'abdos',
-    'dorsaux', 'trapezes', 'biceps', 
+    'dorsaux', 'trapezes', 'deltoides_post', 'biceps', 
     'deltoides_ant', 'pectoraux', 'triceps'
   ];
 
@@ -73,22 +74,25 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
     const data = payload[0]?.payload;
     if (!data) return null;
 
-    const sets = data.sets;
-    let statusText = 'Maintien (<6s)';
-    let statusColor = 'text-slate-400';
+    const sets = Number(data.sets) || 0;
+    let statusText = 'Inactif (0 série)';
+    let statusColor = 'text-slate-500';
 
-    if (sets >= 10 && sets <= 20) {
-      statusText = '✓ Zone Optimale MAV (10-20s)';
-      statusColor = 'text-emerald-400 font-bold';
-    } else if (sets > 20) {
-      statusText = '⚠️ Plafond MRV Dépassé (>20s)';
-      statusColor = 'text-amber-400 font-bold';
-    } else if (sets >= 6) {
-      statusText = 'Stimulus Minimal MEV (6-10s)';
-      statusColor = 'text-sky-400';
-    } else if (sets === 0) {
-      statusText = 'Inactif (0 série)';
-      statusColor = 'text-slate-500';
+    if (sets > 0) {
+      const landmark = getVolumeLandmark(sets);
+      if (landmark.status === 'mav') {
+        statusText = `✓ Zone Optimale ${landmark.shortLabel}`;
+        statusColor = 'text-emerald-400 font-bold';
+      } else if (landmark.status === 'mrv') {
+        statusText = `⚠️ Plafond ${landmark.shortLabel} Dépassé`;
+        statusColor = 'text-amber-400 font-bold';
+      } else if (landmark.status === 'mev') {
+        statusText = `Stimulus Minimal ${landmark.shortLabel}`;
+        statusColor = 'text-sky-400';
+      } else {
+        statusText = landmark.shortLabel;
+        statusColor = 'text-slate-400';
+      }
     }
 
     return (

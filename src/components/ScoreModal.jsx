@@ -351,6 +351,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
     let exName = customExName.trim();
     let exId = selectedExId;
+    let exRatios = null;
 
     if (selectedExId === 'custom') {
       if (!exName) exName = 'Exercice personnalisé';
@@ -358,6 +359,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     } else {
       const found = allAvailableExercises.find(c => c.id === selectedExId);
       exName = found ? found.name : selectedExId;
+      exRatios = found?.muscleRatios;
     }
 
     setExercises(prev => [
@@ -369,7 +371,8 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
         rir: rirVal,
         rpe: rp,
         ...(r !== undefined ? { reps: r } : {}),
-        ...(w !== undefined ? { weightKg: w } : {})
+        ...(w !== undefined ? { weightKg: w } : {}),
+        ...(exRatios && Object.keys(exRatios).length > 0 ? { customRatios: { ...exRatios } } : {})
       }
     ]);
 
@@ -1352,11 +1355,17 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   </div>
                 </div>
 
-                {/* Formule didactique explicite de Foster */}
+                {/* Formule didactique explicite de Foster selon la filière */}
                 {duration && (rpeMusc || rpeCardio) && (
                   <div className="text-xs font-mono text-slate-300 bg-black/40 p-2.5 rounded-xl border border-white/10 flex items-center justify-between flex-wrap gap-2">
                     <span>
-                      📐 Formule : {duration} min × RPE max({rpeCardio || 0}, {rpeMusc || 0}){isEccentric ? ' × 1.15 (excentrique)' : ''}
+                      {isCardio ? (
+                        <>📐 Formule Cardio : {duration} min × RPE cardio ({rpeCardio || 0})</>
+                      ) : isForce ? (
+                        <>📐 Formule Musculaire : {duration} min × RPE musc ({rpeMusc || 0}){isEccentric ? ' × 1.15 (excentrique)' : ''}</>
+                      ) : (
+                        <>📐 Formule Mixte : {duration} min × moyenne RPE ({((numCardio + numMusc * eccentricMultiplier) / 2).toFixed(1)})</>
+                      )}
                     </span>
                     <span className="font-bold text-blue-300">
                       = {load} UA (Unités Arbitraires)

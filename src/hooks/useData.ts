@@ -21,7 +21,7 @@ import {
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
-import { isPrimary } from '../utils/loadHelpers';
+import { isPrimary, computeSessionLoad, getAthleteBaselineDailyLoad } from '../utils/loadHelpers';
 import { SessionExercise, getSavedCustomExercises } from '../utils/muscleHelpers';
 import { 
   isSafeId, 
@@ -418,7 +418,8 @@ export function useData() {
   const commitSimulation = () => {
     Object.entries(simulatedEvents).forEach(([qId, dates]) => {
       Object.entries(dates).forEach(([dateStr, sessionData]) => {
-        saveEventWithImpacts(qId, dateStr, sessionData, false);
+        const { isSimulated, ...clean } = sessionData;
+        saveEventWithImpacts(qId, dateStr, clean, true);
       });
     });
     setSimulatedEvents({});
@@ -431,44 +432,102 @@ export function useData() {
     const newSim: Record<string, Record<string, SessionData>> = {};
     qualities.forEach(q => (newSim[q.id] = {}));
 
+    // Calibration relative basée sur la charge quotidienne moyenne réelle de l'athlète (28 derniers jours)
+    const baseline = getAthleteBaselineDailyLoad(events, 28, today);
+
     if (scenarioType === 'tapering') {
-      // Affûtage : J+2 séance rappel haute intensité (ex: VO2max court), J+5 séance rappel tonique, J+9 séance très courte de dynamisme, volume global divisé par 2
+      // Affûtage Compétition : volume réduit de ~35%, maintien de l'intensité sur rappels toniques ciblés
       const d2 = getLocalYYYYMMDD(new Date(today.getTime() + 2 * 86400000));
       const d5 = getLocalYYYYMMDD(new Date(today.getTime() + 5 * 86400000));
       const d7 = getLocalYYYYMMDD(new Date(today.getTime() + 7 * 86400000));
       const d9 = getLocalYYYYMMDD(new Date(today.getTime() + 9 * 86400000));
       const d12 = getLocalYYYYMMDD(new Date(today.getTime() + 12 * 86400000));
 
+      const scale = Math.max(0.6, Math.min(1.4, baseline.dailyAvg / 350));
+      const durVo2 = Math.round(35 * scale);
+      const durEf = Math.round(40 * scale);
+      const durSprint = Math.max(15, Math.round(20 * scale));
+      const durVo2Short = Math.max(20, Math.round(25 * scale));
+      const durEfShort = Math.max(20, Math.round(25 * scale));
+
       newSim['vo2max'] = {
-        [d2]: { duration: 35, rpeCardio: 8, rpeMusc: 6, load: 245, isSimulated: true },
-        [d9]: { duration: 25, rpeCardio: 7, rpeMusc: 5, load: 150, isSimulated: true }
+        [d2]: { 
+          duration: durVo2, 
+          rpeCardio: 8, 
+          rpeMusc: 6, 
+          load: computeSessionLoad('vo2max', durVo2, 8, 6), 
+          isSimulated: true 
+        },
+        [d9]: { 
+          duration: durVo2Short, 
+          rpeCardio: 7, 
+          rpeMusc: 5, 
+          load: computeSessionLoad('vo2max', durVo2Short, 7, 5), 
+          isSimulated: true 
+        }
       };
       newSim['ef'] = {
-        [d5]: { duration: 40, rpeCardio: 4, rpeMusc: 3, load: 140, isSimulated: true },
-        [d12]: { duration: 25, rpeCardio: 3, rpeMusc: 2, load: 60, isSimulated: true }
+        [d5]: { 
+          duration: durEf, 
+          rpeCardio: 4, 
+          rpeMusc: 3, 
+          load: computeSessionLoad('ef', durEf, 4, 3), 
+          isSimulated: true 
+        },
+        [d12]: { 
+          duration: durEfShort, 
+          rpeCardio: 3, 
+          rpeMusc: 2, 
+          load: computeSessionLoad('ef', durEfShort, 3, 2), 
+          isSimulated: true 
+        }
       };
       newSim['sprint'] = {
-        [d7]: { duration: 20, rpeCardio: 7, rpeMusc: 6, load: 130, isSimulated: true }
+        [d7]: { 
+          duration: durSprint, 
+          rpeCardio: 7, 
+          rpeMusc: 6, 
+          load: computeSessionLoad('sprint', durSprint, 7, 6), 
+          isSimulated: true 
+        }
       };
     } else if (scenarioType === 'overload') {
-      // Surcharge de bloc : séances fortes quotidiennes sur 7 jours
+      // Surcharge de bloc : +30% de charge quotidienne répartie sur 7 jours
+      const targetDailyLoad = Math.round(baseline.dailyAvg * 1.3);
       for (let i = 1; i <= 7; i++) {
         const d = getLocalYYYYMMDD(new Date(today.getTime() + i * 86400000));
-        const qId = i % 2 === 0 ? 'seuil' : 'leg';
+        const isCardioDay = i % 2 === 0;
+        const qId = isCardioDay ? 'seuil' : 'leg';
+        const rpeCardio = isCardioDay ? 8 : 6;
+        const rpeMusc = isCardioDay ? 6 : 8;
+        const effectiveRpe = 8;
+        const duration = Math.max(40, Math.min(100, Math.round(targetDailyLoad / effectiveRpe)));
+        const load = computeSessionLoad(qId, duration, rpeCardio, rpeMusc);
+
         newSim[qId] = {
           ...(newSim[qId] || {}),
-          [d]: { duration: 75, rpeCardio: 8, rpeMusc: 8, load: 600, isSimulated: true }
+          [d]: { 
+            duration, 
+            rpeCardio, 
+            rpeMusc, 
+            load, 
+            isSimulated: true 
+          }
         };
       }
     } else if (scenarioType === 'recovery') {
-      // Récupération active : 7 jours très doux
-      for (let i = 1; i <= 6; i += 2) {
-        const d = getLocalYYYYMMDD(new Date(today.getTime() + i * 86400000));
-        newSim['proprio'] = {
-          ...(newSim['proprio'] || {}),
-          [d]: { duration: 30, rpeCardio: 2, rpeMusc: 2, load: 60, isSimulated: true }
-        };
-      }
+      // Récupération active : séances douces à charge minimale (< 100 UA)
+      const d1 = getLocalYYYYMMDD(new Date(today.getTime() + 1 * 86400000));
+      const d3 = getLocalYYYYMMDD(new Date(today.getTime() + 3 * 86400000));
+      const d5 = getLocalYYYYMMDD(new Date(today.getTime() + 5 * 86400000));
+
+      newSim['proprio'] = {
+        [d1]: { duration: 30, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('proprio', 30, 2, 2), isSimulated: true },
+        [d5]: { duration: 25, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('proprio', 25, 2, 2), isSimulated: true }
+      };
+      newSim['ef'] = {
+        [d3]: { duration: 30, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('ef', 30, 2, 2), isSimulated: true }
+      };
     }
 
     setSimulatedEvents(newSim);

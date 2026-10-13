@@ -91,7 +91,15 @@ describe('Phase 1 Physiology Verifications', () => {
       evalDate.setDate(baseDate.getDate() + dayOffset);
       const evalStr = evalDate.toISOString().split('T')[0];
 
-      const state = computeCellState(qVo2, evts, evalStr);
+      // Signature: computeCellState(qDef, targetDateStr, eventsForQuality)
+      const state = computeCellState(qVo2, evalStr, evts);
+
+      // Vérifie que les données sont bien lues et que le niveau de départ est actif (> 0)
+      if (dayOffset === 0) {
+        expect(state.currentLevel).toBe(100);
+        expect(state.status).toBe('green');
+      }
+
       // Niveau doit être strictement décroissant ou égal (pas de bond de 20% à 55% !)
       expect(state.currentLevel).toBeLessThanOrEqual(prevLevel);
       prevLevel = state.currentLevel;

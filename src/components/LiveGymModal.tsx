@@ -971,6 +971,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         reps: avgReps > 0 ? avgReps : undefined,
         rir: avgRir,
         rpe: 10 - avgRir,
+        customRatios: ex.muscleRatios && Object.keys(ex.muscleRatios).length > 0 ? { ...ex.muscleRatios } : undefined,
         detailSets: ex.sets.map(s => ({
           weightKg: s.weightKg,
           reps: s.reps,
