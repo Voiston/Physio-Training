@@ -5,7 +5,8 @@ import {
   isPrimary, 
   extractSessionLoad,
   computeSessionLoad,
-  getAthleteBaselineDailyLoad
+  getAthleteBaselineDailyLoad,
+  getDailyAthleteSessionCount
 } from '../loadHelpers';
 
 describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
@@ -109,4 +110,31 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
     expect(baseline.dailyAvg).toBe(150);
     expect(baseline.weeklyAvg).toBe(1050);
   });
+
+  it('correctly handles multiple sessions (subSessions) on the same day for a quality', () => {
+    const testDate = '2026-10-13';
+    const multiSessionEvents: Record<string, Record<string, any>> = {
+      ef: {
+        [testDate]: {
+          load: 450, // 270 (matin) + 180 (soir)
+          duration: 75, // 45 min + 30 min
+          isSecondary: false,
+          subSessions: [
+            { id: 'sub_1', name: 'Séance 1 (Matin)', duration: 45, load: 270, rpeMusc: 6, rpeCardio: 6 },
+            { id: 'sub_2', name: 'Séance 2 (Soir)', duration: 30, load: 180, rpeMusc: 6, rpeCardio: 6 }
+          ]
+        }
+      }
+    };
+
+    // getDailyAthleteLoad retourne le total combiné
+    expect(getDailyAthleteLoad(multiSessionEvents, testDate)).toBe(450);
+
+    // getDailyAthleteDuration retourne la durée cumulée
+    expect(getDailyAthleteDuration(multiSessionEvents, testDate)).toBe(75);
+
+    // getDailyAthleteSessionCount compte bien les 2 séances distinctes
+    expect(getDailyAthleteSessionCount(multiSessionEvents, testDate)).toBe(2);
+  });
 });
+

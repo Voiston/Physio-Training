@@ -710,7 +710,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               <XAxis dataKey="label" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
               <YAxis yAxisId="left" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
               <YAxis yAxisId="right" orientation="right" stroke="#38bdf8" tick={{ fill: '#38bdf8', fontSize: 11 }} unit="h" />
-              <Tooltip content={<WeeklyChartTooltip />} />
+              <Tooltip content={WeeklyChartTooltip} />
               <Legend 
                 wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
                 formatter={(val) => val === 'totalLoad' ? 'Charge Totale (UA)' : 'Temps (Heures)'} 

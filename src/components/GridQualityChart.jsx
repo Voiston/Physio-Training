@@ -36,7 +36,7 @@ const GridQualityChart = memo(function GridQualityChart({ series = [] }) {
           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
           <XAxis dataKey="day" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} />
           <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 10 }} />
-          <Tooltip content={<CustomInlineTooltip />} />
+          <Tooltip content={CustomInlineTooltip} />
           <Bar dataKey="load" fill="#3b82f6" opacity={0.35} radius={[3, 3, 0, 0]} name="Charge" />
           <Line type="monotone" dataKey="ema3" stroke="#38bdf8" strokeWidth={2} dot={false} name="EMA 3j" />
           <Line type="monotone" dataKey="ema7" stroke="#3b82f6" strokeWidth={2} dot={false} name="EMA 7j" />

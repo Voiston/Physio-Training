@@ -241,7 +241,7 @@ export default function QualityChartModal({ quality, events, onClose }) {
                 tickLine={{ stroke: '#64748b' }} 
                 axisLine={{ stroke: '#64748b', strokeWidth: 1.2 }} 
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={CustomTooltip} />
               <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
               
               <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.25)" radius={[2, 2, 0, 0]} maxBarSize={18} />

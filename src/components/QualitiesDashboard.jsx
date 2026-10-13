@@ -936,7 +936,7 @@ export default function QualitiesDashboard({
                   tickLine={{ stroke: '#64748b' }} 
                   axisLine={{ stroke: '#64748b', strokeWidth: 1.2 }} 
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={CustomTooltip} />
                 <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 600 }} />
                 
                 <Bar dataKey="load" name="Charge Quotidienne" fill="rgba(255,255,255,0.25)" radius={[3, 3, 0, 0]} maxBarSize={16} />

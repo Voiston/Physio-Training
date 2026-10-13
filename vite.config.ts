@@ -67,8 +67,7 @@ export default defineConfig({
           globIgnores: ['**/stats.html'],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
       visualizer({

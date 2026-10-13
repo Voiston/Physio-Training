@@ -97,6 +97,111 @@ export function getQualityImpacts(qualityId, sport = 'run', qualities = DEFAULT_
   return found?.impacts || [];
 }
 
+/**
+ * Calcule dynamiquement et à la lecture les impacts secondaires à partir des séances directes (primaires).
+ * Évite le stockage et la synchronisation de données dérivées redondantes,
+ * et garantit une cohérence absolue même si la matrice d'impacts ou le profil athlète est mis à jour.
+ */
+export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIES) {
+  const derived = {};
+  for (let i = 0; i < qualities.length; i++) {
+    derived[qualities[i].id] = {};
+  }
+
+  // 1. Recenser les séances directes (non secondaires) par date
+  const dateToPrimarySessions = new Map();
+  const qKeys = Object.keys(primaryEvents || {});
+  for (let i = 0; i < qKeys.length; i++) {
+    const qId = qKeys[i];
+    if (!derived[qId]) derived[qId] = {};
+    const qDates = primaryEvents[qId] || {};
+    const dateKeys = Object.keys(qDates);
+    for (let j = 0; j < dateKeys.length; j++) {
+      const dateStr = dateKeys[j];
+      const session = qDates[dateStr];
+      if (!session) continue;
+      // Les séances marquées secondaires dans d'anciens jeux de données ne sont pas re-traitées comme primaires
+      if (session.isSecondary) continue;
+
+      // Inscription directe de la séance primaire
+      derived[qId][dateStr] = session;
+
+      if (!dateToPrimarySessions.has(dateStr)) {
+        dateToPrimarySessions.set(dateStr, []);
+      }
+      dateToPrimarySessions.get(dateStr).push({ qId, session });
+    }
+  }
+
+  // 2. Calculer à la volée les impacts secondaires pour chaque date active
+  for (const [dateStr, primaryList] of dateToPrimarySessions.entries()) {
+    const primaryQIds = new Set(primaryList.map(p => p.qId));
+
+    for (let i = 0; i < qualities.length; i++) {
+      const targetQ = qualities[i];
+      // Ne jamais écraser une séance principale existante
+      if (primaryQIds.has(targetQ.id)) continue;
+
+      const contributions = {};
+      let totalSecLoad = 0;
+      let totalSecCardio = 0;
+      let totalSecMusc = 0;
+
+      for (let j = 0; j < primaryList.length; j++) {
+        const { qId: parentId, session: parentSession } = primaryList[j];
+        const isParentCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(parentId);
+        const parentSport = parentSession.sport || (isParentCardio ? 'run' : 'muscu');
+        const parentImpacts = getQualityImpacts(parentId, parentSport, qualities);
+        const imp = parentImpacts ? parentImpacts.find(it => it.id === targetQ.id) : null;
+
+        if (imp && imp.ratio > 0) {
+          const pLoad = Number(parentSession.load) || 0;
+          const pCardio = parentSession.loadCardio !== undefined ? Number(parentSession.loadCardio) : pLoad;
+          const pMusc = parentSession.loadMusc !== undefined ? Number(parentSession.loadMusc) : pLoad;
+
+          const calculatedSecLoad = Math.round(pLoad * imp.ratio);
+          const calculatedSecCardio = Math.round(pCardio * imp.ratio);
+          const calculatedSecMusc = Math.round(pMusc * imp.ratio);
+
+          if (calculatedSecLoad > 0) {
+            const parentDef = qualities.find(q => q.id === parentId);
+            contributions[parentId] = {
+              load: calculatedSecLoad,
+              loadCardio: calculatedSecCardio,
+              loadMusc: calculatedSecMusc,
+              ratio: imp.ratio,
+              parentName: parentDef?.name || parentId
+            };
+            totalSecLoad += calculatedSecLoad;
+            totalSecCardio += calculatedSecCardio;
+            totalSecMusc += calculatedSecMusc;
+          }
+        }
+      }
+
+      if (totalSecLoad > 0) {
+        const isTargetCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(targetQ.id);
+        const parentQIds = Object.keys(contributions);
+        derived[targetQ.id][dateStr] = {
+          load: totalSecLoad,
+          loadCardio: totalSecCardio,
+          loadMusc: totalSecMusc,
+          isSecondary: true,
+          sport: isTargetCardio ? 'run' : 'muscu',
+          duration: 0,
+          rpeMusc: 0,
+          rpeCardio: 0,
+          parentContributions: contributions,
+          parentQId: parentQIds[0],
+          originalLoad: totalSecLoad
+        };
+      }
+    }
+  }
+
+  return derived;
+}
+
 export const BLOCK_PRESETS = [
   {
     id: 'force_max',

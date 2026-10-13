@@ -16,7 +16,8 @@ import {
   computeCardioVsMuscularBalance,
   getQualityImpacts,
   computeIntensityDistribution,
-  computePerceivedFatigueAnalysis
+  computePerceivedFatigueAnalysis,
+  computeDerivedEvents
 } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeAllWeeksStats, WeekStats } from '../utils/weekHelpers';
@@ -113,6 +114,23 @@ export interface SecondaryContribution {
   parentName?: string;
 }
 
+export interface SubSession {
+  id: string;
+  name?: string;
+  duration: number;
+  rpeMusc?: number;
+  rpeMusculaire?: number;
+  rpeCardio?: number;
+  fatigue?: number;
+  load: number;
+  loadCardio?: number;
+  loadMusc?: number;
+  sport?: string;
+  isEccentric?: boolean;
+  exercises?: SessionExercise[];
+  notes?: string;
+}
+
 export interface SessionData {
   rpeMusc?: number;
   rpeMusculaire?: number;
@@ -126,6 +144,7 @@ export interface SessionData {
   isEccentric?: boolean;
   isSecondary?: boolean;
   exercises?: SessionExercise[];
+  subSessions?: SubSession[];
   parentQId?: string;
   parentContributions?: Record<string, SecondaryContribution>;
   originalLoad?: number;
@@ -241,6 +260,14 @@ function getInitialEvents(): Record<string, Record<string, SessionData>> {
           const parsed = JSON.parse(rawItem);
           const cleanedSession = sanitizeSessionData(parsed);
           if (!cleanedSession) continue;
+
+          // PURGE DES IMPACTS SECONDAIRES HISTORIQUES :
+          // Si une entrée en localStorage est un impact secondaire rémanent, la purger du stockage local
+          // et ne pas l'ajouter aux événements primaires (elle est calculée dynamiquement à la lecture).
+          if (cleanedSession.isSecondary) {
+            localStorage.removeItem(key);
+            continue;
+          }
 
           if (!loadedEvents[category]) {
             loadedEvents[category] = {};
@@ -699,17 +726,17 @@ export function useData() {
   });
   cloudSyncRef.current = cloudSync;
 
-  // Événements effectifs (réels ou fusionnés avec la simulation si active)
+  // Événements effectifs : fusionne les séances réelles et simulées,
+  // puis calcule dynamiquement à la lecture tous les impacts secondaires rémanents via computeDerivedEvents
   const effectiveEvents = useMemo(() => {
-    if (!isSimulationActive) return events;
-    const merged: Record<string, Record<string, SessionData>> = {};
+    const basePrimary: Record<string, Record<string, SessionData>> = {};
     qualities.forEach(q => {
-      merged[q.id] = { ...(events[q.id] || {}) };
-      if (simulatedEvents[q.id]) {
-        Object.assign(merged[q.id], simulatedEvents[q.id]);
+      basePrimary[q.id] = { ...(events[q.id] || {}) };
+      if (isSimulationActive && simulatedEvents[q.id]) {
+        Object.assign(basePrimary[q.id], simulatedEvents[q.id]);
       }
     });
-    return merged;
+    return computeDerivedEvents(basePrimary, qualities as any) as Record<string, Record<string, SessionData>>;
   }, [events, simulatedEvents, isSimulationActive, qualities]);
 
   // Calcul dynamique et réactif des courbes EMA (3, 7, 21 jours)
@@ -1136,7 +1163,7 @@ export function useData() {
     reader.readAsText(file);
   };
 
-  const saveEventWithImpacts = (qId: string, dateStr: string, sessionData: SessionData | null, applyImpacts: boolean = true) => {
+  const saveEventWithImpacts = (qId: string, dateStr: string, sessionData: SessionData | null, _applyImpacts: boolean = true) => {
     // 1. Sauvegarder ou supprimer la séance directe de l'athlète
     if (!sessionData) {
       saveEvent(qId, dateStr, null);
@@ -1150,106 +1177,10 @@ export function useData() {
       };
       saveEvent(qId, dateStr, normalizedSession);
     }
-
-    if (!applyImpacts) return;
-
-    // 2. Recenser toutes les séances directes/principales de l'athlète sur cette date
-    const primarySessionsOnDate: { qId: string; session: SessionData }[] = [];
-    qualities.forEach(q => {
-      if (q.id === qId) {
-        if (sessionData) {
-          const isCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(qId);
-          primarySessionsOnDate.push({
-            qId: q.id,
-            session: {
-              ...sessionData,
-              sport: sessionData.sport || (isCardio ? 'run' : 'muscu'),
-              isSecondary: false
-            }
-          });
-        }
-      } else {
-        const raw = localStorage.getItem(`${dateStr}_${q.id}`);
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed && isPrimary(parsed)) {
-              primarySessionsOnDate.push({ qId: q.id, session: parsed });
-            }
-          } catch (e) {}
-        }
-      }
-    });
-
-    const primaryQIds = new Set(primarySessionsOnDate.map(p => p.qId));
-
-    // 3. Pour chaque qualité qui n'est PAS occupée par une séance directe :
-    qualities.forEach(targetQ => {
-      // RÈGLE CRITIQUE D'INTÉGRITÉ 1 : Ne JAMAIS écraser une séance principale existante
-      if (primaryQIds.has(targetQ.id)) return;
-
-      // Calculer le cumul multi-parents de tous les impacts ciblant targetQ
-      const contributions: Record<string, SecondaryContribution> = {};
-      let totalSecLoad = 0;
-      let totalSecCardio = 0;
-      let totalSecMusc = 0;
-
-      primarySessionsOnDate.forEach(({ qId: parentId, session: parentSession }) => {
-        const parentSport = parentSession.sport || (['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(parentId) ? 'run' : 'muscu');
-        const parentImpacts = getQualityImpacts(parentId, parentSport, qualities as any) as QualityImpact[];
-        const imp = parentImpacts?.find(i => i.id === targetQ.id);
-
-        if (imp && imp.ratio > 0) {
-          const pLoad = Number(parentSession.load) || 0;
-          const pCardio = parentSession.loadCardio !== undefined ? Number(parentSession.loadCardio) : pLoad;
-          const pMusc = parentSession.loadMusc !== undefined ? Number(parentSession.loadMusc) : pLoad;
-
-          const calculatedSecLoad = Math.round(pLoad * imp.ratio);
-          const calculatedSecCardio = Math.round(pCardio * imp.ratio);
-          const calculatedSecMusc = Math.round(pMusc * imp.ratio);
-
-          if (calculatedSecLoad > 0) {
-            contributions[parentId] = {
-              load: calculatedSecLoad,
-              loadCardio: calculatedSecCardio,
-              loadMusc: calculatedSecMusc,
-              ratio: imp.ratio,
-              parentName: qualities.find(q => q.id === parentId)?.name || parentId
-            };
-            totalSecLoad += calculatedSecLoad;
-            totalSecCardio += calculatedSecCardio;
-            totalSecMusc += calculatedSecMusc;
-          }
-        }
-      });
-
-      const existingRaw = localStorage.getItem(`${dateStr}_${targetQ.id}`);
-      let existingSession: any = null;
-      if (existingRaw) {
-        try { existingSession = JSON.parse(existingRaw); } catch (e) {}
-      }
-
-      if (totalSecLoad > 0) {
-        const isTargetCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(targetQ.id);
-        const secData: SessionData = {
-          load: totalSecLoad,
-          loadCardio: totalSecCardio,
-          loadMusc: totalSecMusc,
-          isSecondary: true,
-          sport: isTargetCardio ? 'run' : 'muscu',
-          duration: 0,
-          rpeMusc: 0,
-          rpeCardio: 0,
-          parentContributions: contributions,
-          parentQId: Object.keys(contributions)[0],
-          originalLoad: totalSecLoad
-        };
-        saveEvent(targetQ.id, dateStr, secData);
-      } else if (existingSession && !isPrimary(existingSession)) {
-        // Plus aucun impact parent et séance secondaire présente : suppression propre
-        saveEvent(targetQ.id, dateStr, null);
-      }
-    });
+    // Note d'architecture : Les impacts secondaires ne sont plus persistés sur disque ni synchronisés.
+    // Ils sont dérivés dynamiquement et instantanément à la lecture par computeDerivedEvents dans effectiveEvents,
+    // garantissant une cohérence absolue même lors de modifications de la matrice d'impacts,
+    // tout en divisant la taille du payload de synchronisation Firestore par 5 à 7.
   };
 
   return { 

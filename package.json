@@ -7,6 +7,7 @@
     "dev": "tsx server.ts",
     "start": "node server.ts",
     "build": "vite build",
+    "generate-icons": "node scripts/generate-icons.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

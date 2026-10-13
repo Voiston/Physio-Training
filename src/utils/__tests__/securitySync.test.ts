@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   sanitizeSessionData,
+  sanitizeEventsPayload,
   sanitizeTombstonesPayload,
   mergeEventsNonDestructive,
   validateAndStageImportPayload
@@ -155,5 +156,29 @@ describe('Synchronisation & Tombstones - Résolution de Conflits & Suppressions'
     const parsedCustom = JSON.parse(staged.entriesToSet.get('physio_custom_exercises')!);
     expect(parsedCustom[0].name).toBe('Hip Thrust Barre');
     expect(parsedCustom[0].isCustom).toBe(true);
+  });
+
+  it('exclut rigoureusement les impacts secondaires de sanitizeEventsPayload pour éviter la saturation Cloud', () => {
+    const rawEventsWithSecondaries = {
+      sprint: {
+        '2026-10-13': { load: 150, duration: 30, sport: 'run', isSecondary: false }
+      },
+      vo2max: {
+        '2026-10-13': { load: 60, isSecondary: true, parentQId: 'sprint' }
+      },
+      leg: {
+        '2026-10-13': { load: 120, isSecondary: true, parentQId: 'sprint' }
+      }
+    };
+
+    const sanitized = sanitizeEventsPayload(rawEventsWithSecondaries);
+
+    // Seule la séance primaire est conservée pour la persistance et la synchronisation
+    expect(sanitized['sprint']?.['2026-10-13']).toBeDefined();
+    expect(sanitized['sprint']['2026-10-13'].load).toBe(150);
+
+    // Les impacts secondaires sont exclus de l'objet persistant (ils sont calculés dynamiquement à la lecture)
+    expect(sanitized['vo2max']?.['2026-10-13']).toBeUndefined();
+    expect(sanitized['leg']?.['2026-10-13']).toBeUndefined();
   });
 });

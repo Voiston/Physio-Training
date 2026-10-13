@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, memo } from 'react';
 
-export default function QualitySparkline({ data, current, width = 115, height = 30 }) {
+const QualitySparkline = memo(function QualitySparkline({ data, current, width = 115, height = 30 }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const containerRef = useRef(null);
 
@@ -157,4 +157,6 @@ export default function QualitySparkline({ data, current, width = 115, height = 
       )}
     </div>
   );
-}
+});
+
+export default QualitySparkline;

@@ -261,7 +261,7 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
               activeDot={{ r: 5, fill: '#60a5fa', stroke: '#ffffff', strokeWidth: 2 }}
             />
 
-            <Tooltip content={<CustomRadarTooltip />} />
+            <Tooltip content={CustomRadarTooltip} />
           </RechartsRadar>
         </ResponsiveContainer>
       </div>

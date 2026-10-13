@@ -1433,7 +1433,7 @@ export default function PhysiologyDashboard({
                 axisLine={false}
               />
               <YAxis stroke="#64748b" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={CustomTooltip} />
               <ReferenceLine y={0} stroke="#475569" strokeDasharray="2 2" />
 
               <Bar 
@@ -1583,7 +1583,7 @@ export default function PhysiologyDashboard({
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="day" stroke="#94a3b8" tick={{ fontSize: 11, fill: '#94a3b8' }} minTickGap={20} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" domain={['auto', 'auto']} tick={{ fontSize: 11, fill: '#94a3b8' }} width={26} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={CustomTooltip} />
                 
                 {vfcCurves.vfc && (
                   <Line type="monotone" dataKey="vfc" name="VFC Nette" stroke="rgba(255,255,255,0.3)" strokeWidth={1} dot={{ r: 2, fill: 'rgba(255,255,255,0.4)', strokeWidth: 0 }} connectNulls />

@@ -112,7 +112,11 @@ export function getDailyAthleteSessionCount(
     if (!qualityEvents) return;
     const session = qualityEvents[dateStr];
     if (session && isPrimary(session)) {
-      count += 1;
+      if (Array.isArray(session.subSessions) && session.subSessions.length > 1) {
+        count += session.subSessions.length;
+      } else {
+        count += 1;
+      }
     }
   });
 

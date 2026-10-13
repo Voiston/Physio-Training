@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { User } from 'firebase/auth';
+import { compressString, decompressString, computeQuotaUsage } from '../utils/compression';
 
 export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error' | 'unpaired';
 
@@ -116,6 +117,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [syncNotification, setSyncNotification] = useState<string | null>(null);
+  const [quotaUsage, setQuotaUsage] = useState<ReturnType<typeof computeQuotaUsage> | null>(null);
+  const [syncErrorDetail, setSyncErrorDetail] = useState<string | null>(null);
 
   const [confirmFirstPush, setConfirmFirstPush] = useState<boolean>(false);
 
@@ -141,12 +144,16 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   // QR Code pairing URL to open the app directly on smartphone
   const pairingUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${typeof window !== 'undefined' ? window.location.pathname : ''}`;
 
+  // Mémoire du dernier payload envoyé pour dirty-check (évite les réécritures inutiles)
+  const lastPushedDataRef = useRef<string>('');
+
   // Push local data to Firestore user document
   const pushToCloud = useCallback(
     async (overrideData?: any) => {
       if (isRemoteUpdatingRef.current) return;
       if (!navigator.onLine) {
         setSyncStatus('offline');
+        setSyncErrorDetail('Appareil hors-ligne : les modifications sont enregistrées localement');
         return;
       }
       
@@ -156,13 +163,39 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         return;
       }
 
-      setSyncStatus('syncing');
       const user = fb.auth.currentUser;
       const path = `sync_records/${user.uid}`;
 
       try {
         const dataToSend = overrideData || getExportableDataRef.current();
         const stringified = typeof dataToSend === 'string' ? dataToSend : JSON.stringify(dataToSend);
+
+        // Dirty-check : éviter de repousser vers Firestore si le document est rigoureusement identique
+        if (!overrideData && lastPushedDataRef.current === stringified) {
+          setSyncStatus('synced');
+          setSyncErrorDetail(null);
+          return;
+        }
+
+        setSyncStatus('syncing');
+
+        // Compression Gzip standard (réduction drastique de 85% à 95% du volume réseau et stockage)
+        const compressed = await compressString(stringified);
+        const quota = computeQuotaUsage(compressed.length);
+        setQuotaUsage(quota);
+
+        if (quota.isOverQuota) {
+          const errMsg = `Plafond de données Cloud dépassé (${(quota.usedChars / 1024).toFixed(1)} Ko sur 500 Ko). Exportez une archive pour libérer de l'espace.`;
+          console.error('[Cloud Sync]', errMsg);
+          setSyncStatus('error');
+          setSyncErrorDetail(errMsg);
+          setSyncNotification(`❌ ${errMsg}`);
+          return;
+        }
+
+        if (quota.isWarning) {
+          setSyncNotification(`⚠️ Volume de données élevé (${quota.percent}% du quota cloud utilisé)`);
+        }
 
         const docRef = fb.doc(fb.db, 'sync_records', user.uid);
         await fb.setDoc(
@@ -171,7 +204,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
             userId: user.uid,
             userEmail: user.email || '',
             key: user.uid,
-            data: stringified,
+            data: compressed,
             version: 1,
             lastDeviceId: deviceId,
             updatedAt: new Date().toISOString(),
@@ -179,12 +212,20 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
           { merge: true }
         );
 
+        lastPushedDataRef.current = stringified;
         setSyncStatus('synced');
+        setSyncErrorDetail(null);
         setLastSyncedAt(new Date());
         setConfirmFirstPush(false);
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Firestore push error:', err);
         setSyncStatus(navigator.onLine ? 'error' : 'offline');
+        const desc = err?.code === 'permission-denied'
+          ? 'Accès refusé par les règles de sécurité Firestore (compte Google non autorisé ou session expirée).'
+          : err?.code === 'resource-exhausted'
+          ? 'Quota Firestore temporairement saturé. Nouvelle tentative dans un instant.'
+          : err?.message || 'Erreur réseau lors de la synchronisation cloud.';
+        setSyncErrorDetail(desc);
         try {
           fb.handleFirestoreError(err, fb.OperationType.WRITE, path);
         } catch {
@@ -200,14 +241,14 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     pushToCloudRef.current = pushToCloud;
   }, [pushToCloud]);
 
-  // Debounced push for interactive user edits
+  // Debounced push for interactive user edits (1500 ms pour regrouper les saisies sans saturer Firestore)
   const triggerDebouncedPush = useCallback(() => {
     if (isRemoteUpdatingRef.current) return;
     if (!localStorage.getItem('physio_user_account')) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       pushToCloudRef.current();
-    }, 800);
+    }, 1500);
   }, []);
 
   // Pull data from Firestore
@@ -233,7 +274,10 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       if (docSnap.exists()) {
         const record = docSnap.data();
         if (record && record.data) {
-          const parsed = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
+          const quota = computeQuotaUsage(record.data.length);
+          setQuotaUsage(quota);
+          const decompressed = typeof record.data === 'string' ? await decompressString(record.data) : record.data;
+          const parsed = typeof decompressed === 'string' ? JSON.parse(decompressed) : decompressed;
           isRemoteUpdatingRef.current = true;
           onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
           setTimeout(() => {
@@ -241,15 +285,21 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
           }, 500);
 
           setSyncStatus('synced');
+          setSyncErrorDetail(null);
           setLastSyncedAt(new Date(record.updatedAt || Date.now()));
           setSyncNotification('⚡ Données synchronisées depuis votre compte Google');
           return;
         }
       }
       setSyncStatus('synced');
-    } catch (err) {
+      setSyncErrorDetail(null);
+    } catch (err: any) {
       console.warn('Firestore pull notice:', err);
       setSyncStatus('error');
+      const desc = err?.code === 'permission-denied'
+        ? 'Accès refusé par les règles Firestore (compte non autorisé).'
+        : err?.message || 'Impossible de récupérer vos données depuis le Cloud.';
+      setSyncErrorDetail(desc);
       try {
         fb.handleFirestoreError(err, fb.OperationType.GET, path);
       } catch {}
@@ -420,26 +470,29 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
                     return;
                   }
 
-                  try {
-                    const parsed = typeof record.data === 'string' ? JSON.parse(record.data) : record.data;
-                    isRemoteUpdatingRef.current = true;
-                    onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
-                    setTimeout(() => {
-                      isRemoteUpdatingRef.current = false;
-                    }, 600);
+                  (async () => {
+                    try {
+                      const decompressed = typeof record.data === 'string' ? await decompressString(record.data) : record.data;
+                      const parsed = typeof decompressed === 'string' ? JSON.parse(decompressed) : decompressed;
+                      isRemoteUpdatingRef.current = true;
+                      onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
+                      setTimeout(() => {
+                        isRemoteUpdatingRef.current = false;
+                      }, 600);
 
-                    setSyncStatus('synced');
-                    setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+                      setSyncStatus('synced');
+                      setLastSyncedAt(new Date(record.updatedAt || Date.now()));
 
-                    const senderDevice = record.lastDeviceId?.startsWith('mobile')
-                      ? 'Smartphone'
-                      : record.lastDeviceId?.startsWith('pc')
-                      ? 'PC'
-                      : 'Appareil distant';
-                    setSyncNotification(`⚡ Synchronisation en direct depuis votre ${senderDevice}`);
-                  } catch (err) {
-                    console.error('Error parsing Firestore remote payload:', err);
-                  }
+                      const senderDevice = record.lastDeviceId?.startsWith('mobile')
+                        ? 'Smartphone'
+                        : record.lastDeviceId?.startsWith('pc')
+                        ? 'PC'
+                        : 'Appareil distant';
+                      setSyncNotification(`⚡ Synchronisation en direct depuis votre ${senderDevice}`);
+                    } catch (err) {
+                      console.error('Error parsing Firestore remote payload:', err);
+                    }
+                  })();
                 }
               } else {
                 // First time user (document cloud vierge)
@@ -518,6 +571,8 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     qrCodeUrl,
     syncNotification,
     setSyncNotification,
+    quotaUsage,
+    syncErrorDetail,
     confirmFirstPush,
     acceptFirstPush,
     rejectFirstPush,

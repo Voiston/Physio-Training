@@ -214,6 +214,30 @@ export function sanitizeSessionData(rawSession: any): any | null {
       });
   }
 
+  // Préservation des sous-séances multiples par filière et par jour
+  if (Array.isArray(rawSession.subSessions)) {
+    safeSession.subSessions = rawSession.subSessions
+      .filter((sub: any) => sub && typeof sub === 'object')
+      .slice(0, 10)
+      .map((sub: any, idx: number) => {
+        const item: any = {
+          id: typeof sub.id === 'string' ? sub.id.slice(0, 64) : `sub_${idx}_${Date.now()}`,
+          duration: Math.max(0, Math.min(1440, Math.round(Number(sub.duration) || 0))),
+          load: Math.max(0, Math.min(100000, Math.round(Number(sub.load) || 0))),
+        };
+        if (typeof sub.name === 'string') item.name = sub.name.slice(0, 50);
+        if (typeof sub.rpeMusc === 'number' && Number.isFinite(sub.rpeMusc)) item.rpeMusc = Math.max(0, Math.min(10, sub.rpeMusc));
+        if (typeof sub.rpeCardio === 'number' && Number.isFinite(sub.rpeCardio)) item.rpeCardio = Math.max(0, Math.min(10, sub.rpeCardio));
+        if (typeof sub.fatigue === 'number' && Number.isFinite(sub.fatigue)) item.fatigue = Math.max(0, Math.min(10, sub.fatigue));
+        if (typeof sub.loadCardio === 'number' && Number.isFinite(sub.loadCardio)) item.loadCardio = Math.max(0, Math.round(sub.loadCardio));
+        if (typeof sub.loadMusc === 'number' && Number.isFinite(sub.loadMusc)) item.loadMusc = Math.max(0, Math.round(sub.loadMusc));
+        if (typeof sub.sport === 'string' && isSafeId(sub.sport)) item.sport = sub.sport.slice(0, 32);
+        if (typeof sub.isEccentric === 'boolean') item.isEccentric = sub.isEccentric;
+        if (typeof sub.notes === 'string') item.notes = sub.notes.slice(0, 500);
+        return item;
+      });
+  }
+
   // Convertir en objet standard sécurisé pour compatibilité JSON / React
   return Object.assign({}, safeSession);
 }
@@ -242,7 +266,9 @@ export function sanitizeEventsPayload(
 
       const rawSession = datesObj[dateStr];
       const cleaned = sanitizeSessionData(rawSession);
-      if (cleaned) {
+      // Les impacts secondaires sont calculés dynamiquement à la lecture par computeDerivedEvents
+      // et ne doivent jamais être persistés ou synchronisés
+      if (cleaned && !cleaned.isSecondary) {
         safeDates[dateStr] = cleaned;
       }
     }

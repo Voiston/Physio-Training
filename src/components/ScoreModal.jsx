@@ -144,23 +144,64 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const isIsolation = info.qId === 'isolation';
   const isForce = ['pull', 'push', 'leg', 'plyo', 'descente', 'abdos', 'proprio', 'isolation'].includes(info.qId);
 
-  const existing = currentSessionData || { 
-    rpeMusc: isIsolation ? 8 : '', 
-    rpeCardio: isIsolation ? 2 : '', 
-    fatigue: isIsolation ? 2 : '', 
-    duration: isIsolation ? 10 : '', 
-    isEccentric: false, 
-    sport: defaultSportForQuality 
+  // Gestion multi-séances par filière et par jour (support 2+ séances par jour sans écrasement)
+  const buildInitialSubSessions = (sess) => {
+    if (sess && !sess.isSecondary) {
+      if (Array.isArray(sess.subSessions) && sess.subSessions.length > 0) {
+        return sess.subSessions.map((s, idx) => ({
+          ...s,
+          id: s.id || `sub_${idx}_${Date.now()}`,
+          name: s.name || `Séance ${idx + 1}`,
+          duration: s.duration ?? (isIsolation ? 10 : ''),
+          rpeMusc: s.rpeMusc ?? s.rpeMusculaire ?? (isIsolation ? 8 : ''),
+          rpeCardio: s.rpeCardio ?? (isIsolation ? 2 : ''),
+          fatigue: s.fatigue ?? (isIsolation ? 2 : ''),
+          sport: s.sport || defaultSportForQuality,
+          isEccentric: s.isEccentric !== undefined ? s.isEccentric : (info.qId === 'descente' || info.qId === 'plyo'),
+          exercises: Array.isArray(s.exercises) ? s.exercises : [],
+          notes: s.notes || ''
+        }));
+      }
+      return [{
+        id: `sub_0_${Date.now()}`,
+        name: 'Séance 1',
+        duration: sess.duration ?? (isIsolation ? 10 : 45),
+        rpeMusc: sess.rpeMusc ?? sess.rpeMusculaire ?? (typeof sess === 'number' ? sess : (isIsolation ? 8 : '')),
+        rpeCardio: sess.rpeCardio ?? (isIsolation ? 2 : ''),
+        fatigue: sess.fatigue ?? (isIsolation ? 2 : ''),
+        sport: sess.sport || defaultSportForQuality,
+        isEccentric: sess.isEccentric !== undefined ? sess.isEccentric : (info.qId === 'descente' || info.qId === 'plyo'),
+        exercises: Array.isArray(sess.exercises) ? sess.exercises : [],
+        notes: sess.notes || ''
+      }];
+    }
+    return [{
+      id: `sub_0_${Date.now()}`,
+      name: 'Séance 1',
+      duration: isIsolation ? 10 : '',
+      rpeMusc: isIsolation ? 8 : '',
+      rpeCardio: isIsolation ? 2 : '',
+      fatigue: isIsolation ? 2 : '',
+      sport: defaultSportForQuality,
+      isEccentric: info.qId === 'descente' || info.qId === 'plyo',
+      exercises: [],
+      notes: ''
+    }];
   };
 
-  const [sport, setSport] = useState(existing.sport || defaultSportForQuality);
-  const [rpeMusc, setRpeMusc] = useState(existing.rpeMusc || (typeof existing === 'number' ? existing : ''));
-  const [rpeCardio, setRpeCardio] = useState(existing.rpeCardio || '');
-  const [fatigue, setFatigue] = useState(existing.fatigue || '');
-  const [duration, setDuration] = useState(existing.duration || '');
+  const [subSessionsList, setSubSessionsList] = useState(() => buildInitialSubSessions(currentSessionData));
+  const [activeSessionIndex, setActiveSessionIndex] = useState(0);
+
+  const activeSub = subSessionsList[activeSessionIndex] || subSessionsList[0];
+
+  const [sport, setSport] = useState(activeSub?.sport || defaultSportForQuality);
+  const [rpeMusc, setRpeMusc] = useState(activeSub?.rpeMusc ?? (isIsolation ? 8 : ''));
+  const [rpeCardio, setRpeCardio] = useState(activeSub?.rpeCardio ?? (isIsolation ? 2 : ''));
+  const [fatigue, setFatigue] = useState(activeSub?.fatigue ?? (isIsolation ? 2 : ''));
+  const [duration, setDuration] = useState(activeSub?.duration ?? (isIsolation ? 10 : ''));
   const [isEccentric, setIsEccentric] = useState(
-    existing.isEccentric !== undefined 
-      ? existing.isEccentric 
+    activeSub?.isEccentric !== undefined 
+      ? activeSub.isEccentric 
       : (info.qId === 'descente' || info.qId === 'plyo')
   );
   const [applyImpacts, setApplyImpacts] = useState(true);
@@ -170,7 +211,88 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const [duplicateSuccess, setDuplicateSuccess] = useState(false);
 
   // --- MODULE MUSCULATION & EXERCICES PAR GROUPE MUSCULAIRE (OPTION A) ---
-  const [exercises, setExercises] = useState(Array.isArray(existing.exercises) ? existing.exercises : []);
+  const [exercises, setExercises] = useState(Array.isArray(activeSub?.exercises) ? activeSub.exercises : []);
+
+  const syncFormWithSubSession = (sub) => {
+    if (!sub) return;
+    setSport(sub.sport || defaultSportForQuality);
+    setRpeMusc(sub.rpeMusc ?? (isIsolation ? 8 : ''));
+    setRpeCardio(sub.rpeCardio ?? (isIsolation ? 2 : ''));
+    setFatigue(sub.fatigue ?? (isIsolation ? 2 : ''));
+    setDuration(sub.duration ?? (isIsolation ? 10 : ''));
+    setIsEccentric(sub.isEccentric !== undefined ? sub.isEccentric : (info.qId === 'descente' || info.qId === 'plyo'));
+    setExercises(Array.isArray(sub.exercises) ? sub.exercises : []);
+  };
+
+  const handleSwitchSubSession = (targetIndex) => {
+    if (targetIndex === activeSessionIndex || !subSessionsList[targetIndex]) return;
+    setSubSessionsList(prev => {
+      const next = [...prev];
+      if (next[activeSessionIndex]) {
+        next[activeSessionIndex] = {
+          ...next[activeSessionIndex],
+          sport,
+          rpeMusc,
+          rpeCardio,
+          fatigue,
+          duration,
+          isEccentric,
+          exercises
+        };
+      }
+      return next;
+    });
+    setActiveSessionIndex(targetIndex);
+    syncFormWithSubSession(subSessionsList[targetIndex]);
+  };
+
+  const handleAddSubSession = () => {
+    haptics.tap();
+    const newIdx = subSessionsList.length;
+    const newSub = {
+      id: `sub_${newIdx}_${Date.now()}`,
+      name: `Séance ${newIdx + 1}`,
+      duration: isIsolation ? 10 : '',
+      rpeMusc: isIsolation ? 8 : '',
+      rpeCardio: isIsolation ? 2 : '',
+      fatigue: isIsolation ? 2 : '',
+      sport: defaultSportForQuality,
+      isEccentric: info.qId === 'descente' || info.qId === 'plyo',
+      exercises: [],
+      notes: ''
+    };
+    setSubSessionsList(prev => {
+      const next = [...prev];
+      if (next[activeSessionIndex]) {
+        next[activeSessionIndex] = {
+          ...next[activeSessionIndex],
+          sport,
+          rpeMusc,
+          rpeCardio,
+          fatigue,
+          duration,
+          isEccentric,
+          exercises
+        };
+      }
+      return [...next, newSub];
+    });
+    setActiveSessionIndex(newIdx);
+    syncFormWithSubSession(newSub);
+  };
+
+  const handleRemoveSubSession = (indexToRemove) => {
+    if (subSessionsList.length <= 1) return;
+    haptics.tap();
+    const updated = subSessionsList.filter((_, idx) => idx !== indexToRemove).map((s, idx) => ({
+      ...s,
+      name: `Séance ${idx + 1}`
+    }));
+    setSubSessionsList(updated);
+    const nextIdx = Math.max(0, Math.min(activeSessionIndex >= indexToRemove ? activeSessionIndex - 1 : activeSessionIndex, updated.length - 1));
+    setActiveSessionIndex(nextIdx);
+    syncFormWithSubSession(updated[nextIdx]);
+  };
 
   // Détection de la dernière séance ayant des exercices pour cette même filière (Accélérateur 1-clic)
   const lastSessionWithExercises = useMemo(() => {
@@ -401,33 +523,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const handleSelectDate = (newDateStr) => {
     setSelectedDate(newDateStr);
     const session = getSessionForDate(newDateStr);
-    if (session) {
-      if (typeof session === 'object') {
-        setSport(session.sport || defaultSportForQuality);
-        setRpeMusc(session.rpeMusc ?? session.rpeMusculaire ?? '');
-        setRpeCardio(session.rpeCardio ?? '');
-        setFatigue(session.fatigue ?? '');
-        setDuration(session.duration ?? '');
-        setIsEccentric(session.isEccentric !== undefined ? session.isEccentric : (info.qId === 'descente' || info.qId === 'plyo'));
-        setExercises(Array.isArray(session.exercises) ? session.exercises : []);
-      } else if (typeof session === 'number') {
-        setSport('run');
-        setRpeMusc(session);
-        setRpeCardio(session);
-        setFatigue(session);
-        setDuration(45);
-        setExercises([]);
-      }
-    } else {
-      // Nouvelle date vierge : calibrage selon la filière (micro-séance ou standard)
-      setSport(defaultSportForQuality);
-      setRpeMusc(isIsolation ? 8 : '');
-      setRpeCardio(isIsolation ? 2 : '');
-      setFatigue(isIsolation ? 2 : '');
-      setDuration(isIsolation ? 10 : '');
-      setIsEccentric(info.qId === 'descente' || info.qId === 'plyo');
-      setExercises([]);
-    }
+    const newSubs = buildInitialSubSessions(session);
+    setSubSessionsList(newSubs);
+    setActiveSessionIndex(0);
+    syncFormWithSubSession(newSubs[0]);
     setAppliedFeedback(false);
   };
 
@@ -537,10 +636,23 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     ? (isCardio ? loadCardio : isForce ? loadMusc : Math.round((loadCardio + loadMusc) / 2))
     : 0;
 
-  // Dominance métabolique
-  const totalFactor = (loadCardio + loadMusc) || 1;
-  const cardioPercent = Math.round((loadCardio / totalFactor) * 100);
-  const muscPercent = 100 - cardioPercent;
+  // Cumul multi-séances pour la journée
+  const totalDayStats = useMemo(() => {
+    let tDur = 0;
+    let tLoad = 0;
+    subSessionsList.forEach((s, idx) => {
+      const d = idx === activeSessionIndex ? (Number(duration) || 0) : (Number(s.duration) || 0);
+      const rM = idx === activeSessionIndex ? (Number(rpeMusc) || 5) : (Number(s.rpeMusc) || 5);
+      const rC = idx === activeSessionIndex ? (Number(rpeCardio) || 5) : (Number(s.rpeCardio) || 5);
+      const ecc = (idx === activeSessionIndex ? isEccentric : s.isEccentric) ? 1.15 : 1.0;
+      const lC = Math.round(d * rC);
+      const lM = Math.round(d * rM * ecc);
+      const sL = isCardio ? lC : isForce ? lM : Math.round((lC + lM) / 2);
+      tDur += d;
+      tLoad += sL;
+    });
+    return { totalDuration: tDur, totalLoad: tLoad };
+  }, [subSessionsList, activeSessionIndex, duration, rpeMusc, rpeCardio, isEccentric, isCardio, isForce]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -595,22 +707,87 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     const durNum = Number(finalDuration);
     const rpeMNum = Number(finalRpeMusc);
     const rpeCNum = Number(finalRpeCardio);
-    const mult = isEccentric ? 1.15 : 1.0;
-    const lCardio = Math.round(durNum * rpeCNum);
-    const lMusc = Math.round(durNum * rpeMNum * mult);
-    const lTotal = isCardio ? lCardio : isForce ? lMusc : Math.round((lCardio + lMusc) / 2);
+
+    // Mettre à jour et consolider toutes les sous-séances avec la séance active courante
+    const updatedSubs = subSessionsList.map((s, idx) => {
+      if (idx === activeSessionIndex) {
+        return {
+          ...s,
+          sport: isMultiSport ? sport : (s.sport || defaultSportForQuality),
+          rpeMusc: rpeMNum,
+          rpeCardio: rpeCNum,
+          fatigue: Number(finalFatigue),
+          duration: durNum,
+          isEccentric: Boolean(isEccentric),
+          exercises: exercises.length > 0 ? exercises : []
+        };
+      }
+      return s;
+    });
+
+    let totalDur = 0;
+    let totalLoad = 0;
+    let totalLoadCardio = 0;
+    let totalLoadMusc = 0;
+    let sumMuscWeighted = 0;
+    let sumCardioWeighted = 0;
+    let maxFatigue = 0;
+    let anyEccentric = false;
+    let allExs = [];
+
+    const computedSubs = updatedSubs.map((sub, sIdx) => {
+      const d = Number(sub.duration) || 0;
+      const rM = Number(sub.rpeMusc) || 5;
+      const rC = Number(sub.rpeCardio) || 5;
+      const subMult = sub.isEccentric ? 1.15 : 1.0;
+      const subCardio = Math.round(d * rC);
+      const subMusc = Math.round(d * rM * subMult);
+      const subLoad = isCardio ? subCardio : isForce ? subMusc : Math.round((subCardio + subMusc) / 2);
+
+      totalDur += d;
+      totalLoad += subLoad;
+      totalLoadCardio += subCardio;
+      totalLoadMusc += subMusc;
+      sumMuscWeighted += d * rM;
+      sumCardioWeighted += d * rC;
+      maxFatigue = Math.max(maxFatigue, Number(sub.fatigue) || 0);
+      if (sub.isEccentric) anyEccentric = true;
+      if (Array.isArray(sub.exercises) && sub.exercises.length > 0) {
+        allExs.push(...sub.exercises);
+      }
+
+      return {
+        ...sub,
+        id: sub.id || `sub_${sIdx}_${Date.now()}`,
+        name: sub.name || `Séance ${sIdx + 1}`,
+        duration: d,
+        rpeMusc: rM,
+        rpeCardio: rC,
+        fatigue: Number(sub.fatigue) || 5,
+        load: subLoad,
+        loadCardio: subCardio,
+        loadMusc: subMusc,
+        sport: sub.sport || defaultSportForQuality,
+        isEccentric: Boolean(sub.isEccentric),
+        exercises: Array.isArray(sub.exercises) && sub.exercises.length > 0 ? sub.exercises : undefined
+      };
+    });
+
+    const finalRpeMuscAvg = totalDur > 0 ? Math.round(sumMuscWeighted / totalDur) : rpeMNum;
+    const finalRpeCardioAvg = totalDur > 0 ? Math.round(sumCardioWeighted / totalDur) : rpeCNum;
 
     onSave({ 
-      rpeMusc: rpeMNum, 
-      rpeCardio: rpeCNum, 
-      fatigue: Number(finalFatigue), 
-      duration: durNum, 
-      load: lTotal,
-      loadCardio: lCardio,
-      loadMusc: lMusc,
-      sport: isMultiSport ? sport : (existing?.sport || defaultSportForQuality),
-      isEccentric: Boolean(isEccentric),
-      exercises: exercises.length > 0 ? exercises : undefined
+      rpeMusc: finalRpeMuscAvg, 
+      rpeCardio: finalRpeCardioAvg, 
+      fatigue: maxFatigue || Number(finalFatigue), 
+      duration: totalDur, 
+      load: totalLoad,
+      loadCardio: totalLoadCardio,
+      loadMusc: totalLoadMusc,
+      sport: isMultiSport ? sport : (computedSubs[0]?.sport || defaultSportForQuality),
+      isEccentric: anyEccentric,
+      exercises: allExs.length > 0 ? allExs : undefined,
+      subSessions: computedSubs.length > 1 ? computedSubs : undefined
     }, applyImpacts, selectedDate);
     onClose();
   };
@@ -970,6 +1147,74 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
               </div>
             </div>
           )}
+
+          {/* GESTION MULTI-SÉANCES DE LA JOURNÉE (Support 2+ séances le même jour sans écrasement) */}
+          <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-300 mr-1 flex items-center gap-1.5">
+                  <Clock size={14} className="text-blue-400" aria-hidden="true" />
+                  <span>Séance(s) du jour :</span>
+                </span>
+                {subSessionsList.map((sub, idx) => {
+                  const isActive = activeSessionIndex === idx;
+                  const curDur = isActive ? (Number(duration) || 0) : (Number(sub.duration) || 0);
+                  const isCurSportBike = (isActive ? sport : sub.sport) === 'bike';
+                  return (
+                    <div key={sub.id || idx} className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchSubSession(idx)}
+                        className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                          isActive
+                            ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-2 ring-blue-300'
+                            : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10 hover:text-white'
+                        }`}
+                        aria-pressed={isActive}
+                      >
+                        <span>{sub.name || `Séance ${idx + 1}`}</span>
+                        {curDur > 0 && (
+                          <span className="text-[10px] font-mono opacity-80">
+                            ({curDur}m {isCurSportBike ? '🚴' : '🏃'})
+                          </span>
+                        )}
+                      </button>
+                      {subSessionsList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSubSession(idx);
+                          }}
+                          aria-label={`Supprimer la ${sub.name || `Séance ${idx + 1}`}`}
+                          title="Supprimer cette séance spécifique"
+                          className="w-7 h-7 -ml-2 min-h-[28px] min-w-[28px] rounded-full bg-red-900/60 hover:bg-red-700 text-red-200 border border-red-500/30 flex items-center justify-center text-xs font-black cursor-pointer transition-colors z-10"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={handleAddSubSession}
+                  className="min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  title="Ajouter une autre séance sur cette même filière aujourd'hui (ex: séance du matin + séance du soir)"
+                >
+                  <Plus size={14} className="text-emerald-400" aria-hidden="true" />
+                  <span>+ Ajouter une séance</span>
+                </button>
+              </div>
+
+              {subSessionsList.length > 1 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs font-mono font-bold">
+                  <span>Cumul jour : {totalDayStats.totalDuration} min · {totalDayStats.totalLoad} UA ({subSessionsList.length} séances)</span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* BARRE D'ONGLETS NAVIGATION RAPIDE (WAI-ARIA Tabs) */}
           <div 
