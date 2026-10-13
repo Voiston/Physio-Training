@@ -5,8 +5,8 @@ export function getLocalYYYYMMDD(dateObj) {
   return `${y}-${m}-${d}`;
 }
 
-export function generateTimeline(pastDays = 14, futureDays = 14) {
-  const today = new Date();
+export function generateTimeline(pastDays = 14, futureDays = 14, referenceDate = new Date()) {
+  const today = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
   const timeline = [];
   for (let i = -pastDays; i <= futureDays; i++) {
     const d = new Date(today);

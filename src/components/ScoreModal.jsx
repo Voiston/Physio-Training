@@ -113,8 +113,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const modalRef = useRef(null);
   const previousActiveElementRef = useRef(null);
   const [validationErrors, setValidationErrors] = useState({});
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const todayStr = useMemo(() => getLocalYYYYMMDD(new Date()), []);
+  const todayStr = getLocalYYYYMMDD(new Date());
   const isMultiSport = useMemo(() => ['vo2max', 'seuil', 'ef', 'sprint'].includes(info.qId), [info.qId]);
   
   // Date sélectionnée (initialisée à la date fournie ou aujourd'hui)

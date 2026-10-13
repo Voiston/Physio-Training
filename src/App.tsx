@@ -132,16 +132,50 @@ function AppContent() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const todayStr = useMemo(() => getLocalYYYYMMDD(new Date()), []);
+  // État today rafraîchi dynamiquement (visibilitychange, focus et tick périodique)
+  // pour éviter qu'une PWA rouverte le lendemain depuis l'arrière-plan n'enregistre sur la veille
+  const [today, setToday] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const refreshTodayIfNeeded = () => {
+      const now = new Date();
+      if (getLocalYYYYMMDD(now) !== getLocalYYYYMMDD(today)) {
+        setToday(now);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshTodayIfNeeded();
+      }
+    };
+
+    const handleFocus = () => {
+      refreshTodayIfNeeded();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    // Vérification de sécurité toutes les 60 secondes pour le passage de minuit
+    const timer = setInterval(refreshTodayIfNeeded, 60000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(timer);
+    };
+  }, [today]);
+
+  const todayStr = useMemo(() => getLocalYYYYMMDD(today), [today]);
   const blockProgress = useMemo(() => {
     return activeBlockToday ? getBlockProgress(activeBlockToday, todayStr) : null;
   }, [activeBlockToday, todayStr]);
 
   // Statistiques de la semaine en cours
   const currentWeekStats = useMemo(() => {
-    const weeks = computeAllWeeksStats(events, qualities, 1, 0);
+    const weeks = computeAllWeeksStats(events, qualities, 1, 0, today);
     return weeks.find(w => w.isCurrentWeek) || weeks[weeks.length - 1];
-  }, [events, qualities]);
+  }, [events, qualities, today]);
 
   // Alertes biomécaniques et musculaires de la semaine courante (H:Q, Pull:Push, MRV)
   const currentMuscularAlerts = useMemo(() => {
@@ -152,11 +186,11 @@ function AppContent() {
   }, [events, currentWeekStats]);
 
   const timeline = useMemo(() => {
-    return generateTimeline(21, 14).map(day => ({
+    return generateTimeline(21, 14, today).map(day => ({
       ...day,
       display: formatDisplayDate(day.dateObj, day.offset)
     }));
-  }, []);
+  }, [today]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] bg-[radial-gradient(ellipse_80%_80%_at_10%_-20%,rgba(30,58,138,0.18),transparent),radial-gradient(ellipse_80%_80%_at_90%_120%,rgba(153,27,27,0.12),transparent)] text-slate-100 font-sans p-2 sm:p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden relative">
@@ -440,9 +474,7 @@ function AppContent() {
                 </button>
 
                 {/* Bouton PWA Install */}
-                <div className="flex items-center p-2.5 rounded-xl bg-white/5 border border-white/10 touch-press active:scale-[0.96]">
-                  <PWAInstallButton />
-                </div>
+                <PWAInstallButton variant="tile" />
 
                 {/* Import JSON */}
                 <button

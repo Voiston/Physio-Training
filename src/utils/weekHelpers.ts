@@ -196,9 +196,10 @@ export function computeAllWeeksStats(
   events: Record<string, Record<string, SessionData>>,
   qualities: Quality[],
   weeksPast: number = 6,
-  weeksFuture: number = 2
+  weeksFuture: number = 2,
+  referenceDate: Date = new Date()
 ): WeekStats[] {
-  const today = new Date();
+  const today = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
   const currentMonday = getMonday(today);
   const currentMondayStr = getLocalYYYYMMDD(currentMonday);
 
@@ -338,7 +339,7 @@ export function computeAllWeeksStats(
     }
 
     // Calcul des jours écoulés pour la semaine en cours
-    const todayStr = getLocalYYYYMMDD(new Date());
+    const todayStr = getLocalYYYYMMDD(today);
     let elapsedDays = 7;
     let isPartial = false;
 
