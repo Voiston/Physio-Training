@@ -29,6 +29,10 @@ import {
   sanitizeSessionData, 
   sanitizeEventsPayload, 
   sanitizeDailyMetricsPayload,
+  sanitizeTombstonesPayload,
+  getSavedTombstones,
+  saveTombstone,
+  removeTombstone,
   validateAndStageImportPayload,
   mergeEventsNonDestructive,
   mergeDailyMetricsNonDestructive
@@ -125,6 +129,7 @@ export interface SessionData {
   parentContributions?: Record<string, SecondaryContribution>;
   originalLoad?: number;
   isSimulated?: boolean;
+  updatedAt?: number;
 }
 
 export interface QualityEMASeriesPoint {
@@ -293,6 +298,7 @@ function getInitialDailyMetrics(): Record<string, DailyMetrics> {
 
 export function useData() {
   const [events, setEvents] = useState<Record<string, Record<string, SessionData>>>(() => getInitialEvents());
+  const [tombstones, setTombstones] = useState<Record<string, number>>(() => getSavedTombstones());
   const [qualities, setQualitiesState] = useState<Quality[]>(() => {
     try {
       const raw = localStorage.getItem('physio_qualities');
@@ -494,6 +500,8 @@ export function useData() {
     setPhysioSettingsState(DEFAULT_PHYSIO_SETTINGS);
     setIsSimulationActive(false);
     setSimulatedEvents({});
+    setTombstones({});
+    localStorage.removeItem('physio_tombstones');
   }, []);
 
   const onRemoteDataReceived = useCallback((remoteData: any) => {
@@ -508,12 +516,28 @@ export function useData() {
         return;
       }
 
-      // 2. FUSION NON DESTRUCTRICE DES SÉANCES (Préserve impérativement les séances saisies hors-ligne en salle)
+      // 2. FUSION NON DESTRUCTRICE DES SÉANCES (Préserve les séances hors-ligne, propage les suppressions et arbitrages récents)
       setEvents(prevLocalEvents => {
         const incomingRemoteEvents = imported.events ? sanitizeEventsPayload(imported.events) : {};
-        const { merged, hasNewLocalData } = mergeEventsNonDestructive(prevLocalEvents, incomingRemoteEvents);
+        const incomingRemoteTombstones = imported.tombstones ? sanitizeTombstonesPayload(imported.tombstones) : {};
 
-        // Répercuter dans le stockage local sans détruire les séances hors-ligne
+        const { merged, hasNewLocalData, mergedTombstones, deletedKeysToPurge } = mergeEventsNonDestructive(
+          prevLocalEvents,
+          incomingRemoteEvents,
+          tombstones,
+          incomingRemoteTombstones
+        );
+
+        // Mettre à jour l'état et le stockage des tombstones
+        setTombstones(mergedTombstones);
+        localStorage.setItem('physio_tombstones', JSON.stringify(mergedTombstones));
+
+        // Purger physiquement les séances supprimées du stockage local
+        deletedKeysToPurge.forEach(k => {
+          localStorage.removeItem(k);
+        });
+
+        // Répercuter les séances fusionnées dans le stockage local
         Object.entries(merged).forEach(([qId, dates]) => {
           if (!isSafeId(qId)) return;
           Object.entries(dates).forEach(([date, data]) => {
@@ -522,7 +546,7 @@ export function useData() {
           });
         });
 
-        // Si l'athlète avait des séances locales plus complètes créées hors-ligne,
+        // Si l'athlète avait des séances locales plus complètes créées hors-ligne ou des suppressions à synchroniser,
         // déclencher un push automatique vers le cloud pour consolider la base distante
         if (hasNewLocalData) {
           setTimeout(() => triggerSyncPush(), 1000);
@@ -603,9 +627,10 @@ export function useData() {
       targetCompetition,
       physioSettings,
       customExercises: getSavedCustomExercises(),
+      tombstones,
       updatedAt: new Date().toISOString(),
     };
-  }, [events, dailyMetrics, trainingBlocks, qualities, blockTemplates, targetCompetition, physioSettings]);
+  }, [events, dailyMetrics, trainingBlocks, qualities, blockTemplates, targetCompetition, physioSettings, tombstones]);
 
   const cloudSync = useCloudSync({
     onRemoteDataReceived,
@@ -691,12 +716,24 @@ export function useData() {
         delete updated[qId][dateStr];
         return updated;
       });
+      // Enregistrer une tombstone de suppression pour propager la suppression aux autres appareils
+      const now = Date.now();
+      const updatedTombstones = saveTombstone(key, now);
+      setTombstones(updatedTombstones);
     } else {
-      localStorage.setItem(key, JSON.stringify(sessionData));
+      const now = Date.now();
+      const sessionWithTimestamp: SessionData = {
+        ...sessionData,
+        updatedAt: sessionData.updatedAt || now
+      };
+      localStorage.setItem(key, JSON.stringify(sessionWithTimestamp));
       setEvents(prev => ({
         ...prev,
-        [qId]: { ...prev[qId], [dateStr]: sessionData }
+        [qId]: { ...prev[qId], [dateStr]: sessionWithTimestamp }
       }));
+      // Retirer toute tombstone antérieure pour cette séance recréée ou éditée
+      const updatedTombstones = removeTombstone(key);
+      setTombstones(updatedTombstones);
     }
     triggerSyncPush();
   };
@@ -884,9 +921,12 @@ export function useData() {
       blockTemplates,
       targetCompetition,
       physioSettings,
+      customExercises: getSavedCustomExercises(),
+      tombstones,
       exportDate: new Date().toISOString() 
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    // Export compact sans indentation inutile : divise le volume par deux et garantit une réimportation fluide
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -905,13 +945,12 @@ export function useData() {
 
     const inputElement = event.target;
 
-    // 1. Plafond de taille strict aligné sur les règles de sécurité Firestore (450 Ko max)
-    // Firestore limite le champ stringifié à 500 000 caractères. Un import au-dessus de 450 Ko bloquerait la synchronisation.
-    const MAX_FILE_SIZE_BYTES = 450 * 1024; // 460 800 octets
+    // 1. Plafond de taille de lecture : 1 Mo (permet de charger d'anciennes sauvegardes indentées avec null, 2)
+    const MAX_FILE_SIZE_BYTES = 1024 * 1024; // 1 Mo
     if (file.size > MAX_FILE_SIZE_BYTES) {
       inputElement.value = '';
       const sizeKo = (file.size / 1024).toFixed(0);
-      const msg = `Fichier trop volumineux (${sizeKo} Ko). La limite maximale est fixée à 450 Ko afin de garantir la synchronisation automatique vers Google Cloud sans saturation.`;
+      const msg = `Fichier trop volumineux (${sizeKo} Ko). La limite maximale autorisée est de 1 Mo.`;
       console.warn('[Import Security]', msg);
       if (onError) onError(msg);
       return;
@@ -940,11 +979,6 @@ export function useData() {
           throw new Error('Fichier de sauvegarde vide ou illisible');
         }
 
-        // Vérification de la longueur brute de chaîne
-        if (content.length > 500000) {
-          throw new Error('Le contenu dépasse le plafond de sécurité de 500 000 caractères.');
-        }
-
         let rawImported: any;
         try {
           rawImported = JSON.parse(content);
@@ -954,6 +988,12 @@ export function useData() {
 
         if (!rawImported || typeof rawImported !== 'object' || Array.isArray(rawImported)) {
           throw new Error('Structure JSON invalide : objet attendu.');
+        }
+
+        // Vérification de la taille minifiée réelle (Firestore limite le document à 500 000 caractères)
+        const minifiedSize = JSON.stringify(rawImported).length;
+        if (minifiedSize > 500000) {
+          throw new Error(`Le volume de données minifié (${(minifiedSize / 1024).toFixed(0)} Ko) dépasse le plafond Firestore de 500 000 caractères.`);
         }
 
         // 3. Migration descendante / ascendante en mémoire
@@ -966,20 +1006,23 @@ export function useData() {
           throw new Error(staged.error || 'Aucune donnée valide trouvée dans la sauvegarde.');
         }
 
-        // 5. COMMIT ATOMIQUE : Remplacement d'un bloc sans destruction des identifiants système
-        // Conserver les métadonnées vitales de la machine et de session
+        // 5. COMMIT ATOMIQUE : Remplacement sans destruction des identifiants système ni des exercices personnalisés
         const savedDeviceId = localStorage.getItem('physio_device_id');
         const savedUserAccount = localStorage.getItem('physio_user_account');
         const savedGymDraft = localStorage.getItem('training_live_session_draft_v1');
+        const savedCustomExercises = localStorage.getItem('physio_custom_exercises');
 
-        // Identifier et purger UNIQUEMENT les anciennes données de santé (clés de dates et réglages physio)
+        // Identifier et purger UNIQUEMENT les anciennes données de séances/métriques sans écraser les exercices personnalisés
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (!key) continue;
           if (
             /^\d{4}-\d{2}-\d{2}_/.test(key) || 
-            (key.startsWith('physio_') && key !== 'physio_device_id' && key !== 'physio_user_account')
+            (key.startsWith('physio_') && 
+             key !== 'physio_device_id' && 
+             key !== 'physio_user_account' && 
+             key !== 'physio_custom_exercises')
           ) {
             keysToRemove.push(key);
           }
@@ -991,10 +1034,13 @@ export function useData() {
           localStorage.setItem(key, value);
         });
 
-        // Restauration garantie des clés système
+        // Restauration garantie des clés système et préservation des exercices personnalisés si non fournis dans l'import
         if (savedDeviceId) localStorage.setItem('physio_device_id', savedDeviceId);
         if (savedUserAccount) localStorage.setItem('physio_user_account', savedUserAccount);
         if (savedGymDraft) localStorage.setItem('training_live_session_draft_v1', savedGymDraft);
+        if (savedCustomExercises && !staged.entriesToSet.has('physio_custom_exercises')) {
+          localStorage.setItem('physio_custom_exercises', savedCustomExercises);
+        }
 
         inputElement.value = '';
         if (onSuccess) onSuccess();

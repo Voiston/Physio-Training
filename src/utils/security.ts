@@ -130,6 +130,16 @@ export function sanitizeSessionData(rawSession: any): any | null {
     safeSession.completedAt = rawSession.completedAt.slice(0, 64);
   }
 
+  // Horodatage de modification / création pour arbitrage précis des conflits et corrections à la baisse
+  if (typeof rawSession.updatedAt === 'number' && Number.isFinite(rawSession.updatedAt)) {
+    safeSession.updatedAt = Math.round(rawSession.updatedAt);
+  } else if (typeof rawSession.updatedAt === 'string') {
+    const parsed = Date.parse(rawSession.updatedAt);
+    if (Number.isFinite(parsed)) {
+      safeSession.updatedAt = parsed;
+    }
+  }
+
   // Préservation des contributions parentes (pour les séances secondaires calculées)
   if (rawSession.parentContributions && typeof rawSession.parentContributions === 'object') {
     const safeContribs: Record<string, any> = createSafeNullDict();
@@ -280,23 +290,125 @@ export function sanitizeDailyMetricsPayload(
 }
 
 /**
+ * Assainit un dictionnaire de tombstones (enregistrements de suppression de séances)
+ * Format : Record<`${dateStr}_${qId}`, timestampNumber>
+ */
+export function sanitizeTombstonesPayload(raw: any): Record<string, number> {
+  const result: Record<string, number> = createSafeNullDict();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return Object.assign({}, result);
+  }
+
+  const now = Date.now();
+  const MAX_TOMBSTONE_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 jours max de rétention
+
+  for (const [key, val] of Object.entries(raw)) {
+    const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
+    if (!match) continue;
+    const [, dateStr, qId] = match;
+    if (!isSafeDate(dateStr) || !isSafeId(qId)) continue;
+
+    const numVal = Number(val);
+    // Timestamp raisonnable (> 2020 et <= maintenant + 1 jour de décalage d'horloge)
+    if (Number.isFinite(numVal) && numVal > 1577836800000 && numVal <= now + 86400000) {
+      if (now - numVal < MAX_TOMBSTONE_AGE_MS) {
+        result[key] = Math.round(numVal);
+      }
+    }
+  }
+
+  return Object.assign({}, result);
+}
+
+/**
+ * Récupère les tombstones enregistrées dans le localStorage
+ */
+export function getSavedTombstones(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem('physio_tombstones');
+    return raw ? sanitizeTombstonesPayload(JSON.parse(raw)) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Enregistre une tombstone de suppression pour une séance donnée
+ */
+export function saveTombstone(eventKey: string, timestamp: number = Date.now()): Record<string, number> {
+  try {
+    const current = getSavedTombstones();
+    current[eventKey] = timestamp;
+    const clean = sanitizeTombstonesPayload(current);
+    localStorage.setItem('physio_tombstones', JSON.stringify(clean));
+    return clean;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Retire une tombstone lorsqu'une séance est recréée sur cette date
+ */
+export function removeTombstone(eventKey: string): Record<string, number> {
+  try {
+    const current = getSavedTombstones();
+    if (current[eventKey]) {
+      delete current[eventKey];
+      localStorage.setItem('physio_tombstones', JSON.stringify(current));
+    }
+    return current;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Fusion non destructrice granulaire des événements (séances d'entraînement) date par date.
- * Résout le problème des séances hors-ligne en salle qui seraient autrement écrasées par un pull distant.
- * 
- * Règle de fusion :
- * 1. Si une séance existe uniquement en local ou uniquement dans le cloud -> elle est conservée.
- * 2. Si une séance existe des deux côtés :
- *    - Si la version locale a des exercices détaillés et la version cloud n'en a pas -> priorité à la version locale.
- *    - Si la charge et les paramètres diffèrent -> conservation de la version ayant la charge la plus complète ou la plus récente.
+ * Résout :
+ * 1. La non-propagation des suppressions : grâce aux tombstones, une séance supprimée sur A
+ *    ne ressuscite pas lorsqu'elle arrive de B.
+ * 2. La correction de charge à la baisse : grâce au timestamp updatedAt, si la séance locale
+ *    a été corrigée plus récemment (ex: de 600 à 60 pts), la version la plus récente gagne
+ *    systématiquement au lieu de conserver la charge maximale arbitraire.
+ * 3. La préservation hors-ligne : une séance créée hors-ligne (sans tombstone correspondante)
+ *    est conservée et synchronisée vers le cloud.
  */
 export function mergeEventsNonDestructive(
   localEvents: Record<string, Record<string, any>>,
-  remoteEvents: Record<string, Record<string, any>>
-): { merged: Record<string, Record<string, any>>; hasNewLocalData: boolean } {
+  remoteEvents: Record<string, Record<string, any>>,
+  localTombstones?: Record<string, number>,
+  remoteTombstones?: Record<string, number>
+): { 
+  merged: Record<string, Record<string, any>>; 
+  hasNewLocalData: boolean;
+  mergedTombstones: Record<string, number>;
+  deletedKeysToPurge: string[];
+} {
   const merged: Record<string, Record<string, any>> = createSafeNullDict();
   let hasNewLocalData = false;
+  const deletedKeysToPurge: string[] = [];
 
-  // 1. Initialiser avec les filières du remote
+  const safeLocalTombstones = sanitizeTombstonesPayload(localTombstones);
+  const safeRemoteTombstones = sanitizeTombstonesPayload(remoteTombstones);
+
+  // 1. Fusionner les tombstones (la suppression la plus récente l'emporte)
+  const mergedTombstones: Record<string, number> = createSafeNullDict();
+  const allTombstoneKeys = new Set([
+    ...Object.keys(safeLocalTombstones),
+    ...Object.keys(safeRemoteTombstones)
+  ]);
+
+  for (const k of allTombstoneKeys) {
+    const tLocal = safeLocalTombstones[k] || 0;
+    const tRemote = safeRemoteTombstones[k] || 0;
+    mergedTombstones[k] = Math.max(tLocal, tRemote);
+    if (tLocal > tRemote) {
+      hasNewLocalData = true; // Le local a une tombstone plus récente à propager
+    }
+  }
+
+  // 2. Initialiser l'ensemble de toutes les filières
   const allQIds = new Set([
     ...Object.keys(localEvents || {}),
     ...Object.keys(remoteEvents || {})
@@ -317,37 +429,62 @@ export function mergeEventsNonDestructive(
     for (const dateStr of allDates) {
       if (!isSafeDate(dateStr)) continue;
 
+      const eventKey = `${dateStr}_${qId}`;
+      const tombstoneTime = mergedTombstones[eventKey] || 0;
+
       const localSession = localDates[dateStr];
       const remoteSession = remoteDates[dateStr];
 
-      if (!remoteSession && localSession) {
-        // Séance locale créée hors-ligne absente du cloud -> préserver impérativement
-        mergedDates[dateStr] = localSession;
-        hasNewLocalData = true;
-      } else if (!localSession && remoteSession) {
-        // Séance provenant du cloud absente en local -> ajouter
-        mergedDates[dateStr] = remoteSession;
-      } else if (localSession && remoteSession) {
-        // Conflit sur la même date et même qualité : arbitrage fin
-        const localExercisesCount = Array.isArray(localSession.exercises) ? localSession.exercises.length : 0;
-        const remoteExercisesCount = Array.isArray(remoteSession.exercises) ? remoteSession.exercises.length : 0;
+      const localUpdated = Number(localSession?.updatedAt) || 0;
+      const remoteUpdated = Number(remoteSession?.updatedAt) || 0;
 
-        if (localExercisesCount > remoteExercisesCount) {
-          // La version locale a des séries saisies à la salle
+      if (localSession && remoteSession) {
+        // Conflit : séance présente en local ET à distance
+        if (tombstoneTime > Math.max(localUpdated, remoteUpdated)) {
+          // La suppression est plus récente que les deux versions : la séance est effacée
+          deletedKeysToPurge.push(eventKey);
+          continue;
+        }
+
+        // Arbitrage par timestamp updatedAt : la modification la plus récente gagne
+        if (localUpdated > remoteUpdated) {
           mergedDates[dateStr] = localSession;
           hasNewLocalData = true;
-        } else if (remoteExercisesCount > localExercisesCount) {
+        } else if (remoteUpdated > localUpdated) {
           mergedDates[dateStr] = remoteSession;
         } else {
-          // Si égalité d'exercices, comparer la charge
-          const localLoad = Number(localSession.load) || 0;
-          const remoteLoad = Number(remoteSession.load) || 0;
-          if (localLoad > remoteLoad) {
+          // Égalité parfaite de timestamp (ou 0 tous les deux) : départager sur le niveau de détail
+          const localExercisesCount = Array.isArray(localSession.exercises) ? localSession.exercises.length : 0;
+          const remoteExercisesCount = Array.isArray(remoteSession.exercises) ? remoteSession.exercises.length : 0;
+
+          if (localExercisesCount > remoteExercisesCount) {
             mergedDates[dateStr] = localSession;
             hasNewLocalData = true;
+          } else if (remoteExercisesCount > localExercisesCount) {
+            mergedDates[dateStr] = remoteSession;
           } else {
+            // Même nombre d'exercices : conserver remote par stabilité
             mergedDates[dateStr] = remoteSession;
           }
+        }
+      } else if (localSession && !remoteSession) {
+        // Séance uniquement en local
+        if (tombstoneTime >= localUpdated) {
+          // Supprimée à distance : ne pas conserver, purger le stockage local
+          deletedKeysToPurge.push(eventKey);
+        } else {
+          // Séance locale créée hors-ligne : préserver et propager au cloud
+          mergedDates[dateStr] = localSession;
+          hasNewLocalData = true;
+        }
+      } else if (!localSession && remoteSession) {
+        // Séance uniquement distante
+        if (tombstoneTime >= remoteUpdated) {
+          // Supprimée localement : ne pas ressusciter, informer le cloud via tombstone
+          hasNewLocalData = true;
+        } else {
+          // Nouvelle séance distante : intégrer
+          mergedDates[dateStr] = remoteSession;
         }
       }
     }
@@ -357,7 +494,9 @@ export function mergeEventsNonDestructive(
 
   return {
     merged: Object.assign({}, merged),
-    hasNewLocalData
+    hasNewLocalData,
+    mergedTombstones: Object.assign({}, mergedTombstones),
+    deletedKeysToPurge
   };
 }
 
@@ -601,7 +740,15 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
       entriesToSet.set('physio_custom_exercises', JSON.stringify(safeEx));
     }
 
-    // 9. Vérification de cohérence : au moins une donnée utile
+    // 9. Validation des tombstones (suppressions de séances synchronisées)
+    if (imported.tombstones && typeof imported.tombstones === 'object') {
+      const safeTombstones = sanitizeTombstonesPayload(imported.tombstones);
+      if (Object.keys(safeTombstones).length > 0) {
+        entriesToSet.set('physio_tombstones', JSON.stringify(safeTombstones));
+      }
+    }
+
+    // 10. Vérification de cohérence : au moins une donnée utile
     if (entriesToSet.size === 0) {
       return {
         isValid: false,

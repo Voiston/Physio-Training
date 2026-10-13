@@ -998,7 +998,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       tonnageKg: totalTonnageKg,
       exercises: packagedExercises.length > 0 ? packagedExercises : undefined,
       source: 'live_gym_tracker',
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
+      updatedAt: Date.now()
     };
 
     // Jouer fanfare de victoire
