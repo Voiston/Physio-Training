@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { EventsByQuality } from '../../types';
 import { 
   getDailyAthleteLoad, 
   getDailyAthleteDuration, 
@@ -30,7 +31,7 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
     // Cas type de l'audit :
     // Une séance de Sprint (charge 100) qui génère 6 impacts secondaires sur d'autres qualités (total 310)
     const testDate = '2026-10-01';
-    const events: Record<string, Record<string, any>> = {
+    const events: EventsByQuality = {
       sprint: {
         [testDate]: { load: 100, duration: 30, sport: 'run', isSecondary: false }
       },
@@ -96,7 +97,7 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
 
     // Cas avec historique récent (ex: 4 séances de 350 UA sur les 7 derniers jours)
     const refDate = new Date('2026-10-15T12:00:00Z');
-    const sampleEvents: Record<string, Record<string, any>> = {
+    const sampleEvents: EventsByQuality = {
       vo2max: {
         '2026-10-14': { load: 350, isSecondary: false },
         '2026-10-12': { load: 350, isSecondary: false },
@@ -113,7 +114,7 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
 
   it('correctly handles multiple sessions (subSessions) on the same day for a quality', () => {
     const testDate = '2026-10-13';
-    const multiSessionEvents: Record<string, Record<string, any>> = {
+    const multiSessionEvents: EventsByQuality = {
       ef: {
         [testDate]: {
           load: 450, // 270 (matin) + 180 (soir)

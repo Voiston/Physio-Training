@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import type { EventsByQuality } from '../types';
+import type { DailyMetrics } from '../hooks/useMetricsState';
 import { PhysiologicalSettings } from '../hooks/useData';
 import { computeBanisterPerformance } from '../utils/physiology';
 import { 
@@ -8,8 +10,8 @@ import {
 
 interface PhysiologicalSettingsModalProps {
   settings: PhysiologicalSettings;
-  events: Record<string, Record<string, any>>;
-  dailyMetrics: Record<string, any>;
+  events: EventsByQuality;
+  dailyMetrics: Record<string, DailyMetrics>;
   onSave: (settings: PhysiologicalSettings) => void;
   onClose: () => void;
 }

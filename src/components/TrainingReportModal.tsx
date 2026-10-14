@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import type { EventsByQuality } from '../types';
+import type { DailyMetrics } from '../hooks/useMetricsState';
 import { createPortal } from 'react-dom';
 import { Quality, TrainingBlock, TargetCompetition } from '../hooks/useData';
 import { extractSessionLoad } from '../utils/physiology';
@@ -12,9 +14,9 @@ import {
 import type { QualitiesEMAMap, FosterMetrics, BanisterPerformance, CardioMuscularBalanceResult } from '../types';
 
 interface TrainingReportModalProps {
-  events: Record<string, Record<string, any>>;
+  events: EventsByQuality;
   qualities: Quality[];
-  dailyMetrics: Record<string, any>;
+  dailyMetrics: Record<string, DailyMetrics>;
   qualitiesEMA: QualitiesEMAMap;
   activeBlock: TrainingBlock | null;
   targetCompetition: TargetCompetition | null;

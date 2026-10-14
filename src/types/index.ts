@@ -80,6 +80,8 @@ export interface SessionData {
   originalLoad?: number;
   /** Charge d'origine conservée par la migration v1 -> v2. */
   loadLegacy?: number;
+  /** RPE unique des anciens schémas (lu en repli de rpeCardio). */
+  rpe?: number;
   /** Tonnage total (kg) des séances de musculation en direct. */
   tonnageKg?: number;
   isSimulated?: boolean;

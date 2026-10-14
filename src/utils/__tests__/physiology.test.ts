@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { SessionData } from '../../types';
 import { 
   computeFosterMetrics, 
   computeBanisterPerformance, 
@@ -108,7 +109,7 @@ describe('Phase 1 Physiology Verifications', () => {
 
   it('Warmup Invariance: computeQualityEMAData produces identical converged current EMA regardless of daysHistory', () => {
     // Generate 30 days of consistent training
-    const historyEvents: Record<string, any> = {};
+    const historyEvents: Record<string, SessionData & { isPrimary: boolean }> = {};
     const ref = new Date();
     for (let i = 1; i <= 30; i++) {
       const d = new Date(ref);

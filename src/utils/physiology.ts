@@ -4,7 +4,10 @@ import { getDailyAthleteLoad, isPrimary, extractSessionLoad } from './loadHelper
 import { isCardioQuality } from './qualities';
 import { getTsbZone, calculateTsbPercent } from './zones';
 import type { TsbZoneInfo } from './zones';
-import type { SessionData } from '../types';
+import type { SessionData, EventsByQuality } from '../types';
+
+/** Métriques journalières par date (readiness, vfc, hrRest…). */
+type DailyMetricsMap = Record<string, Record<string, number | undefined>>;
 import type { TargetCompetition } from '../hooks/useMetricsState';
 import { computeVfcAnalysis, computeHrRestAnalysis } from './vfcHelpers';
 
@@ -443,7 +446,7 @@ export function getQualityImpacts(
  * Calcule dynamiquement et à la lecture les impacts secondaires à partir des séances directes (primaires).
  */
 export function computeDerivedEvents(
-  primaryEvents: Record<string, Record<string, any>> | null | undefined, 
+  primaryEvents: EventsByQuality | null | undefined, 
   qualities: QualityDefinition[] = DEFAULT_QUALITIES
 ): Record<string, Record<string, DerivedSession>> {
   const derived: Record<string, Record<string, DerivedSession>> = {};
@@ -467,7 +470,8 @@ export function computeDerivedEvents(
       if (session.isSecondary) continue;
 
       // Inscription directe de la séance primaire
-      derived[qId][dateStr] = session;
+      // La séance primaire est conservée telle quelle (mêmes champs qu'avant, sans recalcul).
+      derived[qId][dateStr] = session as DerivedSession;
 
       if (!dateToPrimarySessions.has(dateStr)) {
         dateToPrimarySessions.set(dateStr, []);
@@ -722,7 +726,7 @@ function getSortedPrimaryDates(eventsForQuality: Record<string, SessionData> | n
 export function computeCellState(
   qDef: QualityDefinition, 
   targetDateStr: string, 
-  eventsForQuality: Record<string, any> | undefined | null, 
+  eventsForQuality: Record<string, SessionData> | undefined | null, 
   readinessOrBlocks: number | BlockLike[] = 7, 
   maybeBlocks: BlockLike[] = []
 ): CellState {
@@ -948,8 +952,8 @@ export function computeCellState(
 
 export function getTrainingRecommendations(
   qualities: QualityDefinition[], 
-  events: Record<string, Record<string, any>> | undefined | null, 
-  dailyMetrics: Record<string, any> | undefined | null, 
+  events: EventsByQuality | undefined | null, 
+  dailyMetrics: DailyMetricsMap | undefined | null, 
   activeBlock: BlockLike | null = null, 
   referenceDateStr: string | null = null
 ): TrainingRecommendation[] {
@@ -1162,7 +1166,7 @@ export function getTrainingRecommendations(
 
 export function computeQualityEMAData(
   qualityId: string, 
-  eventsForQuality: Record<string, any> | undefined | null, 
+  eventsForQuality: Record<string, SessionData> | undefined | null, 
   daysHistory: number = 45, 
   daysFuture: number = 0
 ): EMACalculation {
@@ -1312,7 +1316,7 @@ export function computeQualityEMAData(
 
 export function computeAllQualitiesEMA(
   qualities: QualityDefinition[], 
-  events: Record<string, Record<string, any>> | undefined | null, 
+  events: EventsByQuality | undefined | null, 
   daysHistory: number = 45, 
   daysFuture: number = 0
 ): Record<string, EMACalculation> {
@@ -1328,7 +1332,7 @@ export function computeAllQualitiesEMA(
 // ============================================================================
 
 export function computeFosterMetrics(
-  events: Record<string, Record<string, any>> | undefined | null, 
+  events: EventsByQuality | undefined | null, 
   referenceDateStr: string | null = null, 
   windowDays: number = 7
 ): FosterLoad {
@@ -1408,8 +1412,8 @@ export function computeFosterMetrics(
 // ============================================================================
 
 export function computeBanisterPerformance(
-  events: Record<string, Record<string, any>> | undefined | null, 
-  dailyMetrics: Record<string, any> = {}, 
+  events: EventsByQuality | undefined | null, 
+  dailyMetrics: DailyMetricsMap = {}, 
   daysHistory: number = 30, 
   daysFuture: number = 14,
   tauFatigue: number = 7,
@@ -1574,8 +1578,8 @@ export function computeBanisterPerformance(
 
 export function getTaperingAnalysis(
   targetCompetition: TargetCompetition | null | undefined, 
-  events: Record<string, Record<string, any>> | undefined | null, 
-  dailyMetrics: Record<string, any> = {},
+  events: EventsByQuality | undefined | null, 
+  dailyMetrics: DailyMetricsMap = {},
   tauFatigue: number = 7,
   tauFitness: number = 28,
   initialCtl: number | null = null,
@@ -1702,7 +1706,7 @@ export function getTaperingAnalysis(
 // ============================================================================
 
 export function computeCardioVsMuscularBalance(
-  events: Record<string, Record<string, any>> | undefined | null, 
+  events: EventsByQuality | undefined | null, 
   referenceDateStr: string | null = null, 
   windowDays: number = 7
 ): CardioMuscularBalance {
@@ -1854,7 +1858,7 @@ export function computeCardioVsMuscularBalance(
 // ============================================================================
 
 export function computeIntensityDistribution(
-  events: Record<string, Record<string, any>> | undefined | null, 
+  events: EventsByQuality | undefined | null, 
   qualities: QualityDefinition[] = DEFAULT_QUALITIES, 
   referenceDateStr: string | null = null, 
   windowDays: number = 28
@@ -1979,7 +1983,7 @@ export function computeIntensityDistribution(
 // ============================================================================
 
 export function computePerceivedFatigueAnalysis(
-  events: Record<string, Record<string, any>> | undefined | null, 
+  events: EventsByQuality | undefined | null, 
   referenceDateStr: string | null = null, 
   windowDays: number = 28
 ): PerceivedFatigueAnalysis {
