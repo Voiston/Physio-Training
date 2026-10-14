@@ -1,6 +1,21 @@
 import { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent } from 'react';
 import { usePersistentState } from './usePersistentState';
 import { useCloudSync } from './useCloudSync';
+import { useBlocksState, type BlockTemplate, type TrainingBlock } from './useBlocksState';
+import { useSimulationState } from './useSimulationState';
+import { 
+  useMetricsState, 
+  getInitialDailyMetrics,
+  type DailyMetrics, 
+  type PhysiologicalSettings, 
+  type TargetCompetition, 
+  DEFAULT_PHYSIO_SETTINGS 
+} from './useMetricsState';
+
+export type { BlockTemplate, TrainingBlock } from './useBlocksState';
+export type { DailyMetrics, PhysiologicalSettings, TargetCompetition } from './useMetricsState';
+export { DEFAULT_PHYSIO_SETTINGS } from './useMetricsState';
+
 import { 
   DEFAULT_QUALITIES, 
   computeAllQualitiesEMA, 
@@ -57,18 +72,6 @@ export interface Quality {
   impacts?: QualityImpact[];
 }
 
-export interface BlockTemplate {
-  id: string;
-  name: string;
-  durationWeeks: number;
-  focusQualities: string[];
-  description: string;
-  targetMultiplier: number;
-  maintenanceMultiplier: number;
-  color?: string;
-  badge?: string;
-}
-
 export interface TrainingRecommendation {
   quality: Quality;
   rank: number;
@@ -84,29 +87,6 @@ export interface TrainingRecommendation {
   actionTip: string;
 }
 
-export interface TrainingBlock {
-  id: string;
-  name: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  durationWeeks: number;
-  focusQualities: string[];
-  targetMultiplier: number;
-  maintenanceMultiplier: number;
-  color?: string;
-  notes?: string;
-}
-
-export interface TargetCompetition {
-  name: string;
-  date: string;
-  type: string; // 'marathon' | 'trail' | 'triathlon' | 'force' | 'course' | 'autre'
-  targetTsb: number; // e.g. 15 to 25
-  targetTsbUnit?: 'percent' | 'points' | string;
-  targetTime?: string;
-  notes?: string;
-}
 
 export interface SecondaryContribution {
   load: number;
@@ -210,25 +190,8 @@ export interface QualityEMAData {
 
 export type QualitiesEMAMap = Record<string, QualityEMAData>;
 
-export interface DailyMetrics {
-  readiness?: number;
-  vfc?: number;
-  hrRest?: number;
-  [key: string]: number | undefined;
-}
 
-export interface PhysiologicalSettings {
-  tauFatigue: number; // 5 to 12 days, default 7
-  tauFitness: number; // 21 to 45 days, default 28
-  profileName?: string;
-  initialCtl?: number;
-}
 
-export const DEFAULT_PHYSIO_SETTINGS: PhysiologicalSettings = {
-  tauFatigue: 7,
-  tauFitness: 28,
-  profileName: 'Standard'
-};
 
 function getInitialEvents(): Record<string, Record<string, SessionData>> {
   try {
@@ -289,42 +252,8 @@ function getInitialEvents(): Record<string, Record<string, SessionData>> {
   return loadedEvents;
 }
 
-function getInitialDailyMetrics(): Record<string, DailyMetrics> {
-  const loadedMetrics: Record<string, DailyMetrics> = {};
-  const ALLOWED_METRICS = new Set(['readiness', 'vfc', 'hrRest']);
 
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-      const match = key.match(/^(\d{4}-\d{2}-\d{2})_(.+)$/);
-      if (match) {
-        const dateStr = match[1];
-        const category = match[2];
 
-        if (!isSafeDate(dateStr) || !ALLOWED_METRICS.has(category)) continue;
-
-        try {
-          const rawItem = localStorage.getItem(key);
-          if (!rawItem) continue;
-          const parsedNum = Number(JSON.parse(rawItem));
-          if (Number.isFinite(parsedNum) && parsedNum >= 0 && parsedNum <= 1000) {
-            if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
-            loadedMetrics[dateStr][category] = parsedNum;
-          }
-        } catch {
-          const rawVal = localStorage.getItem(key);
-          const parsedNum = parseInt(rawVal || '0', 10);
-          if (Number.isFinite(parsedNum) && parsedNum >= 0 && parsedNum <= 1000) {
-            if (!loadedMetrics[dateStr]) loadedMetrics[dateStr] = {};
-            loadedMetrics[dateStr][category] = parsedNum;
-          }
-        }
-      }
-    }
-  } catch {}
-  return loadedMetrics;
-}
 
 export function useData() {
   const [events, setEvents] = useState<Record<string, Record<string, SessionData>>>(() => getInitialEvents());
@@ -360,218 +289,126 @@ export function useData() {
     } catch (e) {}
     return DEFAULT_QUALITIES;
   });
-
-  const [dailyMetrics, setDailyMetrics] = useState<Record<string, DailyMetrics>>(() => getInitialDailyMetrics());
-  
-  const [blockTemplates, setBlockTemplates] = usePersistentState<BlockTemplate[]>('physio_block_templates', () => {
-    return getSavedBlockTemplates();
-  });
-
-  const [trainingBlocks, setTrainingBlocks] = usePersistentState<TrainingBlock[]>('physio_training_blocks', () => {
-    try {
-      const raw = localStorage.getItem('physio_training_blocks');
-      if (raw !== null) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          return parsed.map((b: TrainingBlock) => ({
-            ...b,
-            targetMultiplier: b.targetMultiplier === 0.75 ? 0.45 : (b.targetMultiplier ?? 0.45),
-            maintenanceMultiplier: b.maintenanceMultiplier === 1.35 ? 1.0 : (b.maintenanceMultiplier ?? 1.0)
-          }));
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
-
-  // Objectif Compétition / Épreuve cible
-  const [targetCompetition, setTargetCompetitionState] = useState<TargetCompetition | null>(() => {
-    try {
-      const raw = localStorage.getItem('physio_target_competition');
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return null;
-  });
-
-  const saveTargetCompetition = (comp: TargetCompetition | null) => {
-    setTargetCompetitionState(comp);
-    if (!comp) {
-      localStorage.removeItem('physio_target_competition');
-    } else {
-      localStorage.setItem('physio_target_competition', JSON.stringify(comp));
-    }
-    triggerSyncPush();
-  };
-
-  // Constantes physiologiques individuelles (tauFatigue, tauFitness)
-  const [physioSettings, setPhysioSettingsState] = usePersistentState<PhysiologicalSettings>('physio_settings', () => {
-    try {
-      const raw = localStorage.getItem('physio_settings');
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return DEFAULT_PHYSIO_SETTINGS;
-  });
-
-  const savePhysioSettings = (newSettings: PhysiologicalSettings) => {
-    setPhysioSettingsState(newSettings);
-    triggerSyncPush();
-  };
-
-  // Mode Simulation Prédictive ("What-If")
-  const [isSimulationActive, setIsSimulationActive] = useState<boolean>(false);
-  const [simulatedEvents, setSimulatedEvents] = useState<Record<string, Record<string, SessionData>>>({});
-
-  const toggleSimulation = (active?: boolean) => {
-    setIsSimulationActive(prev => (typeof active === 'boolean' ? active : !prev));
-  };
-
-  const addSimulatedEvent = (qId: string, dateStr: string, sessionData: SessionData) => {
-    setSimulatedEvents(prev => ({
-      ...prev,
-      [qId]: {
-        ...(prev[qId] || {}),
-        [dateStr]: { ...sessionData, isSimulated: true }
-      }
-    }));
-  };
-
-  const removeSimulatedEvent = (qId: string, dateStr: string) => {
-    setSimulatedEvents(prev => {
-      const next = { ...prev, [qId]: { ...(prev[qId] || {}) } };
-      delete next[qId][dateStr];
-      return next;
-    });
-  };
-
-  const clearSimulation = () => {
-    setSimulatedEvents({});
-  };
-
-  const commitSimulation = () => {
-    Object.entries(simulatedEvents).forEach(([qId, dates]) => {
-      Object.entries(dates).forEach(([dateStr, sessionData]) => {
-        const { isSimulated, ...clean } = sessionData;
-        saveEventWithImpacts(qId, dateStr, clean, true);
-      });
-    });
-    setSimulatedEvents({});
-    setIsSimulationActive(false);
-    triggerSyncPush();
-  };
-
-  const applySimulationScenario = (scenarioType: 'tapering' | 'overload' | 'recovery') => {
-    const today = new Date();
-    const newSim: Record<string, Record<string, SessionData>> = {};
-    qualities.forEach(q => (newSim[q.id] = {}));
-
-    // Calibration relative basée sur la charge quotidienne moyenne réelle de l'athlète (28 derniers jours)
-    const baseline = getAthleteBaselineDailyLoad(events, 28, today);
-
-    if (scenarioType === 'tapering') {
-      // Affûtage Compétition : volume réduit de ~35%, maintien de l'intensité sur rappels toniques ciblés
-      const d2 = getLocalYYYYMMDD(addDays(today, 2));
-      const d5 = getLocalYYYYMMDD(addDays(today, 5));
-      const d7 = getLocalYYYYMMDD(addDays(today, 7));
-      const d9 = getLocalYYYYMMDD(addDays(today, 9));
-      const d12 = getLocalYYYYMMDD(addDays(today, 12));
-
-      const scale = Math.max(0.6, Math.min(1.4, baseline.dailyAvg / 350));
-      const durVo2 = Math.round(35 * scale);
-      const durEf = Math.round(40 * scale);
-      const durSprint = Math.max(15, Math.round(20 * scale));
-      const durVo2Short = Math.max(20, Math.round(25 * scale));
-      const durEfShort = Math.max(20, Math.round(25 * scale));
-
-      newSim['vo2max'] = {
-        [d2]: { 
-          duration: durVo2, 
-          rpeCardio: 8, 
-          rpeMusc: 6, 
-          load: computeSessionLoad('vo2max', durVo2, 8, 6), 
-          isSimulated: true 
-        },
-        [d9]: { 
-          duration: durVo2Short, 
-          rpeCardio: 7, 
-          rpeMusc: 5, 
-          load: computeSessionLoad('vo2max', durVo2Short, 7, 5), 
-          isSimulated: true 
-        }
-      };
-      newSim['ef'] = {
-        [d5]: { 
-          duration: durEf, 
-          rpeCardio: 4, 
-          rpeMusc: 3, 
-          load: computeSessionLoad('ef', durEf, 4, 3), 
-          isSimulated: true 
-        },
-        [d12]: { 
-          duration: durEfShort, 
-          rpeCardio: 3, 
-          rpeMusc: 2, 
-          load: computeSessionLoad('ef', durEfShort, 3, 2), 
-          isSimulated: true 
-        }
-      };
-      newSim['sprint'] = {
-        [d7]: { 
-          duration: durSprint, 
-          rpeCardio: 7, 
-          rpeMusc: 6, 
-          load: computeSessionLoad('sprint', durSprint, 7, 6), 
-          isSimulated: true 
-        }
-      };
-    } else if (scenarioType === 'overload') {
-      // Surcharge de bloc : +30% de charge quotidienne répartie sur 7 jours
-      const targetDailyLoad = Math.round(baseline.dailyAvg * 1.3);
-      for (let i = 1; i <= 7; i++) {
-        const d = getLocalYYYYMMDD(addDays(today, i));
-        const isCardioDay = i % 2 === 0;
-        const qId = isCardioDay ? 'seuil' : 'leg';
-        const rpeCardio = isCardioDay ? 8 : 6;
-        const rpeMusc = isCardioDay ? 6 : 8;
-        const effectiveRpe = 8;
-        const duration = Math.max(40, Math.min(100, Math.round(targetDailyLoad / effectiveRpe)));
-        const load = computeSessionLoad(qId, duration, rpeCardio, rpeMusc);
-
-        newSim[qId] = {
-          ...(newSim[qId] || {}),
-          [d]: { 
-            duration, 
-            rpeCardio, 
-            rpeMusc, 
-            load, 
-            isSimulated: true 
-          }
-        };
-      }
-    } else if (scenarioType === 'recovery') {
-      // Récupération active : séances douces à charge minimale (< 100 UA)
-      const d1 = getLocalYYYYMMDD(addDays(today, 1));
-      const d3 = getLocalYYYYMMDD(addDays(today, 3));
-      const d5 = getLocalYYYYMMDD(addDays(today, 5));
-
-      newSim['proprio'] = {
-        [d1]: { duration: 30, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('proprio', 30, 2, 2), isSimulated: true },
-        [d5]: { duration: 25, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('proprio', 25, 2, 2), isSimulated: true }
-      };
-      newSim['ef'] = {
-        [d3]: { duration: 30, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('ef', 30, 2, 2), isSimulated: true }
-      };
-    }
-
-    setSimulatedEvents(newSim);
-    setIsSimulationActive(true);
-  };
-
-
   // Cloud Synchronization for Smartphone ↔ PC Real-Time Sync
   const cloudSyncRef = useRef<any>(null);
   const triggerSyncPush = useCallback(() => {
     cloudSyncRef.current?.triggerDebouncedPush();
   }, []);
+
+  // Sous-hook 1 : Blocs et modèles de périodisation
+  const {
+    trainingBlocks,
+    setTrainingBlocks,
+    activeBlockToday,
+    saveTrainingBlock,
+    deleteTrainingBlock,
+    blockTemplates,
+    setBlockTemplates,
+    saveBlockTemplate,
+    resetBlockTemplates
+  } = useBlocksState({ onPushSync: triggerSyncPush });
+
+  // Sous-hook 2 : Simulation prédictive ("What-If")
+  const {
+    isSimulationActive,
+    setIsSimulationActive,
+    simulatedEvents,
+    setSimulatedEvents,
+    toggleSimulation,
+    addSimulatedEvent,
+    removeSimulatedEvent,
+    clearSimulation,
+    commitSimulation: commitSimulationInternal,
+    applySimulationScenario: applySimulationScenarioInternal
+  } = useSimulationState({ onPushSync: triggerSyncPush });
+
+  // Gestion des événements directs (séances réelles)
+  const saveEvent = useCallback((qId: string, dateStr: string, sessionData: SessionData | null) => {
+    const key = `${dateStr}_${qId}`;
+    if (!sessionData) {
+      localStorage.removeItem(key);
+      setEvents(prev => {
+        const updated = { ...prev, [qId]: { ...prev[qId] } };
+        delete updated[qId][dateStr];
+        return updated;
+      });
+      // Enregistrer une tombstone de suppression pour propager la suppression aux autres appareils
+      const now = Date.now();
+      const updatedTombstones = saveTombstone(key, now);
+      setTombstones(updatedTombstones);
+    } else {
+      const now = Date.now();
+      const sessionWithTimestamp: SessionData = {
+        ...sessionData,
+        updatedAt: sessionData.updatedAt || now
+      };
+      localStorage.setItem(key, JSON.stringify(sessionWithTimestamp));
+      setEvents(prev => ({
+        ...prev,
+        [qId]: { ...prev[qId], [dateStr]: sessionWithTimestamp }
+      }));
+      // Retirer toute tombstone antérieure pour cette séance recréée ou éditée
+      const updatedTombstones = removeTombstone(key);
+      setTombstones(updatedTombstones);
+    }
+    triggerSyncPush();
+  }, [triggerSyncPush]);
+
+  const saveEventWithImpacts = useCallback((qId: string, dateStr: string, sessionData: SessionData | null, _applyImpacts: boolean = true) => {
+    if (!sessionData) {
+      saveEvent(qId, dateStr, null);
+    } else {
+      const isCardio = isCardioQuality(qId, qualities);
+      const normalizedSport = sessionData.sport || (isCardio ? 'run' : 'muscu');
+      const normalizedSession: SessionData = {
+        ...sessionData,
+        sport: normalizedSport,
+        isSecondary: false
+      };
+      saveEvent(qId, dateStr, normalizedSession);
+    }
+  }, [qualities, saveEvent]);
+
+  const commitSimulation = useCallback(() => {
+    commitSimulationInternal(saveEventWithImpacts);
+  }, [commitSimulationInternal, saveEventWithImpacts]);
+
+  const applySimulationScenario = useCallback((scenarioType: 'tapering' | 'overload' | 'recovery') => {
+    applySimulationScenarioInternal(scenarioType, qualities, events);
+  }, [applySimulationScenarioInternal, qualities, events]);
+
+  // Événements effectifs : fusionne les séances réelles et simulées,
+  // puis calcule dynamiquement à la lecture tous les impacts secondaires rémanents via computeDerivedEvents
+  const effectiveEvents = useMemo(() => {
+    const basePrimary: Record<string, Record<string, SessionData>> = {};
+    qualities.forEach(q => {
+      basePrimary[q.id] = { ...(events[q.id] || {}) };
+      if (isSimulationActive && simulatedEvents[q.id]) {
+        Object.assign(basePrimary[q.id], simulatedEvents[q.id]);
+      }
+    });
+    return computeDerivedEvents(basePrimary, qualities as any) as Record<string, Record<string, SessionData>>;
+  }, [events, simulatedEvents, isSimulationActive, qualities]);
+
+  // Sous-hook 3 : Métriques journalières, paramètres physiologiques, objectifs et calculs Banister/Foster
+  const {
+    dailyMetrics,
+    setDailyMetrics,
+    saveDailyMetric,
+    physioSettings,
+    setPhysioSettingsState,
+    savePhysioSettings,
+    targetCompetition,
+    setTargetCompetitionState,
+    saveTargetCompetition,
+    banisterPerformance,
+    fosterMetrics,
+    taperingAnalysis,
+    cardioMuscularBalance,
+    intensityDistribution,
+    perceivedFatigueAnalysis
+  } = useMetricsState(effectiveEvents, qualities, isSimulationActive, { onPushSync: triggerSyncPush });
+
 
   // Callback de purge et réinitialisation atomique des états React (appelé au logout)
   const clearLocalHealthState = useCallback(() => {
@@ -731,64 +568,10 @@ export function useData() {
     onClearLocalHealthData: clearLocalHealthState,
   });
   cloudSyncRef.current = cloudSync;
-
-  // Événements effectifs : fusionne les séances réelles et simulées,
-  // puis calcule dynamiquement à la lecture tous les impacts secondaires rémanents via computeDerivedEvents
-  const effectiveEvents = useMemo(() => {
-    const basePrimary: Record<string, Record<string, SessionData>> = {};
-    qualities.forEach(q => {
-      basePrimary[q.id] = { ...(events[q.id] || {}) };
-      if (isSimulationActive && simulatedEvents[q.id]) {
-        Object.assign(basePrimary[q.id], simulatedEvents[q.id]);
-      }
-    });
-    return computeDerivedEvents(basePrimary, qualities as any) as Record<string, Record<string, SessionData>>;
-  }, [events, simulatedEvents, isSimulationActive, qualities]);
-
   // Calcul dynamique et réactif des courbes EMA (3, 7, 21 jours)
   const qualitiesEMA = useMemo<QualitiesEMAMap>(() => {
     return computeAllQualitiesEMA(qualities, effectiveEvents, 45, isSimulationActive ? 14 : 0) as QualitiesEMAMap;
   }, [qualities, effectiveEvents, isSimulationActive]);
-
-  // Modèle Banister prédictif (couvre la projection de simulation ou de compétition)
-  const banisterPerformance = useMemo(() => {
-    let futureDays = isSimulationActive ? 14 : 7;
-    if (targetCompetition?.date) {
-      const today = new Date();
-      const [ty, tm, td] = targetCompetition.date.split('-').map(Number);
-      const compDate = new Date(ty, tm - 1, td);
-      const daysRemaining = Math.ceil((compDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
-      futureDays = Math.max(futureDays, Math.min(180, Math.max(0, daysRemaining) + 3));
-    }
-
-    return computeBanisterPerformance(
-      effectiveEvents, 
-      dailyMetrics, 
-      30, 
-      futureDays,
-      physioSettings.tauFatigue,
-      physioSettings.tauFitness,
-      physioSettings.initialCtl
-    );
-  }, [effectiveEvents, dailyMetrics, isSimulationActive, physioSettings, targetCompetition]);
-
-  // Métriques de Foster (Monotonie & Strain)
-  const fosterMetrics = useMemo(() => {
-    return computeFosterMetrics(effectiveEvents);
-  }, [effectiveEvents]);
-
-  // Analyse d'affûtage & Compétition (réutilise directement le calcul Banister existant)
-  const taperingAnalysis = useMemo(() => {
-    return getTaperingAnalysis(
-      targetCompetition, 
-      effectiveEvents, 
-      dailyMetrics,
-      physioSettings.tauFatigue,
-      physioSettings.tauFitness,
-      physioSettings.initialCtl,
-      banisterPerformance
-    );
-  }, [targetCompetition, effectiveEvents, dailyMetrics, physioSettings, banisterPerformance]);
 
   // Synthèse hebdomadaire mémoïsée (-6 semaines passées à +2 semaines futures)
   const allWeeksStats = useMemo<WeekStats[]>(() => {
@@ -799,101 +582,11 @@ export function useData() {
     return allWeeksStats.find(w => w.isCurrentWeek) || allWeeksStats[allWeeksStats.length - 1];
   }, [allWeeksStats]);
 
-  // Balance de charge (Cardio vs Musculaire, Dual-Tau, Excentrique)
-  const cardioMuscularBalance = useMemo(() => {
-    return computeCardioVsMuscularBalance(effectiveEvents);
-  }, [effectiveEvents]);
-
-  // Distribution d'intensité selon Stephen Seiler (Polarisation Z1 / Z2 / Z3)
-  const intensityDistribution = useMemo(() => {
-    return computeIntensityDistribution(effectiveEvents, qualities as any);
-  }, [effectiveEvents, qualities]);
-
-  // Analyse de la fatigue perçue & tolérance à l'effort (Charge / Réponse)
-  const perceivedFatigueAnalysis = useMemo(() => {
-    return computePerceivedFatigueAnalysis(effectiveEvents);
-  }, [effectiveEvents]);
-
   // Helper pour récupérer l'historique EMA d'une qualité sur une durée personnalisée
   const getQualityEMA = (qualityId: string, daysHistory: number = 45): QualityEMAData => {
     return computeQualityEMAData(qualityId, effectiveEvents[qualityId] || {}, daysHistory, isSimulationActive ? 14 : 0) as QualityEMAData;
   };
 
-  const saveEvent = (qId: string, dateStr: string, sessionData: SessionData | null) => {
-    const key = `${dateStr}_${qId}`;
-    if (!sessionData) {
-      localStorage.removeItem(key);
-      setEvents(prev => {
-        const updated = { ...prev, [qId]: { ...prev[qId] } };
-        delete updated[qId][dateStr];
-        return updated;
-      });
-      // Enregistrer une tombstone de suppression pour propager la suppression aux autres appareils
-      const now = Date.now();
-      const updatedTombstones = saveTombstone(key, now);
-      setTombstones(updatedTombstones);
-    } else {
-      const now = Date.now();
-      const sessionWithTimestamp: SessionData = {
-        ...sessionData,
-        updatedAt: sessionData.updatedAt || now
-      };
-      localStorage.setItem(key, JSON.stringify(sessionWithTimestamp));
-      setEvents(prev => ({
-        ...prev,
-        [qId]: { ...prev[qId], [dateStr]: sessionWithTimestamp }
-      }));
-      // Retirer toute tombstone antérieure pour cette séance recréée ou éditée
-      const updatedTombstones = removeTombstone(key);
-      setTombstones(updatedTombstones);
-    }
-    triggerSyncPush();
-  };
-
-  const saveDailyMetric = (dateStr: string, type: 'readiness' | 'vfc' | string, score: string | number | null) => {
-    const key = `${dateStr}_${type}`;
-    if (score === null || score === undefined || score === '') {
-      localStorage.removeItem(key);
-      setDailyMetrics(prev => {
-        const updated = { ...prev, [dateStr]: { ...prev[dateStr] } };
-        if (updated[dateStr]) delete updated[dateStr][type];
-        return updated;
-      });
-    } else {
-      const numVal = parseInt(String(score), 10);
-      localStorage.setItem(key, String(numVal));
-      setDailyMetrics(prev => ({ 
-        ...prev, 
-        [dateStr]: { ...prev[dateStr], [type]: numVal } 
-      }));
-    }
-    triggerSyncPush();
-  };
-
-  const saveTrainingBlock = (block: TrainingBlock) => {
-    setTrainingBlocks(prev => {
-      const idx = prev.findIndex(b => b.id === block.id);
-      let updated: TrainingBlock[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = block;
-      } else {
-        updated = [...prev, block];
-      }
-      return updated;
-    });
-    triggerSyncPush();
-  };
-
-  const deleteTrainingBlock = (blockId: string) => {
-    setTrainingBlocks(prev => prev.filter(b => b.id !== blockId));
-    triggerSyncPush();
-  };
-
-  const activeBlockToday = useMemo(() => {
-    const todayStr = getLocalYYYYMMDD(new Date());
-    return getActiveBlockForDate(todayStr, trainingBlocks);
-  }, [trainingBlocks]);
 
   const setQualities = (newQualities: Quality[]) => {
     setQualitiesState(newQualities);
@@ -972,28 +665,6 @@ export function useData() {
 
   const resetQualitiesOrder = () => {
     setQualities(DEFAULT_QUALITIES);
-  };
-
-  const saveBlockTemplate = (template: BlockTemplate) => {
-    setBlockTemplates(prev => {
-      const idx = prev.findIndex(t => t.id === template.id);
-      let updated: BlockTemplate[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = template;
-      } else {
-        updated = [...prev, template];
-      }
-      return updated;
-    });
-    triggerSyncPush();
-  };
-
-  const resetBlockTemplates = () => {
-    localStorage.removeItem('physio_block_templates');
-    const defaults = getSavedBlockTemplates();
-    setBlockTemplates(defaults);
-    triggerSyncPush();
   };
 
   const trainingRecommendations = useMemo<TrainingRecommendation[]>(() => {
@@ -1152,26 +823,6 @@ export function useData() {
       }
     };
     reader.readAsText(file);
-  };
-
-  const saveEventWithImpacts = (qId: string, dateStr: string, sessionData: SessionData | null, _applyImpacts: boolean = true) => {
-    // 1. Sauvegarder ou supprimer la séance directe de l'athlète
-    if (!sessionData) {
-      saveEvent(qId, dateStr, null);
-    } else {
-      const isCardio = isCardioQuality(qId, qualities);
-      const normalizedSport = sessionData.sport || (isCardio ? 'run' : 'muscu');
-      const normalizedSession: SessionData = {
-        ...sessionData,
-        sport: normalizedSport,
-        isSecondary: false
-      };
-      saveEvent(qId, dateStr, normalizedSession);
-    }
-    // Note d'architecture : Les impacts secondaires ne sont plus persistés sur disque ni synchronisés.
-    // Ils sont dérivés dynamiquement et instantanément à la lecture par computeDerivedEvents dans effectiveEvents,
-    // garantissant une cohérence absolue même lors de modifications de la matrice d'impacts,
-    // tout en divisant la taille du payload de synchronisation Firestore par 5 à 7.
   };
 
   return { 

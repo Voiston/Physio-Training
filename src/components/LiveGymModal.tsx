@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, memo, useCallback, useReducer } from 'react';
 import { useModalA11y } from '../hooks/useModalA11y';
+import { GymRestTimer, GymActiveExercise, GymSetHistory } from './gym';
 import { 
   Play, Pause, RotateCcw, Plus, Trash2, Check, Clock, Dumbbell, 
   ChevronDown, ChevronUp, AlertCircle, Sparkles, Volume2, VolumeX,
@@ -113,145 +114,8 @@ const ElapsedClock = memo(function ElapsedClock({
   return <>{formatTime(secs)}</>;
 });
 
-// Composant autonome pour le minuteur de repos :
-// Se recale sur l'horloge absolue (pas de dérive en arrière-plan) et isole les re-rendus
-interface RestBannerProps {
-  timerState: {
-    endsAt: number;
-    targetSeconds: number;
-    label?: string;
-    pausedRemainingMs: number | null;
-  };
-  soundEnabled: boolean;
-  onDone: () => void;
-  onAdjust: (deltaSecs: number) => void;
-  onTogglePause: () => void;
-  onSkip: () => void;
-}
 
-const RestBanner = memo(function RestBanner({
-  timerState,
-  soundEnabled,
-  onDone,
-  onAdjust,
-  onTogglePause,
-  onSkip,
-}: RestBannerProps) {
-  const isPaused = timerState.pausedRemainingMs !== null;
 
-  const calculateRemaining = useCallback(() => {
-    if (timerState.pausedRemainingMs !== null) {
-      return Math.max(0, Math.ceil(timerState.pausedRemainingMs / 1000));
-    }
-    return Math.max(0, Math.ceil((timerState.endsAt - Date.now()) / 1000));
-  }, [timerState.endsAt, timerState.pausedRemainingMs]);
-
-  const [remainingSecs, setRemainingSecs] = useState<number>(calculateRemaining);
-
-  useEffect(() => {
-    if (isPaused) {
-      setRemainingSecs(calculateRemaining());
-      return;
-    }
-
-    let timeoutId: number;
-    const tick = () => {
-      const now = Date.now();
-      const left = Math.max(0, Math.ceil((timerState.endsAt - now) / 1000));
-      setRemainingSecs(left);
-
-      if (left <= 0) {
-        if (soundEnabled) {
-          playRestCompleteChime();
-          triggerVibration([200, 100, 200, 100, 400]);
-        }
-        onDone();
-        return;
-      }
-
-      if (soundEnabled && left <= 3 && left >= 1) {
-        playCountdownBeep(left === 1 ? 660 : 520, 80);
-        triggerVibration(40);
-      }
-
-      // Recalage précis sur la seconde pour éviter les dérives de throttle
-      const msUntilNextSecond = Math.max(30, (timerState.endsAt - now) - (left - 1) * 1000);
-      timeoutId = window.setTimeout(tick, msUntilNextSecond);
-    };
-
-    tick();
-    return () => clearTimeout(timeoutId);
-  }, [timerState.endsAt, isPaused, soundEnabled, onDone, calculateRemaining]);
-
-  return (
-    <div 
-      role="timer"
-      aria-label={`Minuteur de repos : ${Math.floor(remainingSecs / 60)} minutes et ${remainingSecs % 60} secondes restantes`}
-      className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-indigo-500/40 px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 animate-fadeIn shrink-0 shadow-lg"
-    >
-      <div className="flex items-center gap-3">
-        <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-indigo-500/30 border border-indigo-400/50" aria-hidden="true">
-          <Timer size={18} className="text-indigo-200 animate-pulse" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">Repos en cours</span>
-            {timerState.label && (
-              <span className="text-[11px] text-indigo-300/80 truncate max-w-[150px] sm:max-w-xs">
-                {timerState.label}
-              </span>
-            )}
-          </div>
-          <div 
-            className="font-mono font-black text-xl sm:text-2xl text-white tracking-tight tabular-nums"
-            aria-hidden="true"
-          >
-            {formatTime(remainingSecs)}
-          </div>
-        </div>
-      </div>
-
-      {/* Commandes rapides de repos (+30s, -15s, pause, passer) avec cibles tactiles 44px */}
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <button
-          type="button"
-          onClick={() => onAdjust(-15)}
-          className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform cursor-pointer"
-          title="Enlever 15 secondes"
-          aria-label="Enlever 15 secondes au minuteur de repos"
-        >
-          -15s
-        </button>
-        <button
-          type="button"
-          onClick={() => onAdjust(30)}
-          className="min-h-[44px] px-2.5 sm:px-3 py-1 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-xs font-bold text-indigo-200 active:scale-95 transition-transform cursor-pointer"
-          title="Ajouter 30 secondes"
-          aria-label="Ajouter 30 secondes au minuteur de repos"
-        >
-          +30s
-        </button>
-        <button
-          type="button"
-          onClick={onTogglePause}
-          className="min-h-[44px] min-w-[44px] p-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-400/30 text-indigo-200 flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
-          title={isPaused ? 'Reprendre le repos' : 'Mettre le repos en pause'}
-          aria-label={isPaused ? 'Reprendre le chronomètre de repos' : 'Mettre le chronomètre de repos en pause'}
-        >
-          {isPaused ? <Play size={16} /> : <Pause size={16} />}
-        </button>
-        <button
-          type="button"
-          onClick={onSkip}
-          className="min-h-[44px] px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors active:scale-95 flex items-center justify-center cursor-pointer"
-          aria-label="Passer le minuteur de repos et reprendre l'entraînement"
-        >
-          Passer
-        </button>
-      </div>
-    </div>
-  );
-});
 
 interface QualityOption {
   id: string;
@@ -875,6 +739,31 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     setActiveExercises(prev => prev.filter((_, idx) => idx !== exerciseIndex));
   };
 
+  const handleApplyAdaptiveSuggestion = useCallback((exerciseIndex: number) => {
+    const ex = activeExercises[exerciseIndex];
+    if (!ex) return;
+    const adaptive = adaptiveProgressionMap.get(ex.exerciseCatalogId);
+    if (!adaptive || !adaptive.hasHistory) return;
+
+    setActiveExercises(prev => {
+      const clone = [...prev];
+      if (!clone[exerciseIndex]) return prev;
+      clone[exerciseIndex] = {
+        ...clone[exerciseIndex],
+        sets: clone[exerciseIndex].sets.map(s => {
+          if (s.completed) return s;
+          return {
+            ...s,
+            weightKg: adaptive.suggestedWeightKg ?? s.weightKg,
+            reps: adaptive.suggestedReps ?? s.reps,
+            rir: adaptive.suggestedRir ?? s.rir
+          };
+        })
+      };
+      return clone;
+    });
+  }, [activeExercises, adaptiveProgressionMap]);
+
   const handleAddExerciseFromCatalog = (catalogEx: ExerciseDefinition) => {
     recordExerciseUsage(catalogEx.id);
     const newEx: LiveExercise = {
@@ -1335,7 +1224,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
             {/* BANNIÈRE MINUTEUR DE REPOS AUTONOME (Zéro dérive, aucun re-rendu du parent) */}
             {restTimerState && (
-              <RestBanner
+              <GymRestTimer
                 timerState={restTimerState}
                 soundEnabled={soundEnabled}
                 onDone={handleSkipRestTimer}
@@ -1347,276 +1236,23 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
             {/* CONTENU PRINCIPAL : LISTE DES EXERCICES ET SÉRIES */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
-              {activeExercises.map((ex, exIdx) => {
-                // Progression adaptative récupérée depuis la table mémoïsée (zéro recalcul redondant)
-                const adaptive = adaptiveProgressionMap.get(ex.exerciseCatalogId);
+              {activeExercises.map((ex, exIdx) => (
+                <GymActiveExercise
+                  key={ex.id}
+                  exercise={ex}
+                  exerciseIndex={exIdx}
+                  adaptiveSuggestion={adaptiveProgressionMap.get(ex.exerciseCatalogId)}
+                  onUpdateSetValue={handleUpdateSetValue}
+                  onQuickAdjustWeight={handleQuickAdjustWeight}
+                  onQuickAdjustReps={handleQuickAdjustReps}
+                  onValidateSet={handleValidateSet}
+                  onRemoveSet={handleRemoveSet}
+                  onAddSet={handleAddSetToExercise}
+                  onRemoveExercise={handleRemoveExercise}
+                  onApplyAdaptiveSuggestion={handleApplyAdaptiveSuggestion}
+                />
+              ))}
 
-                return (
-                  <div 
-                    key={ex.id}
-                    className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-3 sm:p-4 shadow-sm space-y-3"
-                  >
-                    {/* Header de l'exercice */}
-                    <div className="flex items-start justify-between gap-2 border-b border-slate-700/50 pb-2.5">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-black text-base sm:text-lg text-white tracking-tight truncate">
-                            {ex.name}
-                          </h3>
-                          {ex.category && (
-                            <span className="px-2 py-0.5 rounded-md bg-slate-700/60 text-slate-300 text-[10px] font-bold uppercase tracking-wider">
-                              {ex.category === 'lower' ? 'Bas' : ex.category === 'upper_push' ? 'Push' : ex.category === 'upper_pull' ? 'Pull' : 'Core'}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Suggestion adaptative si historique */}
-                        {adaptive && adaptive.hasHistory && (
-                          <div className="mt-1 flex items-center gap-2 flex-wrap text-xs">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold flex items-center gap-1 border ${
-                              adaptive.status === 'increase'
-                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                : adaptive.status === 'decrease'
-                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                                : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                            }`}>
-                              <Sparkles size={11} />
-                              {adaptive.status === 'increase' ? 'Cible +' : adaptive.status === 'decrease' ? 'Décharge' : 'Maintien'} : 
-                              {adaptive.suggestedWeightKg ? ` ${adaptive.suggestedWeightKg} kg` : ''} 
-                              {adaptive.suggestedReps ? ` × ${adaptive.suggestedReps} reps` : ''} 
-                              (RIR {adaptive.suggestedRir})
-                            </span>
-                            <span className="text-[11px] text-slate-400">
-                              Précédent : {adaptive.lastWeightKg ? `${adaptive.lastWeightKg} kg` : ''} {adaptive.lastReps ? `× ${adaptive.lastReps}` : ''} ({adaptive.lastRir} RIR le {adaptive.lastDate})
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                // Appliquer la suggestion à toutes les séries non complétées de cet exercice
-                                setActiveExercises(prev => {
-                                  const clone = [...prev];
-                                  clone[exIdx] = {
-                                    ...clone[exIdx],
-                                    sets: clone[exIdx].sets.map(s => {
-                                      if (s.completed) return s;
-                                      return {
-                                        ...s,
-                                        weightKg: adaptive.suggestedWeightKg ?? s.weightKg,
-                                        reps: adaptive.suggestedReps ?? s.reps,
-                                        rir: adaptive.suggestedRir ?? s.rir
-                                      };
-                                    })
-                                  };
-                                  return clone;
-                                });
-                              }}
-                              className="text-[10px] text-cyan-400 hover:text-cyan-300 underline font-bold cursor-pointer"
-                            >
-                              Appliquer à cet exercice
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Supprimer exercice */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExercise(exIdx)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title="Retirer cet exercice"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
-                    {/* TABLEAU / CARTES DES SÉRIES TACTILES */}
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-12 gap-1 sm:gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
-                        <div className="col-span-1 text-center">Set</div>
-                        <div className="col-span-5 sm:col-span-3 text-center">Charge (kg)</div>
-                        <div className="col-span-4 sm:col-span-2 text-center">Reps</div>
-                        <div className="hidden sm:block sm:col-span-2 text-center">RIR</div>
-                        <div className="hidden sm:block sm:col-span-2 text-center">Repos</div>
-                        <div className="col-span-2 sm:col-span-2 text-center flex items-center justify-center" title="Validation de série">
-                          <Check size={14} className="text-emerald-400" />
-                        </div>
-                      </div>
-
-                      {ex.sets.map((set, sIdx) => {
-                        const isSetDone = set.completed;
-
-                        return (
-                          <div 
-                            key={set.id}
-                            className={`grid grid-cols-12 gap-1 sm:gap-1.5 items-center p-2 rounded-xl border transition-all ${
-                              isSetDone
-                                ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-100 shadow-sm'
-                                : 'bg-slate-900/60 border-slate-700/60 text-slate-200'
-                            }`}
-                          >
-                            {/* Numéro de série */}
-                            <div className="col-span-1 flex flex-col items-center justify-center">
-                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
-                                isSetDone ? 'bg-emerald-500/30 text-emerald-300 font-black' : 'bg-slate-800 text-slate-300'
-                              }`}>
-                                {set.setNumber}
-                              </span>
-                            </div>
-
-                            {/* Charge (kg) avec boutons tactiles +/- agrandis à 44px de hauteur */}
-                            <div className="col-span-5 sm:col-span-3 flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                disabled={isSetDone}
-                                onClick={() => handleQuickAdjustWeight(exIdx, sIdx, -2.5)}
-                                className="min-w-[36px] sm:min-w-[32px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
-                                title="-2.5 kg"
-                                aria-label={`Diminuer le poids de 2.5 kg pour la série ${set.setNumber} de ${ex.name}`}
-                              >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                step="0.5"
-                                disabled={isSetDone}
-                                value={set.weightKg === 0 ? '' : set.weightKg}
-                                onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'weightKg', Number(e.target.value) || 0)}
-                                placeholder="0"
-                                aria-label={`Poids en kg pour la série ${set.setNumber} de ${ex.name}`}
-                                className="w-13 sm:w-16 min-h-[44px] sm:min-h-[40px] text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              />
-                              <button
-                                type="button"
-                                disabled={isSetDone}
-                                onClick={() => handleQuickAdjustWeight(exIdx, sIdx, 2.5)}
-                                className="min-w-[36px] sm:min-w-[32px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
-                                title="+2.5 kg"
-                                aria-label={`Augmenter le poids de 2.5 kg pour la série ${set.setNumber} de ${ex.name}`}
-                              >
-                                +
-                              </button>
-                            </div>
-
-                            {/* Répétitions avec boutons tactiles +/- agrandis à 44px de hauteur */}
-                            <div className="col-span-4 sm:col-span-2 flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                disabled={isSetDone}
-                                onClick={() => handleQuickAdjustReps(exIdx, sIdx, -1)}
-                                className="min-w-[34px] sm:min-w-[30px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
-                                title="-1 rep"
-                                aria-label={`Diminuer d'une répétition pour la série ${set.setNumber} de ${ex.name}`}
-                              >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                disabled={isSetDone}
-                                value={set.reps || ''}
-                                onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'reps', Math.max(1, Number(e.target.value) || 1))}
-                                placeholder="10"
-                                aria-label={`Nombre de répétitions pour la série ${set.setNumber} de ${ex.name}`}
-                                className="w-10 sm:w-12 min-h-[44px] sm:min-h-[40px] text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              />
-                              <button
-                                type="button"
-                                disabled={isSetDone}
-                                onClick={() => handleQuickAdjustReps(exIdx, sIdx, 1)}
-                                className="min-w-[34px] sm:min-w-[30px] min-h-[44px] sm:min-h-[40px] px-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-90 disabled:opacity-30 text-slate-200 text-base font-black flex items-center justify-center shrink-0 touch-manipulation select-none transition-transform"
-                                title="+1 rep"
-                                aria-label={`Augmenter d'une répétition pour la série ${set.setNumber} de ${ex.name}`}
-                              >
-                                +
-                              </button>
-                            </div>
-
-                            {/* RIR (Répétitions en réserve) */}
-                            <div className="hidden sm:flex sm:col-span-2 items-center justify-center">
-                              <select
-                                disabled={isSetDone}
-                                value={set.rir}
-                                onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'rir', Number(e.target.value))}
-                                aria-label={`Répétitions en réserve RIR pour la série ${set.setNumber} de ${ex.name}`}
-                                className="min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              >
-                                <option value="0">0 (Échec)</option>
-                                <option value="1">1 (Trés dur)</option>
-                                <option value="2">2 (Optimal)</option>
-                                <option value="3">3 (Modéré)</option>
-                                <option value="4">4+ (Léger)</option>
-                              </select>
-                            </div>
-
-                            {/* Temps de repos par défaut pour ce set */}
-                            <div className="hidden sm:flex sm:col-span-2 items-center justify-center">
-                              <select
-                                disabled={isSetDone}
-                                value={set.restSeconds}
-                                onChange={(e) => handleUpdateSetValue(exIdx, sIdx, 'restSeconds', Number(e.target.value))}
-                                aria-label={`Temps de repos prévu après la série ${set.setNumber} de ${ex.name}`}
-                                className="min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                              >
-                                <option value="45">45s</option>
-                                <option value="60">60s</option>
-                                <option value="90">90s (1m30)</option>
-                                <option value="120">120s (2m)</option>
-                                <option value="180">180s (3m)</option>
-                              </select>
-                            </div>
-
-                            {/* BOUTON TACTILE DE VALIDATION (MIN-H 44PX WCAG 2.2) */}
-                            <div className="col-span-2 sm:col-span-2 flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleValidateSet(exIdx, sIdx)}
-                                className={`min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center transition-all shadow-sm touch-manipulation active:scale-95 ${
-                                  isSetDone
-                                    ? 'bg-emerald-500/25 hover:bg-emerald-500/35 border-2 border-emerald-400 text-emerald-400 shadow-emerald-500/20 ring-2 ring-emerald-500/30'
-                                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 active:bg-emerald-500/35 border border-emerald-500/40 text-emerald-400'
-                                }`}
-                                title={isSetDone ? 'Série validée (cliquer pour annuler)' : 'Valider la série'}
-                                aria-label={isSetDone ? `Série ${set.setNumber} de ${ex.name} validée. Cliquer pour annuler.` : `Valider la série ${set.setNumber} de ${ex.name}`}
-                              >
-                                <Check size={20} className="text-emerald-400 stroke-[3]" />
-                              </button>
-
-                              {/* Supprimer la série si plus d'une */}
-                              {ex.sets.length > 1 && !isSetDone && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveSet(exIdx, sIdx)}
-                                  className="min-w-[36px] min-h-[44px] text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 flex items-center justify-center transition-colors touch-manipulation active:scale-90"
-                                  title="Retirer cette série"
-                                  aria-label={`Supprimer la série ${set.setNumber} de ${ex.name}`}
-                                >
-                                  <X size={16} />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Ajouter une série à cet exercice */}
-                    <div className="pt-1 flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => handleAddSetToExercise(exIdx)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 border border-slate-700/80"
-                      >
-                        <Plus size={13} /> Ajouter une série
-                      </button>
-
-                      <span className="text-[11px] text-slate-400">
-                        {ex.sets.filter(s => s.completed).length} / {ex.sets.length} séries validées
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
 
               {/* Bouton pour ajouter un exercice */}
               <button
@@ -1707,6 +1343,15 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Historique détaillé des séries complétées */}
+            <GymSetHistory 
+              exercises={activeExercises}
+              totalTonnageKg={totalTonnageKg}
+              totalCompletedSets={totalCompletedSets}
+              totalPlannedSets={totalPlannedSets}
+              elapsedSeconds={getElapsedSeconds()}
+            />
 
             {/* Saisie RPE & Fatigue */}
             <div className="space-y-4 bg-black/40 p-4 sm:p-5 rounded-2xl border border-slate-800">
