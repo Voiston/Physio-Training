@@ -25,7 +25,7 @@ export type QualityCategory = 'cardio' | 'force' | 'mixte' | 'souplesse';
 export interface QualityLike {
   id: string;
   category?: QualityCategory | string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

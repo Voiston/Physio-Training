@@ -3,6 +3,9 @@ import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers';
 import { getDailyAthleteLoad, isPrimary, extractSessionLoad } from './loadHelpers';
 import { isCardioQuality } from './qualities';
 import { getTsbZone, calculateTsbPercent } from './zones';
+import type { TsbZoneInfo } from './zones';
+import type { SessionData } from '../types';
+import type { TargetCompetition } from '../hooks/useMetricsState';
 import { computeVfcAnalysis, computeHrRestAnalysis } from './vfcHelpers';
 
 export { extractSessionLoad };
@@ -26,7 +29,7 @@ export interface QualityDefinition {
   category?: 'cardio' | 'force' | 'mixte' | string;
   impacts?: QualityImpact[];
   isCustom?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SessionImpactContribution {
@@ -49,8 +52,19 @@ export interface DerivedSession {
   parentContributions?: Record<string, SessionImpactContribution>;
   parentQId?: string;
   originalLoad?: number;
-  exercises?: any[];
-  [key: string]: any;
+  exercises?: SessionData['exercises'];
+  [key: string]: unknown;
+}
+
+/** Forme minimale d'un bloc d'entraînement lue par les calculs (TrainingBlock ou équivalent). */
+export interface BlockLike {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  durationWeeks?: number;
+  focusQualities?: string[];
+  targetMultiplier?: number;
+  maintenanceMultiplier?: number;
 }
 
 export interface BlockTemplate {
@@ -84,7 +98,7 @@ export interface TrainingRecommendation {
   isHardQuality: boolean;
   cellState: CellState;
   daysSinceLastSession: number | null;
-  lastSessionData: any;
+  lastSessionData: SessionData | null;
   urgencyScore: number;
   urgencyLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'OPTIMAL' | 'REST';
   urgencyBadge: string;
@@ -241,21 +255,21 @@ export interface BanisterPerformanceResult {
   peakDay: BanisterPoint | null;
   historyDays: number;
   isWarmedUp: boolean;
-  tsbZone: any;
+  tsbZone: TsbZoneInfo;
 }
 
 // 4. Structure TaperingRecommendation
 export interface TaperingRecommendation {
-  targetCompetition: any;
+  targetCompetition: TargetCompetition;
   daysRemaining: number;
   banister: BanisterPerformanceResult;
-  compDayData: any;
+  compDayData: BanisterPoint;
   targetTsb: number;
   targetTsbUnit: string;
   projectedTsb: number;
   projectedTsbPercent: number | null;
   tsbGap: number;
-  tsbZone: any;
+  tsbZone: TsbZoneInfo;
   foster: FosterLoad;
   futureSessionsCount: number;
   status: 'BUILD' | 'TAPER_START' | 'TAPER_OPTIMAL' | 'TAPER_PASSIVE' | 'TAPER_OVERREACHING' | 'PEAK' | 'POST';
@@ -438,7 +452,7 @@ export function computeDerivedEvents(
   }
 
   // 1. Recenser les séances directes (non secondaires) par date
-  const dateToPrimarySessions = new Map<string, Array<{ qId: string; session: any }>>();
+  const dateToPrimarySessions = new Map<string, Array<{ qId: string; session: SessionData }>>();
   const qKeys = Object.keys(primaryEvents || {});
   for (let i = 0; i < qKeys.length; i++) {
     const qId = qKeys[i];
@@ -602,7 +616,7 @@ export function computeBlockEndDate(startDateStr: string, durationWeeks: number)
   return getLocalYYYYMMDD(end);
 }
 
-export function getActiveBlockForDate(dateStr: string, blocks: any[] = []): any | null {
+export function getActiveBlockForDate<B extends BlockLike>(dateStr: string, blocks: B[] = []): B | null {
   if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return null;
   return blocks.find(b => {
     if (!b || !b.startDate || !b.endDate) return false;
@@ -610,7 +624,7 @@ export function getActiveBlockForDate(dateStr: string, blocks: any[] = []): any 
   }) || null;
 }
 
-export function getBlockProgress(block: any, referenceDateStr?: string | null): BlockProgress | null {
+export function getBlockProgress(block: (BlockLike & { durationWeeks: number }) | null | undefined, referenceDateStr?: string | null): BlockProgress | null {
   if (!block || !block.startDate || !block.endDate) return null;
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
   const [sy, sm, sd] = block.startDate.split('-').map(Number);
@@ -658,14 +672,14 @@ export function getSavedBlockTemplates(): BlockTemplate[] {
         }));
       }
     }
-  } catch {}
+  } catch (err) { console.warn('[physiology] Modèles de blocs illisibles, préréglages utilisés', err); }
   return BLOCK_PRESETS;
 }
 
 export function saveBlockTemplates(templates: BlockTemplate[]): void {
   try {
     localStorage.setItem('physio_block_templates', JSON.stringify(templates));
-  } catch {}
+  } catch (err) { console.warn('[physiology] Sauvegarde des modèles de blocs impossible', err); }
 }
 
 export function reorderQualitiesForBlock(qualities: QualityDefinition[], focusQualities: string[] = []): QualityDefinition[] {
@@ -693,7 +707,7 @@ export function reorderQualitiesForBlock(qualities: QualityDefinition[], focusQu
 
 // Cache WeakMap pour pré-indexer les dates de séances principales par qualité
 const primaryDatesCache = new WeakMap<object, string[]>();
-function getSortedPrimaryDates(eventsForQuality: any): string[] {
+function getSortedPrimaryDates(eventsForQuality: Record<string, SessionData> | null | undefined): string[] {
   if (!eventsForQuality || typeof eventsForQuality !== 'object') return [];
   let cached = primaryDatesCache.get(eventsForQuality);
   if (!cached) {
@@ -709,8 +723,8 @@ export function computeCellState(
   qDef: QualityDefinition, 
   targetDateStr: string, 
   eventsForQuality: Record<string, any> | undefined | null, 
-  readinessOrBlocks: number | any[] = 7, 
-  maybeBlocks: any[] = []
+  readinessOrBlocks: number | BlockLike[] = 7, 
+  maybeBlocks: BlockLike[] = []
 ): CellState {
   const blocks = Array.isArray(readinessOrBlocks) ? readinessOrBlocks : (maybeBlocks || []);
   const [ty, tm, td] = targetDateStr.split('-').map(Number);
@@ -719,7 +733,7 @@ export function computeCellState(
 
   const activeBlock = getActiveBlockForDate(targetDateStr, blocks);
   const isFocus = Boolean(activeBlock && activeBlock.focusQualities?.includes(qDef.id));
-  const prescriptionMultiplier = isFocus 
+  const prescriptionMultiplier = isFocus && activeBlock
     ? (activeBlock.targetMultiplier ?? 0.45) 
     : (activeBlock?.maintenanceMultiplier ?? 1.0);
 
@@ -884,7 +898,7 @@ export function computeCellState(
   let blockStateInfo: { name: string; type: 'focus' | 'maintenance'; label: string } | null = null;
   if (activeBlock) {
     blockStateInfo = {
-      name: activeBlock.name,
+      name: activeBlock.name ?? '',
       type: isFocus ? 'focus' : 'maintenance',
       label: isFocus ? 'Fréquence de développement (x0.45)' : 'Maintien nominal (x1.0)'
     };
@@ -936,7 +950,7 @@ export function getTrainingRecommendations(
   qualities: QualityDefinition[], 
   events: Record<string, Record<string, any>> | undefined | null, 
   dailyMetrics: Record<string, any> | undefined | null, 
-  activeBlock: any = null, 
+  activeBlock: BlockLike | null = null, 
   referenceDateStr: string | null = null
 ): TrainingRecommendation[] {
   const refDate = referenceDateStr || getLocalYYYYMMDD(new Date());
@@ -987,7 +1001,7 @@ export function getTrainingRecommendations(
       .sort();
     
     let daysSinceLastSession: number | null = null;
-    let lastSessionData: any = null;
+    let lastSessionData: SessionData | null = null;
     if (sessionDates.length > 0) {
       const lastDate = sessionDates[sessionDates.length - 1];
       lastSessionData = qualityEvents[lastDate];
@@ -1015,7 +1029,7 @@ export function getTrainingRecommendations(
         urgencyScore = 60 * rankWeight * blockWeight;
         urgencyBadge = '⚡ Focus Bloc';
         urgencyColor = 'blue';
-        reason = `Qualité prioritaire du bloc actif « ${activeBlock.name} », sans séance enregistrée.`;
+        reason = `Qualité prioritaire du bloc actif « ${activeBlock?.name} », sans séance enregistrée.`;
         actionTip = 'Programmer une première séance pour amorcer le bloc.';
       } else {
         urgencyLevel = 'LOW';
@@ -1559,13 +1573,13 @@ export function computeBanisterPerformance(
 // ============================================================================
 
 export function getTaperingAnalysis(
-  targetCompetition: any, 
+  targetCompetition: TargetCompetition | null | undefined, 
   events: Record<string, Record<string, any>> | undefined | null, 
   dailyMetrics: Record<string, any> = {},
   tauFatigue: number = 7,
   tauFitness: number = 28,
   initialCtl: number | null = null,
-  existingBanister: any = null
+  existingBanister: BanisterPerformanceResult | null = null
 ): TaperingRecommendation | null {
   if (!targetCompetition || !targetCompetition.date) return null;
 
@@ -1577,7 +1591,7 @@ export function getTaperingAnalysis(
   const daysRemaining = Math.ceil(diffMs / (1000 * 3600 * 24));
 
   const projectionDays = Math.max(7, Math.min(180, Math.max(0, daysRemaining) + 3));
-  const banister: BanisterPerformanceResult = (existingBanister && existingBanister.series?.some((s: any) => s.dateStr === targetCompetition.date))
+  const banister: BanisterPerformanceResult = (existingBanister && existingBanister.series?.some((s) => s.dateStr === targetCompetition.date))
     ? existingBanister
     : computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness, initialCtl);
 

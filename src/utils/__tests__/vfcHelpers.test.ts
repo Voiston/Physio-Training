@@ -67,3 +67,43 @@ describe('vfcHelpers - Statistical HRV & Resting HR Analysis', () => {
     expect(hr.color).toBe('rose');
   });
 });
+
+describe('vfcHelpers - degraded input', () => {
+  it('handles empty, null-ish and missing metrics without throwing', () => {
+    const empty = computeVfcAnalysis({}, '2026-10-01');
+    expect(empty.status).toBe('initializing');
+    expect(empty.currentValue).toBeNull();
+    expect(empty.dataPointsCount).toBe(0);
+
+    const hr = computeHrRestAnalysis({}, '2026-10-01');
+    expect(hr.status).toBe('initializing');
+    expect(hr.currentValue).toBeNull();
+  });
+
+  it('ignores zero and negative VFC readings (corrupt sensor values)', () => {
+    const metrics: Record<string, { vfc?: number }> = {
+      '2026-10-01': { vfc: 0 },
+      '2026-09-30': { vfc: -12 },
+      '2026-09-29': { vfc: 60 }
+    };
+    const vfc = computeVfcAnalysis(metrics, '2026-10-01');
+    expect(vfc.dataPointsCount).toBe(1);
+    expect(vfc.currentValue).toBe(60);
+  });
+
+  it('falls back to the latest past reading when today is missing', () => {
+    const vfc = computeVfcAnalysis({ '2026-09-27': { vfc: 58 } }, '2026-10-01');
+    expect(vfc.currentValue).toBe(58);
+  });
+
+  it('ignores readings outside the baseline window', () => {
+    const vfc = computeVfcAnalysis({ '2026-01-01': { vfc: 70 } }, '2026-10-01');
+    expect(vfc.dataPointsCount).toBe(0);
+    expect(vfc.currentValue).toBeNull();
+  });
+
+  it('treats an invalid reference date as today instead of throwing', () => {
+    expect(() => computeVfcAnalysis({}, 'not-a-date')).not.toThrow();
+    expect(() => computeHrRestAnalysis({}, 'not-a-date')).not.toThrow();
+  });
+});

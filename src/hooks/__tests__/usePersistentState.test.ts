@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock localStorage in Node test environment
 const store: Record<string, string> = {};
@@ -15,7 +15,7 @@ const localStorageMock = {
   }
 };
 
-(globalThis as any).localStorage = localStorageMock;
+vi.stubGlobal('localStorage', localStorageMock);
 
 import { usePersistentState } from '../usePersistentState';
 

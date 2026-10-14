@@ -2,25 +2,27 @@ import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } fro
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
 import { useData, BlockTemplate } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
-import _Grid from './components/Grid';
-const Grid = _Grid as React.ComponentType<any>;
-const RadarChart = lazy<React.ComponentType<any>>(() => import('./components/RadarChart'));
+import Grid from './components/Grid';
+const RadarChart = lazy(() => import('./components/RadarChart'));
 import SmartSuggestions from './components/SmartSuggestions';
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastProvider, useToast } from './components/Toast';
+import type { ScoreModalInfo } from './components/ScoreModal';
+import type { MetricModalInfo } from './components/MetricModal';
+import type { Quality, SessionData } from './types';
 
 // Vues découpées en code-splitting asynchrone (chargement à la demande par onglet)
-const PhysiologyDashboard = lazy<React.ComponentType<any>>(() => import('./components/PhysiologyDashboard'));
-const QualitiesDashboard = lazy<React.ComponentType<any>>(() => import('./components/QualitiesDashboard'));
+const PhysiologyDashboard = lazy(() => import('./components/PhysiologyDashboard'));
+const QualitiesDashboard = lazy(() => import('./components/QualitiesDashboard'));
 const WeeklyAnalysisView = lazy(() => import('./components/WeeklyAnalysisView').then(m => ({ default: m.WeeklyAnalysisView })));
 const PeriodizationView = lazy(() => import('./components/PeriodizationView').then(m => ({ default: m.PeriodizationView })));
 
 // Modales découpées en code-splitting (chargées uniquement lors de l'interaction utilisateur)
-const ScoreModal = lazy<React.ComponentType<any>>(() => import('./components/ScoreModal'));
-const MetricModal = lazy<React.ComponentType<any>>(() => import('./components/MetricModal'));
-const QualityChartModal = lazy<React.ComponentType<any>>(() => import('./components/QualityChartModal'));
+const ScoreModal = lazy(() => import('./components/ScoreModal'));
+const MetricModal = lazy(() => import('./components/MetricModal'));
+const QualityChartModal = lazy(() => import('./components/QualityChartModal'));
 const TrainingBlocksModal = lazy(() => import('./components/TrainingBlocksModal'));
 const CompetitionModal = lazy(() => import('./components/CompetitionModal').then(m => ({ default: m.CompetitionModal })));
 const TrainingReportModal = lazy(() => import('./components/TrainingReportModal').then(m => ({ default: m.TrainingReportModal })));
@@ -101,9 +103,9 @@ function AppContent() {
 
   const [activeTab, setActiveTab] = useState<'grid' | 'weeks' | 'physiology' | 'qualities' | 'periodization'>('grid');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [modalInfo, setModalInfo] = useState<any>(null);
-  const [metricModalInfo, setMetricModalInfo] = useState<any>(null);
-  const [qualityChartInfo, setQualityChartInfo] = useState<any>(null);
+  const [modalInfo, setModalInfo] = useState<ScoreModalInfo | null>(null);
+  const [metricModalInfo, setMetricModalInfo] = useState<MetricModalInfo | null>(null);
+  const [qualityChartInfo, setQualityChartInfo] = useState<Quality | null>(null);
   const [showBlocksModal, setShowBlocksModal] = useState<boolean>(false);
   const [selectedTemplateForModal, setSelectedTemplateForModal] = useState<BlockTemplate | null>(null);
   const [showCompetitionModal, setShowCompetitionModal] = useState<boolean>(false);
@@ -185,15 +187,15 @@ function AppContent() {
     }));
   }, [today]);
 
-  const handleGridCellClick = useCallback((q: any, dateStr: string, currentData: any) => {
+  const handleGridCellClick = useCallback((q: Quality, dateStr: string, currentData?: SessionData | null) => {
     setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
   }, []);
 
-  const handleGridQualityClick = useCallback((q: any) => {
+  const handleGridQualityClick = useCallback((q: Quality) => {
     setQualityChartInfo(q);
   }, []);
 
-  const handleGridMetricClick = useCallback((dateStr: string, type: string, currentValue: any) => {
+  const handleGridMetricClick = useCallback((dateStr: string, type: string, currentValue: number | string) => {
     let title = 'Métrique Physiologique';
     let label = 'Valeur';
     let min = 1;
@@ -939,7 +941,7 @@ function AppContent() {
                 events={events} 
                 qualities={qualities}
                 allWeeksStats={allWeeksStats}
-                onOpenScoreModal={(q: any, dateStr: string, currentData: any) => {
+                onOpenScoreModal={(q: Quality, dateStr: string, currentData?: SessionData) => {
                   setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
                 }}
                 showToast={showToast}
@@ -1033,7 +1035,7 @@ function AppContent() {
             setModalInfo(null);
             setShowLiveGymModal(true);
           }}
-          onSave={(sessionData: any, applyImpacts: boolean, targetDateStr?: string) => {
+          onSave={(sessionData: SessionData | null, applyImpacts: boolean, targetDateStr?: string) => {
             const finalDate = targetDateStr || modalInfo.dateStr;
             saveEventWithImpacts(modalInfo.qId, finalDate, sessionData, applyImpacts);
             if (sessionData) {
@@ -1058,7 +1060,7 @@ function AppContent() {
         <MetricModal 
           info={metricModalInfo}
           onClose={() => setMetricModalInfo(null)}
-          onSave={(val: any) => {
+          onSave={(val: number | null) => {
             saveDailyMetric(metricModalInfo.dateStr, metricModalInfo.type, val);
             if (val !== null) {
               showToast({

@@ -41,10 +41,13 @@ export const MUSCLE_GROUPS: Record<string, MuscleGroup> = {
 
 export { EXERCISE_CATALOG, type ExerciseDefinition } from '../data/exerciseCatalog';
 import { EXERCISE_CATALOG, ExerciseDefinition } from '../data/exerciseCatalog';
+import type { PartialEventsByQuality } from '../types';
 
 
 export interface SessionExercise {
   id: string;
+  /** Id du catalogue quand l'exercice vient de la séance en direct. */
+  exerciseCatalogId?: string;
   name: string;
   sets: number;
   reps?: number;
@@ -289,7 +292,7 @@ export function getVolumeLandmark(effectiveSets: number): {
  * Agrège les données d'exercices de musculation de toutes les séances d'une semaine donnée.
  */
 export function computeWeeklyMuscularSummary(
-  events: Record<string, Record<string, any>> = {},
+  events: PartialEventsByQuality = {},
   startDateStr: string,
   endDateStr: string,
   customCatalog: ExerciseDefinition[] = []
@@ -327,7 +330,7 @@ export function computeWeeklyMuscularSummary(
       if (dateStr < startDateStr || dateStr > endDateStr) return;
       if (!sessionData || sessionData.isSecondary) return;
 
-      const exercises: SessionExercise[] = sessionData.exercises;
+      const exercises: SessionExercise[] | undefined = sessionData.exercises;
       if (Array.isArray(exercises) && exercises.length > 0) {
         totalSessionsWithExercises += 1;
         const analysis = computeSessionMuscularBreakdown(exercises, customCatalog);
@@ -607,7 +610,7 @@ export interface ExerciseProgressionSuggestion {
  * Recherche la dernière performance d'un exercice donné à travers tout l'historique des séances (toutes filières confondues).
  */
 export function findLastExercisePerformance(
-  events: Record<string, Record<string, any>> | undefined | null,
+  events: PartialEventsByQuality | undefined | null,
   exerciseId: string,
   beforeDateStr?: string
 ): LastExercisePerformance | null {
@@ -626,7 +629,7 @@ export function findLastExercisePerformance(
       if (beforeDateStr && dateStr >= beforeDateStr) continue;
 
       const foundEx = session.exercises.find(
-        (ex: any) => ex && (ex.id === exerciseId || (ex.name && ex.name.toLowerCase() === exerciseId.toLowerCase()))
+        (ex: SessionExercise | null | undefined) => ex && (ex.id === exerciseId || (ex.name && ex.name.toLowerCase() === exerciseId.toLowerCase()))
       );
 
       if (foundEx) {
@@ -651,7 +654,7 @@ export function findLastExercisePerformance(
         if (dateStr === beforeDateStr) continue;
 
         const foundEx = session.exercises.find(
-          (ex: any) => ex && (ex.id === exerciseId || (ex.name && ex.name.toLowerCase() === exerciseId.toLowerCase()))
+          (ex: SessionExercise | null | undefined) => ex && (ex.id === exerciseId || (ex.name && ex.name.toLowerCase() === exerciseId.toLowerCase()))
         );
 
         if (foundEx) {
@@ -900,7 +903,7 @@ export function getLocalExerciseUsage(): Record<string, { count: number; lastUse
  * 3. Nombre total d'utilisations historiques
  */
 export function getFrequentRecentExercises(
-  events: Record<string, Record<string, any>> | undefined | null,
+  events: PartialEventsByQuality | undefined | null,
   allAvailableExercises: ExerciseDefinition[] = EXERCISE_CATALOG,
   maxResults: number = 8,
   referenceDateStr?: string
