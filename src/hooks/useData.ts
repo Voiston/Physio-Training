@@ -1,14 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent } from 'react';
 import { usePersistentState } from './usePersistentState';
 import { useCloudSync } from './useCloudSync';
-import { useBlocksState, type BlockTemplate, type TrainingBlock } from './useBlocksState';
+import { useBlocksState, type TrainingBlock } from './useBlocksState';
 import { useSimulationState } from './useSimulationState';
 import { 
   useMetricsState, 
-  getInitialDailyMetrics,
   type DailyMetrics, 
-  type PhysiologicalSettings, 
-  type TargetCompetition, 
   DEFAULT_PHYSIO_SETTINGS 
 } from './useMetricsState';
 
@@ -20,26 +17,15 @@ import {
   DEFAULT_QUALITIES, 
   computeAllQualitiesEMA, 
   computeQualityEMAData,
-  getActiveBlockForDate,
-  computeBlockEndDate,
   reorderQualitiesForBlock,
-  getSavedBlockTemplates,
-  saveBlockTemplates,
   getTrainingRecommendations,
-  computeFosterMetrics,
-  computeBanisterPerformance,
-  getTaperingAnalysis,
-  computeCardioVsMuscularBalance,
-  getQualityImpacts,
-  computeIntensityDistribution,
-  computePerceivedFatigueAnalysis,
+  getSavedBlockTemplates,
   computeDerivedEvents
 } from '../utils/physiology';
-import { getLocalYYYYMMDD, addDays, parseLocalDate } from '../utils/dateHelpers';
+import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeAllWeeksStats, WeekStats } from '../utils/weekHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
-import { isPrimary, computeSessionLoad, getAthleteBaselineDailyLoad } from '../utils/loadHelpers';
 import { isCardioQuality } from '../utils/qualities';
 import { SessionExercise, getSavedCustomExercises } from '../utils/muscleHelpers';
 import { 
@@ -65,11 +51,12 @@ export interface QualityImpact {
 export interface Quality {
   id: string;
   name: string;
-  g: number;
-  o: number;
+  g?: number;
+  o?: number;
   retentionDays?: number;
   category?: 'cardio' | 'force' | 'mixte' | string;
   impacts?: QualityImpact[];
+  [key: string]: any;
 }
 
 export interface TrainingRecommendation {
@@ -77,7 +64,7 @@ export interface TrainingRecommendation {
   rank: number;
   isBlockFocus: boolean;
   cellState: any;
-  daysSinceLastSession: number;
+  daysSinceLastSession: number | null;
   lastSessionData: any;
   urgencyScore: number;
   urgencyLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'OPTIMAL' | 'REST' | string;

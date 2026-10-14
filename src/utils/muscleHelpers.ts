@@ -13,7 +13,7 @@
  *     * Pull:Push ratio (Tirage / Poussée) : visée >= 1.0 (centrage huméral et santé de la coiffe des rotateurs)
  */
 
-import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers.js';
+import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers';
 
 export interface MuscleGroup {
   id: string;
@@ -124,8 +124,6 @@ export function computeSessionMuscularBreakdown(
     const effectiveRpe = ex.rpe !== undefined && ex.rpe !== null && Number(ex.rpe) > 0
       ? Math.min(10, Math.max(1, Number(ex.rpe)))
       : (ex.rir !== undefined && ex.rir !== null ? Math.min(10, Math.max(1, 10 - Number(ex.rir))) : 8);
-
-    const weight = Number(ex.weightKg) || 0;
 
     totalSets += sets;
     totalReps += sets * reps;

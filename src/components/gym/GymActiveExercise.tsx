@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Trash2, Sparkles, Check, Plus, X } from 'lucide-react';
 import type { LiveExercise, LiveSet } from '../LiveGymModal';
 import type { computeAdaptiveProgression } from '../../utils/muscleHelpers';

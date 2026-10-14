@@ -8,12 +8,12 @@ import {
   formatMinutes
 } from '../utils/weekHelpers';
 import { 
-  BarChart, Bar, LineChart, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell
+  Bar, Line, ComposedChart, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell
 } from 'recharts';
 import { 
-  Calendar, Clock, Zap, TrendingUp, TrendingDown, ArrowRight, ArrowUpRight, 
-  ArrowDownRight, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, Filter, 
-  ArrowUpDown, Scale, Copy, Check, Info, Bike, Footprints, Dumbbell, Layers, ChevronRight, RefreshCw
+  Calendar, Clock, Zap, TrendingUp, TrendingDown, ArrowUpRight, 
+  ArrowDownRight, Sparkles, Filter, 
+  ArrowUpDown, Scale, Copy, Check, Info, Bike, Footprints, Dumbbell, Layers
 } from 'lucide-react';
 import { 
   computeWeeklyMuscularSummary, 

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
 import { GymRestTimer, GymActiveExercise, GymSetHistory } from '../index';
 
 describe('Gym Components (Modular Gym HUD)', () => {

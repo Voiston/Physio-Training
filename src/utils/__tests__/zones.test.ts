@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTsbZone, calculateTsbPercent } from '../zones';
+import { getTsbZone } from '../zones';
 
 describe('zones - TSB Relative Zones (% of CTL)', () => {
   it('detects cold start / initialization when CTL is low or history is short (< 3 * tauFitness = 84 days)', () => {

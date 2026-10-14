@@ -66,6 +66,7 @@ export const MuscleRegion: React.FC<MuscleRegionProps> = ({
       onBlur={() => onHover?.(null)}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      data-fatigue={fatigueLevel}
       style={{ filter: glowFilter }}
       className={`transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5] ${className}`}
     >

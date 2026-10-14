@@ -6,7 +6,7 @@
  * 3. L'altération des formats de dates et de filières à l'import JSON ou Firestore.
  */
 
-import { getLocalYYYYMMDD } from './dateHelpers.js';
+import { getLocalYYYYMMDD } from './dateHelpers';
 
 // Format sécurisé pour les identifiants de filières/qualités : lettres, chiffres, underscores (1 à 32 caractères)
 export const SAFE_ID_REGEX = /^[a-z][a-z0-9_]{0,31}$/i;
@@ -532,10 +532,10 @@ export function mergeEventsNonDestructive(
  * Fusion non destructrice des métriques journalières physiologiques (VFC, FC repos, Readiness)
  */
 export function mergeDailyMetricsNonDestructive(
-  localMetrics: Record<string, Record<string, number>>,
-  remoteMetrics: Record<string, Record<string, number>>
-): { merged: Record<string, Record<string, number>>; hasNewLocalData: boolean } {
-  const merged: Record<string, Record<string, number>> = createSafeNullDict();
+  localMetrics: Record<string, any>,
+  remoteMetrics: Record<string, any>
+): { merged: Record<string, any>; hasNewLocalData: boolean } {
+  const merged: Record<string, any> = createSafeNullDict();
   let hasNewLocalData = false;
 
   const allDates = new Set([

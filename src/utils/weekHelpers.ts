@@ -239,9 +239,6 @@ export function computeAllWeeksStats(
     });
   }
 
-  // Map des qualités pour lookup rapide
-  const qualityMap = new Map<string, Quality>(qualities.map(q => [q.id, q]));
-
   // Première passe : calcul des métriques brutes par semaine
   const computedList: WeekStats[] = rawWeeks.map(rw => {
     const { week: weekNo, year } = getISOWeekNumber(rw.monday);

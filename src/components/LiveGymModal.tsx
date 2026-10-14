@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo, useRef, memo, useCallback, useRedu
 import { useModalA11y } from '../hooks/useModalA11y';
 import { GymRestTimer, GymActiveExercise, GymSetHistory } from './gym';
 import { 
-  Play, Pause, RotateCcw, Plus, Trash2, Check, Clock, Dumbbell, 
-  ChevronDown, ChevronUp, AlertCircle, Sparkles, Volume2, VolumeX,
-  X, Flame, Zap, ArrowRight, CheckCircle2, ChevronRight, Search, 
-  Layers, ShieldAlert, Award, Timer, BatteryCharging, Info, Sun
+  Play, Pause, Plus, Check, Dumbbell, 
+  ChevronDown, ChevronUp, Sparkles, Volume2, VolumeX,
+  X, CheckCircle2, ChevronRight, Search, 
+  Layers, Award, Timer, BatteryCharging, Sun
 } from 'lucide-react';
 import { 
   MUSCLE_GROUPS, 
@@ -13,7 +13,6 @@ import {
   getSavedCustomExercises,
   findLastExercisePerformance, 
   computeAdaptiveProgression,
-  computeSessionMuscularBreakdown,
   ExerciseDefinition,
   getFrequentRecentExercises,
   recordExerciseUsage,
@@ -21,8 +20,6 @@ import {
   ORDERED_PRIMARY_MUSCLES
 } from '../utils/muscleHelpers';
 import { 
-  playCountdownBeep, 
-  playRestCompleteChime, 
   playSetCompletedSound, 
   playVictoryFanfare, 
   triggerVibration 
@@ -135,7 +132,6 @@ interface LiveGymModalProps {
 }
 
 const STORAGE_DRAFT_KEY = 'training_live_session_draft_v1';
-const DEFAULT_REST_PRESETS = [45, 60, 90, 120, 180];
 
 export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   isOpen,
@@ -843,7 +839,6 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     // Conversion en structure compatible avec le reste de l'application
     const elapsedSecs = getElapsedSeconds();
     const sessionDurationMin = Math.max(5, Math.round(elapsedSecs / 60));
-    const isIso = selectedQualityId === 'isolation';
 
     // Synthétiser les exercices
     const packagedExercises = activeExercises.map(ex => {
@@ -1383,6 +1378,29 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                     sessionRpeMusc >= 6 ? 'Effort modéré à soutenu' : 'Effort léger'
                   }`}
                   className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* RPE Cardio */}
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
+                  <label htmlFor="summary-rpe-cardio">RPE Cardio (Essoufflement de 1 à 10)</label>
+                  <span className="font-mono text-base text-emerald-400">{sessionRpeCardio} / 10</span>
+                </div>
+                <input
+                  id="summary-rpe-cardio"
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="0.5"
+                  value={sessionRpeCardio}
+                  onChange={(e) => setSessionRpeCardio(Number(e.target.value))}
+                  aria-label="RPE Cardio : ressenti cardiovasculaire"
+                  aria-valuemin={1}
+                  aria-valuemax={10}
+                  aria-valuenow={sessionRpeCardio}
+                  aria-valuetext={`RPE Cardio ${sessionRpeCardio} sur 10`}
+                  className="w-full accent-emerald-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
                 />
               </div>
 

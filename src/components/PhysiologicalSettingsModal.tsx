@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PhysiologicalSettings } from '../hooks/useData';
 import { computeBanisterPerformance } from '../utils/physiology';
 import { 
-  Sliders, X, Check, RotateCcw, Activity, Shield, 
+  Sliders, X, Check, RotateCcw, Shield, 
   Sparkles, Info, HeartPulse, User, Zap 
 } from 'lucide-react';
 

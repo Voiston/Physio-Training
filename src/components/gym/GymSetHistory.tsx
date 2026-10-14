@@ -1,5 +1,5 @@
-import React, { memo } from 'react';
-import { Dumbbell, CheckCircle2, Trophy, Clock } from 'lucide-react';
+import { memo } from 'react';
+import { Dumbbell, CheckCircle2, Clock } from 'lucide-react';
 import type { LiveExercise } from '../LiveGymModal';
 
 export interface GymSetHistoryProps {

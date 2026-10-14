@@ -115,7 +115,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   });
 
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [qrCodeUrl] = useState<string>('');
   const [syncNotification, setSyncNotification] = useState<string | null>(null);
   const [quotaUsage, setQuotaUsage] = useState<ReturnType<typeof computeQuotaUsage> | null>(null);
   const [syncErrorDetail, setSyncErrorDetail] = useState<string | null>(null);

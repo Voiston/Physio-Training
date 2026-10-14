@@ -3,8 +3,7 @@ import { Quality, SessionData } from '../hooks/useData';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeSessionLoad } from '../utils/loadHelpers';
 import { 
-  Sparkles, Play, CheckCircle2, RotateCcw, X, Plus, 
-  Calendar, Zap, Shield, ArrowRight, Activity 
+  Sparkles, Play, CheckCircle2, RotateCcw, X, Plus 
 } from 'lucide-react';
 
 interface SimulationBannerProps {

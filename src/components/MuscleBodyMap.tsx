@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { MUSCLE_GROUPS, VolumeStatus, getVolumeLandmark, MuscleGroup } from '../utils/muscleHelpers';
-import { Layers, Dumbbell, Sparkles, Check, ChevronRight, Eye, Info, X, Activity, Target, Flame, ShieldAlert, Zap } from 'lucide-react';
+import { Dumbbell, Check, ChevronRight, Eye, Info, X, Activity, Target, Flame, ShieldAlert, Zap } from 'lucide-react';
 import { haptics } from '../utils/haptics';
 import { MuscleRegion, type MuscleRegionProps } from './MuscleRegion';
 

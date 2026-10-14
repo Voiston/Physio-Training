@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { 
   X, Calendar, Zap, Shield, Flame, Activity, Sparkles, 
-  Trash2, Plus, Check, Clock, AlertCircle, Dumbbell, Settings,
-  RotateCcw, ArrowUpDown, ArrowUp, ArrowDown
+  Trash2, Plus, Check, Clock, Dumbbell, Settings,
+  RotateCcw, ArrowUpDown
 } from 'lucide-react';
 import { 
   computeBlockEndDate, 

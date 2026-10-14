@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback, useRef, useEffect, lazy, Suspense } fro
 import { generateTimeline, formatDisplayDate, getLocalYYYYMMDD } from './utils/dateHelpers';
 import { useData, BlockTemplate } from './hooks/useData';
 import { getBlockProgress } from './utils/physiology';
-import Grid from './components/Grid';
-const RadarChart = lazy(() => import('./components/RadarChart'));
+import _Grid from './components/Grid';
+const Grid = _Grid as React.ComponentType<any>;
+const RadarChart = lazy<React.ComponentType<any>>(() => import('./components/RadarChart'));
 import SmartSuggestions from './components/SmartSuggestions';
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
@@ -11,15 +12,15 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastProvider, useToast } from './components/Toast';
 
 // Vues découpées en code-splitting asynchrone (chargement à la demande par onglet)
-const PhysiologyDashboard = lazy(() => import('./components/PhysiologyDashboard'));
-const QualitiesDashboard = lazy(() => import('./components/QualitiesDashboard'));
+const PhysiologyDashboard = lazy<React.ComponentType<any>>(() => import('./components/PhysiologyDashboard'));
+const QualitiesDashboard = lazy<React.ComponentType<any>>(() => import('./components/QualitiesDashboard'));
 const WeeklyAnalysisView = lazy(() => import('./components/WeeklyAnalysisView').then(m => ({ default: m.WeeklyAnalysisView })));
 const PeriodizationView = lazy(() => import('./components/PeriodizationView').then(m => ({ default: m.PeriodizationView })));
 
 // Modales découpées en code-splitting (chargées uniquement lors de l'interaction utilisateur)
-const ScoreModal = lazy(() => import('./components/ScoreModal'));
-const MetricModal = lazy(() => import('./components/MetricModal'));
-const QualityChartModal = lazy(() => import('./components/QualityChartModal'));
+const ScoreModal = lazy<React.ComponentType<any>>(() => import('./components/ScoreModal'));
+const MetricModal = lazy<React.ComponentType<any>>(() => import('./components/MetricModal'));
+const QualityChartModal = lazy<React.ComponentType<any>>(() => import('./components/QualityChartModal'));
 const TrainingBlocksModal = lazy(() => import('./components/TrainingBlocksModal'));
 const CompetitionModal = lazy(() => import('./components/CompetitionModal').then(m => ({ default: m.CompetitionModal })));
 const TrainingReportModal = lazy(() => import('./components/TrainingReportModal').then(m => ({ default: m.TrainingReportModal })));
@@ -41,7 +42,7 @@ import {
 } from './utils/muscleHelpers';
 import { 
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
-  Trophy, FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
+  FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
   PanelLeftClose, PanelLeftOpen, BarChart3, Dumbbell, Cloud,
   MoreVertical, X
 } from 'lucide-react';
@@ -792,7 +793,7 @@ function AppContent() {
                               <span className="font-semibold">Fréquence de développement (x0.45 · 2-3x/sem) :</span>
                             </div>
                             <p className="text-[10px] text-slate-400 pl-4 leading-tight m-0">
-                              {activeBlockToday.focusQualities.map(id => qualities.find(q => q.id === id)?.name || id).join(', ')}
+                              {activeBlockToday.focusQualities.map((id: string) => qualities.find(q => q.id === id)?.name || id).join(', ')}
                             </p>
 
                             <div className="flex items-center gap-1.5 text-sky-300 pt-1">
@@ -919,47 +920,10 @@ function AppContent() {
                   currentWeekStats={currentWeekStats}
                   moveQuality={moveQuality}
                   reorderQualities={reorderQualities}
-                  onCellClick={(q: any, dateStr: string, currentData: any) => setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData })}
-                  onQualityClick={(q: any) => setQualityChartInfo(q)}
-                  onMetricClick={(dateStr: string, type: string, currentValue: any) => {
-                    let title = 'Métrique Physiologique';
-                    let label = 'Valeur';
-                    let min = 1;
-                    let max = 300;
-                    let placeholder = 'Ex: 50';
-
-                    if (type === 'readiness') {
-                      title = 'Readiness Score';
-                      label = 'Score de Forme (1 à 10)';
-                      min = 1;
-                      max = 10;
-                      placeholder = 'Ex: 7';
-                    } else if (type === 'vfc') {
-                      title = 'VFC Matinale';
-                      label = 'Valeur VFC RMSSD (ms)';
-                      min = 10;
-                      max = 300;
-                      placeholder = 'Ex: 65';
-                    } else if (type === 'hrRest') {
-                      title = 'FC de Repos Matinale';
-                      label = 'Fréquence Cardiaque de Repos (bpm)';
-                      min = 30;
-                      max = 150;
-                      placeholder = 'Ex: 48';
-                    }
-
-                    setMetricModalInfo({
-                      type,
-                      dateStr,
-                      currentValue,
-                      title,
-                      label,
-                      min,
-                      max,
-                      placeholder
-                    });
-                  }}
-                  onOpenWeeklyView={() => setActiveTab('weeks')}
+                  onCellClick={handleGridCellClick}
+                  onQualityClick={handleGridQualityClick}
+                  onMetricClick={handleGridMetricClick}
+                  onOpenWeeklyView={handleOpenWeeklyView}
                 />
               </div>
             </section>

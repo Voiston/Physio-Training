@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { 
-  Sparkles, AlertTriangle, Clock, Zap, CheckCircle2, 
-  ArrowUp, ArrowDown, ChevronRight, ChevronDown, ChevronUp, Play, Flame, ShieldAlert,
-  ArrowUpDown, Dumbbell, Info
+  Sparkles, Clock, Zap, CheckCircle2, 
+  ChevronDown, ChevronUp, Play, Flame, ShieldAlert,
+  ArrowUpDown, Dumbbell
 } from 'lucide-react';
 import { Quality, TrainingRecommendation, TrainingBlock } from '../hooks/useData';
 import { MuscularAlert } from '../utils/muscleHelpers';
@@ -39,40 +39,6 @@ export default function SmartSuggestions({
   ).length;
 
   const displayList = isExpanded ? recommendations : recommendations.slice(0, 3);
-
-  const getUrgencyIcon = (level: string) => {
-    switch (level) {
-      case 'REST':
-        return <ShieldAlert className="w-4 h-4 text-rose-400" />;
-      case 'CRITICAL':
-        return <Flame className="w-4 h-4 text-red-400 animate-pulse" />;
-      case 'HIGH':
-        return <AlertTriangle className="w-4 h-4 text-amber-400" />;
-      case 'MEDIUM':
-        return <Clock className="w-4 h-4 text-yellow-400" />;
-      case 'LOW':
-        return <Info className="w-4 h-4 text-blue-400" />;
-      default:
-        return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
-    }
-  };
-
-  const getBadgeStyle = (level: string) => {
-    switch (level) {
-      case 'REST':
-        return 'bg-rose-500/20 text-rose-300 border-rose-500/30';
-      case 'CRITICAL':
-        return 'bg-red-500/20 text-red-300 border-red-500/40 shadow-[0_0_10px_rgba(239,68,68,0.2)]';
-      case 'HIGH':
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-      case 'MEDIUM':
-        return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
-      case 'LOW':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
-      default:
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-    }
-  };
 
   return (
     <div className="bg-gradient-to-r from-blue-950/30 via-slate-900/60 to-purple-950/20 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-xl text-slate-100">
@@ -195,7 +161,6 @@ export default function SmartSuggestions({
           // Hiérarchie visuelle dégradée pour éviter le syndrome "tout est rouge/prioritaire"
           const isRank1 = index === 0;
           const isRank2 = index === 1;
-          const isRank3 = index >= 2;
 
           let cardStyle = 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700';
           let priorityLabel = `Priorité ${index + 1} · En Maintien`;

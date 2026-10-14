@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { TargetCompetition } from '../hooks/useData';
 import { 
-  Trophy, Calendar, AlertTriangle, ShieldCheck, Flame, 
-  X, Check, Gauge, Sparkles, TrendingUp, HelpCircle 
+  Trophy, Calendar, AlertTriangle, 
+  X, Check, Gauge, Sparkles 
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 

@@ -5,8 +5,8 @@ import { extractSessionLoad } from '../utils/physiology';
 import { isPrimary } from '../utils/loadHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { 
-  Printer, X, FileText, Download, Calendar, Activity, 
-  TrendingUp, Award, ShieldAlert, Sparkles, CheckCircle, Heart, Dumbbell,
+  Printer, X, FileText, Activity, 
+  Award, Sparkles, Heart,
   Copy, Check 
 } from 'lucide-react';
 
@@ -26,7 +26,6 @@ interface TrainingReportModalProps {
 export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
   events,
   qualities,
-  dailyMetrics,
   qualitiesEMA,
   activeBlock,
   targetCompetition,
@@ -58,7 +57,6 @@ export const TrainingReportModal: React.FC<TrainingReportModalProps> = ({
   }, [onClose]);
 
   const today = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => getLocalYYYYMMDD(today), [today]);
 
   const reportDates = useMemo(() => {
     const dates: string[] = [];

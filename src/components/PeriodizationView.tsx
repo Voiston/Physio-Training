@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Calendar, Trophy, FileText, Sliders, Zap, Shield, Plus, 
-  Sparkles, CheckCircle2, ArrowRight, Activity, Clock, Flame 
+  Sparkles, ArrowRight, Activity, Clock 
 } from 'lucide-react';
 import { TrainingBlock, BlockTemplate, TargetCompetition } from '../hooks/useData';
 import { getBlockProgress } from '../utils/physiology';
@@ -13,9 +13,9 @@ interface PeriodizationViewProps {
   qualities: any[];
   targetCompetition: TargetCompetition | null;
   taperingAnalysis: any;
-  fosterMetrics: any;
-  banisterPerformance: any;
-  cardioMuscularBalance: any;
+  fosterMetrics?: any;
+  banisterPerformance?: any;
+  cardioMuscularBalance?: any;
   physioSettings: any;
   onOpenBlocksModal: () => void;
   onOpenCompetitionModal: () => void;
@@ -69,9 +69,6 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
   qualities,
   targetCompetition,
   taperingAnalysis,
-  fosterMetrics,
-  banisterPerformance,
-  cardioMuscularBalance,
   physioSettings,
   onOpenBlocksModal,
   onOpenCompetitionModal,

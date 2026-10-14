@@ -1,5 +1,5 @@
 import { SessionData } from '../hooks/useData';
-import { getLocalYYYYMMDD, addDays } from './dateHelpers.js';
+import { getLocalYYYYMMDD, addDays } from './dateHelpers';
 
 /**
  * Détermine si une entrée d'entraînement est une séance principale (réalisée par l'athlète)

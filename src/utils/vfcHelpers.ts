@@ -37,7 +37,7 @@ export interface HrRestAnalysisResult {
   dataPointsCount: number;
 }
 
-import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers.js';
+import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers';
 
 function parseRefDate(referenceDateStr: string | Date | null): Date {
   return parseLocalDate(referenceDateStr || new Date());

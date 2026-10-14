@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { CheckCircle2, AlertCircle, Info, Sparkles, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Sparkles, X } from 'lucide-react';
 
 export interface ToastItem {
   id: string;

@@ -1,20 +1,341 @@
 import { calculateEMA, calculateExpDecay } from './mathHelpers';
 import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers';
 import { getDailyAthleteLoad, isPrimary, extractSessionLoad } from './loadHelpers';
-import { isCardioQuality, isForceQuality, CARDIO_QUALITY_IDS } from './qualities';
+import { isCardioQuality } from './qualities';
 import { getTsbZone, calculateTsbPercent } from './zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from './vfcHelpers';
 
 export { extractSessionLoad };
 
-/**
- * Qualités physiques et filières d'entraînement par défaut.
- * - retentionDays : durée résiduelle globale de maintien après un bloc de développement concentré (modèle d'Issurin 2008, 2010).
- * - g (vert) : fenêtre d'assimilation active et de consolidation post-séance.
- * - o (orange) : fenêtre de rappel optimal avant désentraînement progressif (Mujika & Padilla 2000, 2001; Bosquet et al. 2013).
- * - rouge : fenêtre de rappel dépassée (indique qu'un rappel est conseillé, non que la qualité est totalement perdue).
- */
-export const DEFAULT_QUALITIES = [
+// ============================================================================
+// INTERFACES & STRUCTURES TYPÉES
+// ============================================================================
+
+export interface QualityImpact {
+  id: string;
+  ratio: number;
+  confidence?: 'estimé' | 'mesuré';
+}
+
+export interface QualityDefinition {
+  id: string;
+  name: string;
+  g?: number;
+  o?: number;
+  retentionDays?: number;
+  category?: 'cardio' | 'force' | 'mixte' | string;
+  impacts?: QualityImpact[];
+  isCustom?: boolean;
+  [key: string]: any;
+}
+
+export interface SessionImpactContribution {
+  load: number;
+  loadCardio: number;
+  loadMusc: number;
+  ratio: number;
+  parentName: string;
+}
+
+export interface DerivedSession {
+  load: number;
+  loadCardio: number;
+  loadMusc: number;
+  isSecondary: boolean;
+  sport: string;
+  duration: number;
+  rpeMusc: number;
+  rpeCardio: number;
+  parentContributions?: Record<string, SessionImpactContribution>;
+  parentQId?: string;
+  originalLoad?: number;
+  exercises?: any[];
+  [key: string]: any;
+}
+
+export interface BlockTemplate {
+  id: string;
+  name: string;
+  durationWeeks: number;
+  focusQualities: string[];
+  description: string;
+  targetMultiplier: number;
+  maintenanceMultiplier: number;
+  color: string;
+  badge: string;
+}
+
+export interface BlockProgress {
+  currentDay: number;
+  totalDays: number;
+  currentWeek: number;
+  totalWeeks: number;
+  remainingDays: number;
+  percent: number;
+  isActive: boolean;
+  isUpcoming: boolean;
+  isPast: boolean;
+}
+
+export interface TrainingRecommendation {
+  quality: QualityDefinition;
+  rank: number;
+  isBlockFocus: boolean;
+  isHardQuality: boolean;
+  cellState: CellState;
+  daysSinceLastSession: number | null;
+  lastSessionData: any;
+  urgencyScore: number;
+  urgencyLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'OPTIMAL' | 'REST';
+  urgencyBadge: string;
+  urgencyColor: string;
+  reason: string;
+  actionTip: string;
+}
+
+export interface CellStateLevel {
+  status: 'green' | 'orange' | 'red';
+  opacity: number;
+  daysLeft: number;
+  currentLevel: number;
+}
+
+export interface CellState {
+  status: 'green' | 'orange' | 'red';
+  opacity: number;
+  daysLeft: number;
+  currentLevel: number;
+  tooltip: string;
+  isBurnout: boolean;
+  isAcuteFatigueHigh: boolean;
+  blockStateInfo: {
+    name: string;
+    type: 'focus' | 'maintenance';
+    label: string;
+  } | null;
+  mostRecentSessionDays: number | null;
+  refLoad_q: number;
+  physio: CellStateLevel;
+  prescription: CellStateLevel;
+}
+
+// 1. Structure EMACalculation
+export interface QualityEMASeriesPoint {
+  dateStr: string;
+  day: number;
+  offset: number;
+  load: number;
+  isPrimarySession: boolean;
+  ema3: number;
+  ema7: number;
+  ema21: number;
+}
+
+export interface QualityEMACurrentStats {
+  load: number;
+  ema3: number;
+  ema7: number;
+  ema21: number;
+  prevEma3: number;
+  prevEma7: number;
+  prevEma21: number;
+  prevPeriodEma3: number;
+  prevPeriodEma7: number;
+  prevPeriodEma21: number;
+  prevWeekEma3: number;
+  prevWeekEma7: number;
+  prevWeekEma21: number;
+  delta3: number;
+  delta7: number;
+  delta21: number;
+  periodDelta3: number;
+  periodDelta7: number;
+  periodDelta21: number;
+  weekDelta3: number;
+  weekDelta7: number;
+  weekDelta21: number;
+  percent3: number;
+  percent7: number;
+  percent21: number;
+  periodPercent3: number;
+  periodPercent7: number;
+  periodPercent21: number;
+  weekPercent3: number;
+  weekPercent7: number;
+  weekPercent21: number;
+  trend3: 'up' | 'down' | 'flat';
+  trend7: 'up' | 'down' | 'flat';
+  trend21: 'up' | 'down' | 'flat';
+  acwr: number | null;
+  trend: 'up' | 'down' | 'flat';
+}
+
+export interface EMACalculation {
+  qualityId: string;
+  series: QualityEMASeriesPoint[];
+  current: QualityEMACurrentStats;
+  sparkline: QualityEMASeriesPoint[];
+}
+
+export type QualityEMAData = EMACalculation;
+
+// 2. Structure FosterLoad
+export interface FosterDailyLoad {
+  dateStr: string;
+  load: number;
+}
+
+export interface FosterLoad {
+  windowDays: number;
+  dailyLoads: FosterDailyLoad[];
+  totalLoad: number;
+  meanLoad: number;
+  stdDev: number;
+  monotony: number;
+  strain: number;
+  riskLevel: 'OPTIMAL' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  riskBadge: string;
+  riskColor: string;
+  advice: string;
+}
+
+export type FosterMetricsResult = FosterLoad;
+
+// 3. Structure BanisterParams & BanisterPerformanceResult
+export interface BanisterParams {
+  tauFatigue: number;
+  tauFitness: number;
+  daysHistory?: number;
+  daysFuture?: number;
+  initialCtl?: number | null;
+  kFatigue?: number;
+  kFitness?: number;
+  p0?: number;
+}
+
+export interface BanisterPoint {
+  dateStr: string;
+  day: number;
+  month: number;
+  offset: number;
+  isToday: boolean;
+  isFuture: boolean;
+  load: number;
+  vfc: number | null;
+  readiness: number | null;
+  atl: number;
+  ctl: number;
+  tsb: number;
+  tsbPercent: number | null;
+  acwr: number;
+  acwrUncoupled: number;
+}
+
+export interface BanisterPerformanceResult {
+  tauFatigue: number;
+  tauFitness: number;
+  series: BanisterPoint[];
+  current: BanisterPoint;
+  todayIndex: number;
+  futureSeries: BanisterPoint[];
+  peakDay: BanisterPoint | null;
+  historyDays: number;
+  isWarmedUp: boolean;
+  tsbZone: any;
+}
+
+// 4. Structure TaperingRecommendation
+export interface TaperingRecommendation {
+  targetCompetition: any;
+  daysRemaining: number;
+  banister: BanisterPerformanceResult;
+  compDayData: any;
+  targetTsb: number;
+  targetTsbUnit: string;
+  projectedTsb: number;
+  projectedTsbPercent: number | null;
+  tsbGap: number;
+  tsbZone: any;
+  foster: FosterLoad;
+  futureSessionsCount: number;
+  status: 'BUILD' | 'TAPER_START' | 'TAPER_OPTIMAL' | 'TAPER_PASSIVE' | 'TAPER_OVERREACHING' | 'PEAK' | 'POST';
+  statusBadge: string;
+  statusColor: string;
+  advice: string;
+}
+
+export type TaperingAnalysisResult = TaperingRecommendation;
+
+// 5. Structure Balance Cardio vs Musculaire
+export interface CardioMuscularDailyItem {
+  dateStr: string;
+  day: number;
+  cardioLoad: number;
+  muscLoad: number;
+  globalLoad: number;
+  hasEccentric: boolean;
+}
+
+export interface CardioMuscularBalance {
+  windowDays: number;
+  dailyBreakdown: CardioMuscularDailyItem[];
+  totalCardioLoad: number;
+  totalMuscLoad: number;
+  totalGlobalLoad: number;
+  totalEccentricSessions: number;
+  cardioPercent: number;
+  muscPercent: number;
+  asymmetryScore: number;
+  tauCardio: number;
+  tauMusc: number;
+  atlCardio: number;
+  atlMusc: number;
+  state: 'BALANCED' | 'CARDIO_DOMINANT' | 'MUSCULAR_DOMINANT';
+  badge: string;
+  color: string;
+  description: string;
+  recommendation: string;
+}
+
+// 6. Structure Distribution Seiler
+export interface IntensityDistribution {
+  windowDays: number;
+  totalSessions: number;
+  totalMinutes: number;
+  totalLoad: number;
+  z1Minutes: number;
+  z2Minutes: number;
+  z3Minutes: number;
+  z1TimePct: number;
+  z2TimePct: number;
+  z3TimePct: number;
+  z1LoadPct: number;
+  z2LoadPct: number;
+  z3LoadPct: number;
+  strengthSessionsCount: number;
+  profile: 'EMPTY' | 'POLARIZED' | 'PYRAMIDAL' | 'THRESHOLD_DOMINANT' | 'HIGH_INTENSITY' | 'BASE_BUILDING' | 'BALANCED';
+  badge: string;
+  color: string;
+  advice: string;
+}
+
+// 7. Structure Fatigue Perçue
+export interface PerceivedFatigueAnalysis {
+  count: number;
+  meanFatigue: number | null;
+  meanDiscrepancy: number;
+  highStrainSessionsCount: number;
+  status: 'initializing' | 'optimal' | 'elevated' | 'critical';
+  badge: string;
+  color: string;
+  interpretation: string;
+}
+
+// ============================================================================
+// QUALITÉS PAR DÉFAUT & IMPACTS SPORTIFS
+// ============================================================================
+
+export const DEFAULT_QUALITIES: QualityDefinition[] = [
   { id: 'vo2max', name: 'VO2max', g: 7, o: 4, retentionDays: 15, category: 'cardio', impacts: [{ id: 'seuil', ratio: 0.6, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.4, confidence: 'estimé' }, { id: 'plyo', ratio: 0.3, confidence: 'estimé' }] },
   { id: 'seuil', name: 'Seuil', g: 8, o: 5, retentionDays: 18, category: 'cardio', impacts: [{ id: 'vo2max', ratio: 0.3, confidence: 'estimé' }, { id: 'ef', ratio: 0.4, confidence: 'estimé' }, { id: 'leg', ratio: 0.3, confidence: 'estimé' }, { id: 'co2', ratio: 0.3, confidence: 'estimé' }, { id: 'plyo', ratio: 0.2, confidence: 'estimé' }] },
   { id: 'ef', name: 'Endurance Fondamentale', g: 10, o: 6, retentionDays: 30, category: 'cardio', impacts: [{ id: 'leg', ratio: 0.2, confidence: 'estimé' }, { id: 'co2', ratio: 0.2, confidence: 'estimé' }] },
@@ -31,7 +352,7 @@ export const DEFAULT_QUALITIES = [
   { id: 'proprio', name: 'Proprioception', g: 5, o: 3, retentionDays: 7, category: 'force' }
 ];
 
-export const SPORT_IMPACTS = {
+export const SPORT_IMPACTS: Record<string, Record<string, QualityImpact[]>> = {
   vo2max: {
     run: [
       { id: 'seuil', ratio: 0.6, confidence: 'estimé' },
@@ -91,7 +412,11 @@ export const SPORT_IMPACTS = {
   }
 };
 
-export function getQualityImpacts(qualityId, sport = 'run', qualities = DEFAULT_QUALITIES) {
+export function getQualityImpacts(
+  qualityId: string, 
+  sport: string = 'run', 
+  qualities: QualityDefinition[] = DEFAULT_QUALITIES
+): QualityImpact[] {
   if (SPORT_IMPACTS[qualityId]) {
     const sportKey = sport === 'bike' ? 'bike' : 'run';
     return SPORT_IMPACTS[qualityId][sportKey] || [];
@@ -102,22 +427,23 @@ export function getQualityImpacts(qualityId, sport = 'run', qualities = DEFAULT_
 
 /**
  * Calcule dynamiquement et à la lecture les impacts secondaires à partir des séances directes (primaires).
- * Évite le stockage et la synchronisation de données dérivées redondantes,
- * et garantit une cohérence absolue même si la matrice d'impacts ou le profil athlète est mis à jour.
  */
-export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIES) {
-  const derived = {};
+export function computeDerivedEvents(
+  primaryEvents: Record<string, Record<string, any>> | null | undefined, 
+  qualities: QualityDefinition[] = DEFAULT_QUALITIES
+): Record<string, Record<string, DerivedSession>> {
+  const derived: Record<string, Record<string, DerivedSession>> = {};
   for (let i = 0; i < qualities.length; i++) {
     derived[qualities[i].id] = {};
   }
 
   // 1. Recenser les séances directes (non secondaires) par date
-  const dateToPrimarySessions = new Map();
+  const dateToPrimarySessions = new Map<string, Array<{ qId: string; session: any }>>();
   const qKeys = Object.keys(primaryEvents || {});
   for (let i = 0; i < qKeys.length; i++) {
     const qId = qKeys[i];
     if (!derived[qId]) derived[qId] = {};
-    const qDates = primaryEvents[qId] || {};
+    const qDates = primaryEvents?.[qId] || {};
     const dateKeys = Object.keys(qDates);
     for (let j = 0; j < dateKeys.length; j++) {
       const dateStr = dateKeys[j];
@@ -132,7 +458,7 @@ export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIE
       if (!dateToPrimarySessions.has(dateStr)) {
         dateToPrimarySessions.set(dateStr, []);
       }
-      dateToPrimarySessions.get(dateStr).push({ qId, session });
+      dateToPrimarySessions.get(dateStr)!.push({ qId, session });
     }
   }
 
@@ -145,7 +471,7 @@ export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIE
       // Ne jamais écraser une séance principale existante
       if (primaryQIds.has(targetQ.id)) continue;
 
-      const contributions = {};
+      const contributions: Record<string, SessionImpactContribution> = {};
       let totalSecLoad = 0;
       let totalSecCardio = 0;
       let totalSecMusc = 0;
@@ -205,7 +531,11 @@ export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIE
   return derived;
 }
 
-export const BLOCK_PRESETS = [
+// ============================================================================
+// BLOCS D'ENTRAÎNEMENT & PÉRIODISATION
+// ============================================================================
+
+export const BLOCK_PRESETS: BlockTemplate[] = [
   {
     id: 'force_max',
     name: 'Force max',
@@ -263,7 +593,7 @@ export const BLOCK_PRESETS = [
   }
 ];
 
-export function computeBlockEndDate(startDateStr, durationWeeks) {
+export function computeBlockEndDate(startDateStr: string, durationWeeks: number): string {
   const [y, m, d] = startDateStr.split('-').map(Number);
   const start = new Date(y, m - 1, d);
   const totalDays = durationWeeks * 7 - 1;
@@ -272,7 +602,7 @@ export function computeBlockEndDate(startDateStr, durationWeeks) {
   return getLocalYYYYMMDD(end);
 }
 
-export function getActiveBlockForDate(dateStr, blocks = []) {
+export function getActiveBlockForDate(dateStr: string, blocks: any[] = []): any | null {
   if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return null;
   return blocks.find(b => {
     if (!b || !b.startDate || !b.endDate) return false;
@@ -280,7 +610,7 @@ export function getActiveBlockForDate(dateStr, blocks = []) {
   }) || null;
 }
 
-export function getBlockProgress(block, referenceDateStr) {
+export function getBlockProgress(block: any, referenceDateStr?: string | null): BlockProgress | null {
   if (!block || !block.startDate || !block.endDate) return null;
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
   const [sy, sm, sd] = block.startDate.split('-').map(Number);
@@ -315,13 +645,12 @@ export function getBlockProgress(block, referenceDateStr) {
   };
 }
 
-export function getSavedBlockTemplates() {
+export function getSavedBlockTemplates(): BlockTemplate[] {
   try {
     const raw = localStorage.getItem('physio_block_templates');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Upgrade legacy multipliers if present (0.75 -> 0.45, 1.35 -> 1.0)
         return parsed.map(t => ({
           ...t,
           targetMultiplier: t.targetMultiplier === 0.75 ? 0.45 : (t.targetMultiplier ?? 0.45),
@@ -329,20 +658,20 @@ export function getSavedBlockTemplates() {
         }));
       }
     }
-  } catch (e) {}
+  } catch {}
   return BLOCK_PRESETS;
 }
 
-export function saveBlockTemplates(templates) {
+export function saveBlockTemplates(templates: BlockTemplate[]): void {
   try {
     localStorage.setItem('physio_block_templates', JSON.stringify(templates));
-  } catch (e) {}
+  } catch {}
 }
 
-export function reorderQualitiesForBlock(qualities, focusQualities = []) {
+export function reorderQualitiesForBlock(qualities: QualityDefinition[], focusQualities: string[] = []): QualityDefinition[] {
   if (!focusQualities || focusQualities.length === 0) return qualities;
-  const focused = [];
-  const remaining = [];
+  const focused: QualityDefinition[] = [];
+  const remaining: QualityDefinition[] = [];
 
   focusQualities.forEach(id => {
     const found = qualities.find(q => q.id === id);
@@ -358,12 +687,262 @@ export function reorderQualitiesForBlock(qualities, focusQualities = []) {
   return [...focused, ...remaining];
 }
 
-export function getTrainingRecommendations(qualities, events, dailyMetrics, activeBlock = null, referenceDateStr = null) {
+// ============================================================================
+// CALCUL CELLULAIRE & RECOMMANDATIONS D'ENTRAÎNEMENT
+// ============================================================================
+
+// Cache WeakMap pour pré-indexer les dates de séances principales par qualité
+const primaryDatesCache = new WeakMap<object, string[]>();
+function getSortedPrimaryDates(eventsForQuality: any): string[] {
+  if (!eventsForQuality || typeof eventsForQuality !== 'object') return [];
+  let cached = primaryDatesCache.get(eventsForQuality);
+  if (!cached) {
+    cached = Object.keys(eventsForQuality)
+      .filter(k => isPrimary(eventsForQuality[k]) && extractSessionLoad(eventsForQuality[k]) > 0)
+      .sort();
+    primaryDatesCache.set(eventsForQuality, cached);
+  }
+  return cached;
+}
+
+export function computeCellState(
+  qDef: QualityDefinition, 
+  targetDateStr: string, 
+  eventsForQuality: Record<string, any> | undefined | null, 
+  readinessOrBlocks: number | any[] = 7, 
+  maybeBlocks: any[] = []
+): CellState {
+  const blocks = Array.isArray(readinessOrBlocks) ? readinessOrBlocks : (maybeBlocks || []);
+  const [ty, tm, td] = targetDateStr.split('-').map(Number);
+  const targetDateObj = new Date(ty, tm - 1, td);
+  const targetTime = targetDateObj.getTime();
+
+  const activeBlock = getActiveBlockForDate(targetDateStr, blocks);
+  const isFocus = Boolean(activeBlock && activeBlock.focusQualities?.includes(qDef.id));
+  const prescriptionMultiplier = isFocus 
+    ? (activeBlock.targetMultiplier ?? 0.45) 
+    : (activeBlock?.maintenanceMultiplier ?? 1.0);
+
+  let bestStatusPrescription: 'green' | 'orange' | 'red' = 'red';
+  let daysLeftPrescription = 0;
+  let opacityPrescription = 1;
+  let currentLevelPrescription = 0;
+
+  let bestStatusPhysio: 'green' | 'orange' | 'red' = 'red';
+  let daysLeftPhysio = 0;
+  let opacityPhysio = 1;
+  let currentLevelPhysio = 0;
+
+  let recent3DaysLoad = 0;
+  let total28dLoad = 0;
+  let sessionCount28d = 0;
+
+  const pastPrimaryLoads: number[] = [];
+  const parsedSessions: Array<{ daysSince: number; load: number; isSec: boolean }> = [];
+
+  if (eventsForQuality && typeof eventsForQuality === 'object') {
+    const iterDate = new Date(targetDateObj);
+    for (let daysSince = 0; daysSince <= 90; daysSince++) {
+      if (daysSince > 0) {
+        iterDate.setDate(iterDate.getDate() - 1);
+      }
+      const y = iterDate.getFullYear();
+      const m = String(iterDate.getMonth() + 1).padStart(2, '0');
+      const d = String(iterDate.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${d}`;
+
+      const sessData = eventsForQuality[dateKey];
+      if (!sessData) continue;
+
+      const isPrim = isPrimary(sessData);
+      const load = extractSessionLoad(sessData);
+
+      if (isPrim && load > 0 && daysSince <= 60) {
+        pastPrimaryLoads.push(load);
+      }
+
+      parsedSessions.push({ daysSince, load, isSec: !isPrim });
+    }
+  }
+
+  let mostRecentSessionDays: number | null = null;
+  const sortedPrimaryDates = getSortedPrimaryDates(eventsForQuality);
+  if (sortedPrimaryDates.length > 0) {
+    let low = 0;
+    let high = sortedPrimaryDates.length - 1;
+    let latestDateKey: string | null = null;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (sortedPrimaryDates[mid] <= targetDateStr) {
+        latestDateKey = sortedPrimaryDates[mid];
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    if (latestDateKey) {
+      const [ly, lm, ld] = latestDateKey.split('-').map(Number);
+      const latestTime = new Date(ly, lm - 1, ld).getTime();
+      mostRecentSessionDays = Math.round((targetTime - latestTime) / 86400000);
+    }
+  }
+
+  pastPrimaryLoads.sort((a, b) => a - b);
+  const defaultRefLoad = qDef.id === 'isolation' ? 80 : (qDef.category === 'force' ? 200 : (qDef.category === 'mixte' ? 180 : 250));
+  const refLoad_q = pastPrimaryLoads.length > 0 ? pastPrimaryLoads[Math.floor(pastPrimaryLoads.length / 2)] : defaultRefLoad;
+
+  for (let i = 0; i < parsedSessions.length; i++) {
+    const { daysSince, load, isSec } = parsedSessions[i];
+
+    if (daysSince <= 3) {
+      recent3DaysLoad += load;
+    }
+    if (daysSince <= 28) {
+      total28dLoad += load;
+      if (load > 0) sessionCount28d++;
+    }
+
+    let doseScale = 0;
+    if (load >= 15) {
+      const ratio = load / refLoad_q;
+      if (isSec) {
+        doseScale = Math.min(0.35, 0.25 * Math.sqrt(Math.max(0, ratio)));
+      } else {
+        doseScale = Math.max(0.3, Math.min(1.3, 0.45 + 0.55 * Math.sqrt(Math.max(0, ratio))));
+      }
+    }
+
+    if (doseScale > 0) {
+      const gBase = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
+      const oBase = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
+
+      const gPhysio = gBase * doseScale;
+      const oPhysio = oBase * doseScale;
+
+      if (daysSince < gPhysio) {
+        const dLeft = gPhysio - daysSince;
+        if (bestStatusPhysio !== 'green' || dLeft > daysLeftPhysio) {
+          bestStatusPhysio = 'green';
+          daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          opacityPhysio = 1 - (daysSince / gPhysio) * 0.4;
+          currentLevelPhysio = Math.round(100 - (daysSince / gPhysio) * 30);
+        }
+      } else if (daysSince < (gPhysio + oPhysio) && bestStatusPhysio !== 'green') {
+        const dLeft = (gPhysio + oPhysio) - daysSince;
+        if (bestStatusPhysio !== 'orange' || dLeft > daysLeftPhysio) {
+          bestStatusPhysio = 'orange';
+          daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          const progressOrange = (daysSince - gPhysio) / oPhysio;
+          opacityPhysio = 0.6 - progressOrange * 0.3;
+          currentLevelPhysio = Math.max(35, Math.round(70 - progressOrange * 35));
+        }
+      }
+
+      const gPrescription = gPhysio * prescriptionMultiplier;
+      const oPrescription = oPhysio * prescriptionMultiplier;
+
+      if (daysSince < gPrescription) {
+        const dLeft = gPrescription - daysSince;
+        if (bestStatusPrescription !== 'green' || dLeft > daysLeftPrescription) {
+          bestStatusPrescription = 'green';
+          daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          opacityPrescription = 1 - (daysSince / gPrescription) * 0.4;
+          currentLevelPrescription = Math.round(100 - (daysSince / gPrescription) * 30);
+        }
+      } else if (daysSince < (gPrescription + oPrescription) && bestStatusPrescription !== 'green') {
+        const dLeft = (gPrescription + oPrescription) - daysSince;
+        if (bestStatusPrescription !== 'orange' || dLeft > daysLeftPrescription) {
+          bestStatusPrescription = 'orange';
+          daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
+          const progressOrangePresc = (daysSince - gPrescription) / oPrescription;
+          opacityPrescription = 0.6 - progressOrangePresc * 0.3;
+          currentLevelPrescription = Math.max(30, Math.round(70 - progressOrangePresc * 40));
+        }
+      }
+    }
+  }
+
+  const gBaseNominal = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
+  const oBaseNominal = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
+  const totalNominal = gBaseNominal + oBaseNominal;
+
+  if (bestStatusPhysio === 'red' && mostRecentSessionDays !== null) {
+    const daysOver = Math.max(0, mostRecentSessionDays - totalNominal);
+    currentLevelPhysio = Math.max(0, Math.round(35 * Math.exp(-0.04 * daysOver)));
+  }
+  if (bestStatusPrescription === 'red' && mostRecentSessionDays !== null) {
+    const totalPrescNominal = Math.round(totalNominal * prescriptionMultiplier);
+    const daysOverPresc = Math.max(0, mostRecentSessionDays - totalPrescNominal);
+    currentLevelPrescription = Math.max(0, Math.round(30 * Math.exp(-0.05 * daysOverPresc)));
+  }
+
+  const dailyAverage28d = sessionCount28d > 0 ? (total28dLoad / 28) : (refLoad_q / 7);
+  const qualityOverloadThreshold = Math.max(refLoad_q * 2.5, dailyAverage28d * 3 * 1.8);
+  const isAcuteFatigueHigh = recent3DaysLoad > qualityOverloadThreshold;
+  const isBurnout = isAcuteFatigueHigh;
+
+  let blockStateInfo: { name: string; type: 'focus' | 'maintenance'; label: string } | null = null;
+  if (activeBlock) {
+    blockStateInfo = {
+      name: activeBlock.name,
+      type: isFocus ? 'focus' : 'maintenance',
+      label: isFocus ? 'Fréquence de développement (x0.45)' : 'Maintien nominal (x1.0)'
+    };
+  }
+
+  let tooltip = mostRecentSessionDays === null 
+    ? 'Filière non stimulée (aucune séance enregistrée)' 
+    : `Fenêtre dépassée (J+${mostRecentSessionDays}) • Rappel recommandé`;
+  if (bestStatusPrescription === 'green') {
+    tooltip = isFocus 
+      ? `Prescription bloc : prochaine séance sous ${daysLeftPrescription}j (maintien acquis : ${daysLeftPhysio}j)`
+      : `Effet d'entraînement actif : reste ${daysLeftPhysio} jours de maintien résiduel`;
+  }
+  if (bestStatusPrescription === 'orange') {
+    tooltip = `Fenêtre de rappel : piqûre recommandée sous ${daysLeftPrescription} jours`;
+  }
+  if (blockStateInfo) {
+    tooltip += ` • [Bloc ${blockStateInfo.name} : ${blockStateInfo.label}]`;
+  }
+  if (isAcuteFatigueHigh) tooltip += ' ⚠️ FATIGUE AIGUË ÉLEVÉE (3 jours de charge intense)';
+
+  return { 
+    status: bestStatusPrescription, 
+    opacity: opacityPrescription, 
+    daysLeft: daysLeftPrescription, 
+    currentLevel: Math.max(0, currentLevelPrescription), 
+    tooltip, 
+    isBurnout,
+    isAcuteFatigueHigh,
+    blockStateInfo,
+    mostRecentSessionDays,
+    refLoad_q,
+    physio: {
+      status: bestStatusPhysio,
+      opacity: opacityPhysio,
+      daysLeft: daysLeftPhysio,
+      currentLevel: Math.max(0, currentLevelPhysio)
+    },
+    prescription: {
+      status: bestStatusPrescription,
+      opacity: opacityPrescription,
+      daysLeft: daysLeftPrescription,
+      currentLevel: Math.max(0, currentLevelPrescription)
+    }
+  };
+}
+
+export function getTrainingRecommendations(
+  qualities: QualityDefinition[], 
+  events: Record<string, Record<string, any>> | undefined | null, 
+  dailyMetrics: Record<string, any> | undefined | null, 
+  activeBlock: any = null, 
+  referenceDateStr: string | null = null
+): TrainingRecommendation[] {
   const refDate = referenceDateStr || getLocalYYYYMMDD(new Date());
   const readiness = dailyMetrics?.[refDate]?.readiness || 7;
   const numQualities = qualities.length || 1;
 
-  // Analyse des marqueurs de récupération autonome (VFC & FC repos) et de fatigue perçue
   const vfcAnalysis = computeVfcAnalysis(dailyMetrics || {}, refDate);
   const hrRestAnalysis = computeHrRestAnalysis(dailyMetrics || {}, refDate);
   const perceivedFatigueAnalysis = computePerceivedFatigueAnalysis(events || {}, refDate, 14);
@@ -377,7 +956,6 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
 
   const HARD_QUALITIES = new Set(['vo2max', 'seuil', 'sprint', 'pull', 'push', 'leg', 'plyo', 'descente']);
 
-  // Détection de séance intense réalisée la veille (J-1) ou le jour même (J-0) pour alternance physiologique (D3)
   const refDateObj = new Date(refDate);
   const yesterdayObj = new Date(refDateObj);
   yesterdayObj.setDate(yesterdayObj.getDate() - 1);
@@ -393,8 +971,8 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
     }
   });
 
-  const list = qualities.map((q, idx) => {
-    const rank = idx + 1; // 1 = le plus prioritaire
+  const list: TrainingRecommendation[] = qualities.map((q, idx) => {
+    const rank = idx + 1;
     const rankWeight = 1 + ((numQualities - idx) / numQualities) * 1.5;
 
     const isBlockFocus = Boolean(activeBlock?.focusQualities?.includes(q.id));
@@ -403,14 +981,13 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
 
     const cellState = computeCellState(q, refDate, events?.[q.id] || {}, readiness, activeBlock ? [activeBlock] : []);
 
-    // Trouver la dernière date de séance directe (principale)
     const qualityEvents = events?.[q.id] || {};
     const sessionDates = Object.keys(qualityEvents)
       .filter(d => d <= refDate && qualityEvents[d] && isPrimary(qualityEvents[d]) && extractSessionLoad(qualityEvents[d]) > 0)
       .sort();
     
-    let daysSinceLastSession = null;
-    let lastSessionData = null;
+    let daysSinceLastSession: number | null = null;
+    let lastSessionData: any = null;
     if (sessionDates.length > 0) {
       const lastDate = sessionDates[sessionDates.length - 1];
       lastSessionData = qualityEvents[lastDate];
@@ -418,9 +995,8 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       daysSinceLastSession = Math.max(0, Math.round(diffMs / (1000 * 3600 * 24)));
     }
 
-    // Calcul du score d'urgence et de pertinence
     let urgencyScore = 0;
-    let urgencyLevel = 'OPTIMAL'; // CRITICAL, HIGH, MEDIUM, LOW, OPTIMAL, REST, NEVER
+    let urgencyLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'OPTIMAL' | 'REST' = 'OPTIMAL';
     let urgencyBadge = '✅ Maintenu';
     let urgencyColor = 'emerald';
     let reason = '';
@@ -434,7 +1010,6 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       reason = 'Charge accumulée élevée sur 72h. Fatigue neuromusculaire aiguë.';
       actionTip = 'Privilégier le repos complet ou la régénération active très douce.';
     } else if (daysSinceLastSession === null) {
-      // Qualité jamais renseignée / non stimulée
       if (isBlockFocus) {
         urgencyLevel = 'MEDIUM';
         urgencyScore = 60 * rankWeight * blockWeight;
@@ -487,7 +1062,6 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
         actionTip = 'Séance de rappel idéale à caler dans les 24-48 heures.';
       }
     } else {
-      // Vert
       const daysLeft = cellState.daysLeft || 1;
       urgencyScore = Math.max(5, (25 - daysLeft) * rankWeight);
 
@@ -506,18 +1080,15 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       }
     }
 
-    // Modulation d'alternance des contraintes (D3) : si séance intense récente et filière HARD
     if (recentHardSessionDone && isHardQuality && urgencyScore > 0) {
       urgencyScore = Math.round(urgencyScore * 0.55);
       if (urgencyLevel === 'CRITICAL') urgencyLevel = 'HIGH';
       else if (urgencyLevel === 'HIGH') urgencyLevel = 'MEDIUM';
       reason += ' • [Vigilance alternance : séance intense récente, priorité à la régénération active]';
     } else if (recentHardSessionDone && !isHardQuality && urgencyScore > 0) {
-      // Filière aérobie légère ou proprioception favorisée après un jour dur
       urgencyScore = Math.round(urgencyScore * 1.25);
     }
 
-    // Intégration directe des marqueurs physiologiques de récupération (VFC, FC repos, Readiness)
     if (hasSystemicFatigue) {
       if (isHardQuality && urgencyScore > 0) {
         urgencyScore = Math.round(urgencyScore * 0.45);
@@ -543,7 +1114,6 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
       reason += ' • [⚡ Excellente disponibilité autonome (VFC & Readiness favorables) : créneau idéal pour séance qualitative]';
     }
 
-    // Prise en compte de la balance de fatigue Cardio vs Musculaire (découplage dual-tau)
     if (cardioMuscBalance.state === 'MUSCULAR_DOMINANT' && (q.category === 'force' || q.id === 'descente' || q.id === 'plyo') && urgencyScore > 0) {
       urgencyScore = Math.round(urgencyScore * 0.7);
       reason += ' • [Fatigue musculaire résiduelle dominante : privilégier régénération ou travail aérobie sans impact]';
@@ -572,268 +1142,25 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
   return list.sort((a, b) => b.urgencyScore - a.urgencyScore);
 }
 
+// ============================================================================
+// MOYENNES MOBILES EXPONENTIELLES (EMA) & ACWR
+// ============================================================================
 
-// Cache WeakMap pour pré-indexer les dates de séances principales par qualité
-const primaryDatesCache = new WeakMap();
-function getSortedPrimaryDates(eventsForQuality) {
-  if (!eventsForQuality || typeof eventsForQuality !== 'object') return [];
-  let cached = primaryDatesCache.get(eventsForQuality);
-  if (!cached) {
-    cached = Object.keys(eventsForQuality)
-      .filter(k => isPrimary(eventsForQuality[k]) && extractSessionLoad(eventsForQuality[k]) > 0)
-      .sort(); // Le tri lexicographique des clés 'YYYY-MM-DD' équivaut au tri chronologique
-    primaryDatesCache.set(eventsForQuality, cached);
-  }
-  return cached;
-}
-
-export function computeCellState(qDef, targetDateStr, eventsForQuality, readinessOrBlocks = 7, maybeBlocks = []) {
-  const blocks = Array.isArray(readinessOrBlocks) ? readinessOrBlocks : (maybeBlocks || []);
-  const [ty, tm, td] = targetDateStr.split('-').map(Number);
-  const targetDateObj = new Date(ty, tm - 1, td);
-  const targetTime = targetDateObj.getTime();
-
-  // Détection du bloc de préparation spécifique actif pour la date cible
-  const activeBlock = getActiveBlockForDate(targetDateStr, blocks);
-  const isFocus = !!(activeBlock && activeBlock.focusQualities?.includes(qDef.id));
-  const prescriptionMultiplier = isFocus 
-    ? (activeBlock.targetMultiplier ?? 0.45) 
-    : (activeBlock?.maintenanceMultiplier ?? 1.0);
-
-  let bestStatusPrescription = 'red';
-  let daysLeftPrescription = 0;
-  let opacityPrescription = 1;
-  let currentLevelPrescription = 0;
-
-  let bestStatusPhysio = 'red';
-  let daysLeftPhysio = 0;
-  let opacityPhysio = 1;
-  let currentLevelPhysio = 0;
-
-  let recent3DaysLoad = 0;
-  let total28dLoad = 0;
-  let sessionCount28d = 0;
-
-  // Calcul de la charge de référence pour doseScale : EXCLUSIVEMENT sur les séances directes (principales)
-  // pour éviter qu'une filière qui n'a que des impacts secondaires ne s'auto-calibre à doseScale=1.0
-  const pastPrimaryLoads = [];
-  const parsedSessions = [];
-
-  // 1. Accès direct O(1) aux clés sur la fenêtre glissante de 90 jours (couvre 3 x tau21 = 63j)
-  if (eventsForQuality && typeof eventsForQuality === 'object') {
-    const iterDate = new Date(targetDateObj);
-    for (let daysSince = 0; daysSince <= 90; daysSince++) {
-      if (daysSince > 0) {
-        iterDate.setDate(iterDate.getDate() - 1);
-      }
-      const y = iterDate.getFullYear();
-      const m = String(iterDate.getMonth() + 1).padStart(2, '0');
-      const d = String(iterDate.getDate()).padStart(2, '0');
-      const dateKey = `${y}-${m}-${d}`;
-
-      const sessData = eventsForQuality[dateKey];
-      if (!sessData) continue;
-
-      const isPrim = isPrimary(sessData);
-      const load = extractSessionLoad(sessData);
-
-      if (isPrim && load > 0 && daysSince <= 60) {
-        pastPrimaryLoads.push(load);
-      }
-
-      parsedSessions.push({ daysSince, load, isSec: !isPrim });
-    }
-  }
-
-  // 2. Recherche binaire O(log K) de la séance principale la plus récente (sur tout l'historique)
-  let mostRecentSessionDays = null;
-  const sortedPrimaryDates = getSortedPrimaryDates(eventsForQuality);
-  if (sortedPrimaryDates.length > 0) {
-    let low = 0;
-    let high = sortedPrimaryDates.length - 1;
-    let latestDateKey = null;
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      if (sortedPrimaryDates[mid] <= targetDateStr) {
-        latestDateKey = sortedPrimaryDates[mid];
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
-    }
-    if (latestDateKey) {
-      const [ly, lm, ld] = latestDateKey.split('-').map(Number);
-      const latestTime = new Date(ly, lm - 1, ld).getTime();
-      mostRecentSessionDays = Math.round((targetTime - latestTime) / 86400000);
-    }
-  }
-
-  pastPrimaryLoads.sort((a, b) => a - b);
-  const defaultRefLoad = qDef.id === 'isolation' ? 80 : (qDef.category === 'force' ? 200 : (qDef.category === 'mixte' ? 180 : 250));
-  const refLoad_q = pastPrimaryLoads.length > 0 ? pastPrimaryLoads[Math.floor(pastPrimaryLoads.length / 2)] : defaultRefLoad;
-
-  for (let i = 0; i < parsedSessions.length; i++) {
-    const { daysSince, load, isSec } = parsedSessions[i];
-
-    if (daysSince <= 3) {
-      recent3DaysLoad += load;
-    }
-    if (daysSince <= 28) {
-      total28dLoad += load;
-      if (load > 0) sessionCount28d++;
-    }
-
-      // Dose-réponse continue avec seuil minimal effectif (load >= 15 UA)
-      let doseScale = 0;
-      if (load >= 15) {
-        const ratio = load / refLoad_q;
-        if (isSec) {
-          // Les impacts secondaires représentent une contrainte mécanique / fatigue périphérique
-          // et non un stimulus direct d'adaptation : doseScale strictement bornée (max 0.35)
-          // pour ne JAMAIS accorder une fenêtre verte complète sans séance directe
-          doseScale = Math.min(0.35, 0.25 * Math.sqrt(Math.max(0, ratio)));
-        } else {
-          doseScale = Math.max(0.3, Math.min(1.3, 0.45 + 0.55 * Math.sqrt(Math.max(0, ratio))));
-        }
-      }
-
-      if (doseScale > 0) {
-        // 1. Calcul Physiologique Pur (fondé sur retentionDays et délais nominaux g et o)
-        const gBase = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
-        const oBase = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
-
-        const gPhysio = gBase * doseScale;
-        const oPhysio = oBase * doseScale;
-
-        if (daysSince < gPhysio) {
-          const dLeft = gPhysio - daysSince;
-          if (bestStatusPhysio !== 'green' || dLeft > daysLeftPhysio) {
-            bestStatusPhysio = 'green';
-            daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            opacityPhysio = 1 - (daysSince / gPhysio) * 0.4;
-            currentLevelPhysio = Math.round(100 - (daysSince / gPhysio) * 30); // 100% -> 70%
-          }
-        } else if (daysSince < (gPhysio + oPhysio) && bestStatusPhysio !== 'green') {
-          const dLeft = (gPhysio + oPhysio) - daysSince;
-          if (bestStatusPhysio !== 'orange' || dLeft > daysLeftPhysio) {
-            bestStatusPhysio = 'orange';
-            daysLeftPhysio = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            const progressOrange = (daysSince - gPhysio) / oPhysio;
-            opacityPhysio = 0.6 - progressOrange * 0.3;
-            currentLevelPhysio = Math.max(35, Math.round(70 - progressOrange * 35)); // 70% -> 35%
-          }
-        }
-
-        // 2. Calcul Prescription (avec multiplicateur de bloc x0.45 pour la Grille et les alertes)
-        const gPrescription = gPhysio * prescriptionMultiplier;
-        const oPrescription = oPhysio * prescriptionMultiplier;
-
-        if (daysSince < gPrescription) {
-          const dLeft = gPrescription - daysSince;
-          if (bestStatusPrescription !== 'green' || dLeft > daysLeftPrescription) {
-            bestStatusPrescription = 'green';
-            daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            opacityPrescription = 1 - (daysSince / gPrescription) * 0.4;
-            currentLevelPrescription = Math.round(100 - (daysSince / gPrescription) * 30); // 100% -> 70%
-          }
-        } else if (daysSince < (gPrescription + oPrescription) && bestStatusPrescription !== 'green') {
-          const dLeft = (gPrescription + oPrescription) - daysSince;
-          if (bestStatusPrescription !== 'orange' || dLeft > daysLeftPrescription) {
-            bestStatusPrescription = 'orange';
-            daysLeftPrescription = Math.max(0.1, Math.round(dLeft * 10) / 10);
-            const progressOrangePresc = (daysSince - gPrescription) / oPrescription;
-            opacityPrescription = 0.6 - progressOrangePresc * 0.3;
-            currentLevelPrescription = Math.max(30, Math.round(70 - progressOrangePresc * 40)); // 70% -> 30%
-          }
-        }
-      }
-    }
-
-  // Décroissance continue monotone au-delà de la fenêtre de rappel (statut rouge)
-  // Raccordement continu au seuil d'expiration (35% pour physio, 30% pour prescription)
-  // sans discontinuité ni ressaut artificiel (Mujika & Padilla 2000, 2001)
-  const gBaseNominal = qDef.g || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.6) : 6);
-  const oBaseNominal = qDef.o || (qDef.retentionDays ? Math.round(qDef.retentionDays * 0.4) : 4);
-  const totalNominal = gBaseNominal + oBaseNominal;
-
-  if (bestStatusPhysio === 'red' && mostRecentSessionDays !== null) {
-    const daysOver = Math.max(0, mostRecentSessionDays - totalNominal);
-    currentLevelPhysio = Math.max(0, Math.round(35 * Math.exp(-0.04 * daysOver)));
-  }
-  if (bestStatusPrescription === 'red' && mostRecentSessionDays !== null) {
-    const totalPrescNominal = Math.round(totalNominal * prescriptionMultiplier);
-    const daysOverPresc = Math.max(0, mostRecentSessionDays - totalPrescNominal);
-    currentLevelPrescription = Math.max(0, Math.round(30 * Math.exp(-0.05 * daysOverPresc)));
-  }
-
-  // Évaluation de la fatigue aiguë élevée relative à la référence de la filière et à la moyenne de l'athlète
-  const dailyAverage28d = sessionCount28d > 0 ? (total28dLoad / 28) : (refLoad_q / 7);
-  const qualityOverloadThreshold = Math.max(refLoad_q * 2.5, dailyAverage28d * 3 * 1.8);
-  const isAcuteFatigueHigh = recent3DaysLoad > qualityOverloadThreshold;
-  const isBurnout = isAcuteFatigueHigh;
-
-  let blockStateInfo = null;
-  if (activeBlock) {
-    blockStateInfo = {
-      name: activeBlock.name,
-      type: isFocus ? 'focus' : 'maintenance',
-      label: isFocus ? 'Fréquence de développement (x0.45)' : 'Maintien nominal (x1.0)'
-    };
-  }
-
-  let tooltip = mostRecentSessionDays === null 
-    ? 'Filière non stimulée (aucune séance enregistrée)' 
-    : `Fenêtre dépassée (J+${mostRecentSessionDays}) • Rappel recommandé`;
-  if (bestStatusPrescription === 'green') {
-    tooltip = isFocus 
-      ? `Prescription bloc : prochaine séance sous ${daysLeftPrescription}j (maintien acquis : ${daysLeftPhysio}j)`
-      : `Effet d'entraînement actif : reste ${daysLeftPhysio} jours de maintien résiduel`;
-  }
-  if (bestStatusPrescription === 'orange') {
-    tooltip = `Fenêtre de rappel : piqûre recommandée sous ${daysLeftPrescription} jours`;
-  }
-  if (blockStateInfo) {
-    tooltip += ` • [Bloc ${blockStateInfo.name} : ${blockStateInfo.label}]`;
-  }
-  if (isAcuteFatigueHigh) tooltip += ' ⚠️ FATIGUE AIGUË ÉLEVÉE (3 jours de charge intense)';
-
-  return { 
-    status: bestStatusPrescription, 
-    opacity: opacityPrescription, 
-    daysLeft: daysLeftPrescription, 
-    currentLevel: Math.max(0, currentLevelPrescription), 
-    tooltip, 
-    isBurnout,
-    isAcuteFatigueHigh,
-    blockStateInfo,
-    mostRecentSessionDays,
-    refLoad_q,
-    physio: {
-      status: bestStatusPhysio,
-      opacity: opacityPhysio,
-      daysLeft: daysLeftPhysio,
-      currentLevel: Math.max(0, currentLevelPhysio)
-    },
-    prescription: {
-      status: bestStatusPrescription,
-      opacity: opacityPrescription,
-      daysLeft: daysLeftPrescription,
-      currentLevel: Math.max(0, currentLevelPrescription)
-    }
-  };
-}
-
-/**
- * Calcule l'historique de charge et les courbes EMA (3, 7, 21 jours)
- * pour une qualité donnée sur une fenêtre temporelle passée et présente.
- * Intègre un échauffement systématique d'au moins 90 jours (>= 3 * tau21 = 63j)
- * pour garantir que les EMA et l'ACWR soient totalement convergés indépendamment
- * de la plage d'affichage sélectionnée (ex: 14j vs 45j vs 90j).
- */
-export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory = 45, daysFuture = 0) {
+export function computeQualityEMAData(
+  qualityId: string, 
+  eventsForQuality: Record<string, any> | undefined | null, 
+  daysHistory: number = 45, 
+  daysFuture: number = 0
+): EMACalculation {
   const today = parseLocalDate(new Date());
   const warmupDays = Math.max(90, daysHistory + 63);
-  const fullRawData = [];
+  const fullRawData: Array<{
+    dateStr: string;
+    day: number;
+    offset: number;
+    load: number;
+    isPrimarySession: boolean;
+  }> = [];
 
   for (let i = -warmupDays; i <= daysFuture; i++) {
     const d = addDays(today, i);
@@ -860,7 +1187,7 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const ema7 = calculateEMA(loads, 7, true, 0);
   const ema21 = calculateEMA(loads, 21, true, 0);
 
-  const fullSeries = fullRawData.map((d, idx) => ({
+  const fullSeries: QualityEMASeriesPoint[] = fullRawData.map((d, idx) => ({
     ...d,
     ema3: Math.round(ema3[idx] * 10) / 10,
     ema7: Math.round(ema7[idx] * 10) / 10,
@@ -871,12 +1198,10 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const current = todayIndex >= 0 ? fullSeries[todayIndex] : fullSeries[fullSeries.length - 1];
   const prev = todayIndex > 0 ? fullSeries[todayIndex - 1] : null;
 
-  // Comparaisons par rapport au jour précédent (J-1)
   const deltaEma3 = prev ? Math.round((current.ema3 - prev.ema3) * 10) / 10 : 0;
   const deltaEma7 = prev ? Math.round((current.ema7 - prev.ema7) * 10) / 10 : 0;
   const deltaEma21 = prev ? Math.round((current.ema21 - prev.ema21) * 10) / 10 : 0;
 
-  // Comparaisons par rapport à la période caractéristique de chaque EMA (J-3, J-7, J-21)
   const prevPeriod3 = todayIndex >= 3 ? fullSeries[todayIndex - 3] : prev;
   const prevPeriod7 = todayIndex >= 7 ? fullSeries[todayIndex - 7] : prev;
   const prevPeriod21 = todayIndex >= 21 ? fullSeries[todayIndex - 21] : prev;
@@ -885,7 +1210,6 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const periodDelta7 = prevPeriod7 ? Math.round((current.ema7 - prevPeriod7.ema7) * 10) / 10 : deltaEma7;
   const periodDelta21 = prevPeriod21 ? Math.round((current.ema21 - prevPeriod21.ema21) * 10) / 10 : deltaEma21;
 
-  // Comparaisons par rapport à la semaine précédente (J-7)
   const prevWeek = todayIndex >= 7 ? fullSeries[todayIndex - 7] : prev;
   const weekDelta3 = prevWeek ? Math.round((current.ema3 - prevWeek.ema3) * 10) / 10 : deltaEma3;
   const weekDelta7 = prevWeek ? Math.round((current.ema7 - prevWeek.ema7) * 10) / 10 : deltaEma7;
@@ -903,10 +1227,6 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   const weekPercent7 = prevWeek && prevWeek.ema7 > 0 ? Math.round((weekDelta7 / prevWeek.ema7) * 1000) / 10 : (weekDelta7 > 0 ? 100 : 0);
   const weekPercent21 = prevWeek && prevWeek.ema21 > 0 ? Math.round((weekDelta21 / prevWeek.ema21) * 1000) / 10 : (weekDelta21 > 0 ? 100 : 0);
 
-  // Validation statistique de l'ACWR par filière :
-  // Nécessite au moins 4 séances directes/principales sur les 28 derniers jours et une EMA 21j significative (> 5 UA)
-  // pour éviter les ratios aberrants (ex: 3.8) après une simple reprise d'une qualité peu fréquente
-  // ou une qualité qui ne reçoit que des transferts secondaires.
   const recentSessionsCount28d = fullRawData
     .filter(d => d.offset <= 0 && d.offset >= -28)
     .filter(d => d.isPrimarySession).length;
@@ -920,15 +1240,13 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
     ? (current.ema3 > prev.ema3 + 0.5 ? 'up' : current.ema3 < prev.ema3 - 0.5 ? 'down' : 'flat') 
     : 'flat';
 
-  const trend3 = deltaEma3 > 0.1 ? 'up' : deltaEma3 < -0.1 ? 'down' : 'flat';
-  const trend7 = deltaEma7 > 0.1 ? 'up' : deltaEma7 < -0.1 ? 'down' : 'flat';
-  const trend21 = deltaEma21 > 0.1 ? 'up' : deltaEma21 < -0.1 ? 'down' : 'flat';
+  const trend3: 'up' | 'down' | 'flat' = deltaEma3 > 0.1 ? 'up' : deltaEma3 < -0.1 ? 'down' : 'flat';
+  const trend7: 'up' | 'down' | 'flat' = deltaEma7 > 0.1 ? 'up' : deltaEma7 < -0.1 ? 'down' : 'flat';
+  const trend21: 'up' | 'down' | 'flat' = deltaEma21 > 0.1 ? 'up' : deltaEma21 < -0.1 ? 'down' : 'flat';
 
-  // Troncature pour l'affichage selon daysHistory demandé
   const series = fullSeries.filter(s => s.offset >= -daysHistory);
   const seriesTodayIndex = series.findIndex(s => s.offset === 0);
 
-  // Sparkline : 14 derniers jours jusqu'à aujourd'hui inclus
   const sparklineStart = Math.max(0, seriesTodayIndex >= 0 ? seriesTodayIndex - 13 : series.length - 14);
   const sparklineEnd = seriesTodayIndex >= 0 ? seriesTodayIndex + 1 : series.length;
   const sparkline = series.slice(sparklineStart, sparklineEnd);
@@ -978,40 +1296,42 @@ export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory =
   };
 }
 
-/**
- * Calcule les courbes EMA (3, 7, 21 jours) pour l'ensemble des qualités.
- */
-export function computeAllQualitiesEMA(qualities, events, daysHistory = 45, daysFuture = 0) {
-  const result = {};
+export function computeAllQualitiesEMA(
+  qualities: QualityDefinition[], 
+  events: Record<string, Record<string, any>> | undefined | null, 
+  daysHistory: number = 45, 
+  daysFuture: number = 0
+): Record<string, EMACalculation> {
+  const result: Record<string, EMACalculation> = {};
   for (const q of qualities) {
     result[q.id] = computeQualityEMAData(q.id, events?.[q.id] || {}, daysHistory, daysFuture);
   }
   return result;
 }
 
-/**
- * Calcule les métriques de monotonie et de strain de Foster sur une période de 7 jours.
- * - Monotonie de Foster = Moyenne quotidienne de charge / Écart-type
- * - Strain de Foster = Charge totale hebdo × Monotonie
- */
-export function computeFosterMetrics(events, referenceDateStr = null, windowDays = 7) {
+// ============================================================================
+// CALCUL DE CHARGE & MONOTONIE DE FOSTER (7 JOURS)
+// ============================================================================
+
+export function computeFosterMetrics(
+  events: Record<string, Record<string, any>> | undefined | null, 
+  referenceDateStr: string | null = null, 
+  windowDays: number = 7
+): FosterLoad {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
   const todayStr = getLocalYYYYMMDD(new Date());
   const isEvaluatingToday = !referenceDateStr || referenceDateStr === todayStr;
 
-  // Si l'évaluation porte sur aujourd'hui et qu'aucune séance n'est encore enregistrée aujourd'hui,
-  // on utilise les 7 jours complets écoulés (J-7 à J-1) pour ne pas fausser artificiellement la variance
   const todayLoad = getDailyAthleteLoad(events, todayStr);
   const offsetStart = (isEvaluatingToday && todayLoad === 0) ? 1 : 0;
 
-  const dailyLoads = [];
+  const dailyLoads: FosterDailyLoad[] = [];
 
   for (let i = windowDays - 1 + offsetStart; i >= offsetStart; i--) {
     const d = new Date(refDate);
     d.setDate(refDate.getDate() - i);
     const dateStr = getLocalYYYYMMDD(d);
 
-    // Charge réelle de l'athlète (exclut les impacts secondaires pour éviter tout double-comptage)
     const load = getDailyAthleteLoad(events, dateStr);
     dailyLoads.push({ dateStr, load });
   }
@@ -1020,21 +1340,19 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
   const exactMeanLoad = totalLoad / windowDays;
   const meanLoad = Math.round(exactMeanLoad);
 
-  // Variance calculée sur la moyenne exacte non tronquée pour éviter tout biais numérique
   const variance = dailyLoads.reduce((acc, d) => acc + Math.pow(d.load - exactMeanLoad, 2), 0) / windowDays;
   const stdDev = Math.sqrt(variance);
 
-  // Si l'écart-type est nul mais qu'il y a de la charge (même charge tous les jours sans repos)
   let monotony = 1.0;
   if (stdDev > 0) {
     monotony = Math.round((exactMeanLoad / stdDev) * 100) / 100;
   } else if (exactMeanLoad > 0) {
-    monotony = 2.5; // Monotonie maximale harmonisée
+    monotony = 2.5;
   }
 
   const strain = Math.round(totalLoad * monotony);
 
-  let riskLevel = 'OPTIMAL'; // OPTIMAL, MODERATE, HIGH, CRITICAL
+  let riskLevel: 'OPTIMAL' | 'MODERATE' | 'HIGH' | 'CRITICAL' = 'OPTIMAL';
   let riskBadge = '✅ Équilibré';
   let riskColor = 'emerald';
   let advice = 'Excellente alternance entre séances stimulantes et régénération.';
@@ -1071,56 +1389,61 @@ export function computeFosterMetrics(events, referenceDateStr = null, windowDays
   };
 }
 
-/**
- * Modèle Banister étendu (Passé + Projection Future) :
- * - ATL (Fatigue aiguë, tau = tauFatigue, ex: 5 à 12j, défaut 7j)
- * - CTL (Condition physique / Fitness chronique, tau = tauFitness, ex: 21 à 45j, défaut 28j)
- * - TSB = CTL - ATL (Training Stress Balance / Readiness / Forme)
- * - Prédiction du pic de forme (TSB apex)
- */
+// ============================================================================
+// MODÈLE DE BANISTER ÉTENDU & PROJECTIONS FUTURES
+// ============================================================================
+
 export function computeBanisterPerformance(
-  events, 
-  dailyMetrics = {}, 
-  daysHistory = 30, 
-  daysFuture = 14,
-  tauFatigue = 7,
-  tauFitness = 28,
-  initialCtl = null
-) {
+  events: Record<string, Record<string, any>> | undefined | null, 
+  dailyMetrics: Record<string, any> = {}, 
+  daysHistory: number = 30, 
+  daysFuture: number = 14,
+  tauFatigue: number = 7,
+  tauFitness: number = 28,
+  initialCtl: number | null = null
+): BanisterPerformanceResult {
   const today = parseLocalDate(new Date());
 
-  // Déterminer la date de la plus ancienne séance enregistrée pour connaître l'historique réel
-  let earliestSessionDate = null;
-  Object.values(events || {}).forEach(qDates => {
-    if (qDates) {
-      Object.entries(qDates).forEach(([dateStr, session]) => {
-        if (session && isPrimary(session) && extractSessionLoad(session) > 0) {
-          const d = parseLocalDate(dateStr);
-          if (!isNaN(d.getTime())) {
-            if (!earliestSessionDate || d < earliestSessionDate) {
-              earliestSessionDate = d;
+  let earliestSessionDate: Date | null = null;
+  if (events && typeof events === 'object') {
+    for (const qDates of Object.values(events)) {
+      if (qDates && typeof qDates === 'object') {
+        for (const [dateStr, session] of Object.entries(qDates)) {
+          if (session && isPrimary(session) && extractSessionLoad(session) > 0) {
+            const d = parseLocalDate(dateStr);
+            if (!isNaN(d.getTime())) {
+              if (!earliestSessionDate || d < earliestSessionDate) {
+                earliestSessionDate = d;
+              }
             }
           }
         }
-      });
+      }
     }
-  });
+  }
 
-  const historyDays = earliestSessionDate 
+  const historyDays = earliestSessionDate !== null
     ? Math.max(0, Math.round((today.getTime() - earliestSessionDate.getTime()) / (1000 * 3600 * 24)))
     : 0;
 
-  // Période d'échauffement mathématique : englobe tout l'historique de l'athlète + au moins 90 jours
   const warmupDays = Math.max(90, historyDays + 60, daysHistory + 60);
-  const fullRawData = [];
+  const fullRawData: Array<{
+    dateStr: string;
+    day: number;
+    month: number;
+    offset: number;
+    isToday: boolean;
+    isFuture: boolean;
+    load: number;
+    vfc: number | null;
+    readiness: number | null;
+  }> = [];
 
   for (let i = -warmupDays; i <= daysFuture; i++) {
     const d = addDays(today, i);
     const dateStr = getLocalYYYYMMDD(d);
 
-    // Charge réelle de l'athlète (exclut les impacts secondaires pour éviter toute surévaluation)
     const load = getDailyAthleteLoad(events, dateStr);
-
     const vfc = dailyMetrics?.[dateStr]?.vfc || null;
     const readiness = dailyMetrics?.[dateStr]?.readiness || null;
 
@@ -1139,11 +1462,8 @@ export function computeBanisterPerformance(
 
   const loads = fullRawData.map(d => d.load);
   
-  // Injection propre de initialCtl : semée au jour de la première séance réelle de l'athlète
-  // En condition de base stable (steady-state initial), la fatigue aiguë (ATL0) est alignée
-  // sur la condition chronique initiale (CTL0) pour éviter un artefact de sur-fraîcheur artificielle (+100%)
-  let atlArray;
-  let ctlArray;
+  let atlArray: number[];
+  let ctlArray: number[];
   if (initialCtl !== null && Number(initialCtl) > 0) {
     const initCtlNum = Number(initialCtl);
     const firstSessionIdx = fullRawData.findIndex(d => d.offset === -historyDays);
@@ -1169,18 +1489,15 @@ export function computeBanisterPerformance(
   const minWarmupThreshold = hasInitialCtl ? 0 : Math.max(84, Math.round(tauFitness * 3));
   const isWarmedUp = hasInitialCtl || (historyDays >= minWarmupThreshold);
 
-  const fullSeries = fullRawData.map((d, idx) => {
+  const fullSeries: BanisterPoint[] = fullRawData.map((d, idx) => {
     const atl = Math.round(atlArray[idx] * 10) / 10;
     const ctl = Math.round(ctlArray[idx] * 10) / 10;
     const tsb = Math.round((ctl - atl) * 10) / 10;
-    // Si la CTL n'est pas encore convergée mathématiquement, neutraliser le TSB% pour éviter fausses alertes
     const rawTsbPercent = calculateTsbPercent(ctl, atl);
     const tsbPercent = isWarmedUp ? rawTsbPercent : null;
 
-    // ACWR couplé classique (avec neutralisation si CTL non convergée)
     const acwr = (ctl > 0 && isWarmedUp) ? Math.round((atl / ctl) * 100) / 100 : 1;
 
-    // ACWR non couplé (aiguë J-0..J-6 vs chronique non couplée J-7..J-27)
     let acwrUncoupled = acwr;
     if (idx >= 27 && isWarmedUp) {
       const acuteLoads = loads.slice(idx - 6, idx + 1);
@@ -1194,16 +1511,15 @@ export function computeBanisterPerformance(
 
     return {
       ...d,
-      atl, // Fatigue aiguë (tauFatigue j)
-      ctl, // Fitness chronique (tauFitness j)
-      tsb, // Forme absolue (CTL - ATL)
-      tsbPercent, // Forme relative en % de la CTL (null si en cours de convergence)
+      atl,
+      ctl,
+      tsb,
+      tsbPercent,
       acwr,
       acwrUncoupled
     };
   });
 
-  // Ne renvoyer pour l'affichage que la fenêtre demandée [-daysHistory, daysFuture]
   const displayStartIndex = fullSeries.findIndex(s => s.offset === -daysHistory);
   const series = displayStartIndex >= 0 ? fullSeries.slice(displayStartIndex) : fullSeries;
 
@@ -1211,8 +1527,7 @@ export function computeBanisterPerformance(
   const current = todayIndex >= 0 ? series[todayIndex] : series[0];
   const futureSeries = series.filter(s => s.isFuture);
 
-  // Recherche du pic de forme dans les jours futurs
-  let peakDay = null;
+  let peakDay: BanisterPoint | null = null;
   if (futureSeries.length > 0) {
     let maxTsb = -999;
     futureSeries.forEach(s => {
@@ -1223,7 +1538,6 @@ export function computeBanisterPerformance(
     });
   }
 
-  // Zone centrale TSB selon les pourcentages de CTL avec seuil de convergence
   const tsbZone = getTsbZone(current.ctl, current.atl, historyDays, tauFitness, hasInitialCtl);
 
   return {
@@ -1240,18 +1554,19 @@ export function computeBanisterPerformance(
   };
 }
 
-/**
- * Analyse d'affûtage (Tapering) en vue d'un objectif ou d'une compétition
- */
+// ============================================================================
+// ANALYSE D'AFFÛTAGE (TAPERING)
+// ============================================================================
+
 export function getTaperingAnalysis(
-  targetCompetition, 
-  events, 
-  dailyMetrics = {},
-  tauFatigue = 7,
-  tauFitness = 28,
-  initialCtl = null,
-  existingBanister = null
-) {
+  targetCompetition: any, 
+  events: Record<string, Record<string, any>> | undefined | null, 
+  dailyMetrics: Record<string, any> = {},
+  tauFatigue: number = 7,
+  tauFitness: number = 28,
+  initialCtl: number | null = null,
+  existingBanister: any = null
+): TaperingRecommendation | null {
   if (!targetCompetition || !targetCompetition.date) return null;
 
   const today = new Date();
@@ -1261,9 +1576,8 @@ export function getTaperingAnalysis(
   const diffMs = compDate.getTime() - today.getTime();
   const daysRemaining = Math.ceil(diffMs / (1000 * 3600 * 24));
 
-  // Modèle PMC sur 30j passés et projection jusqu'à la compétition (jusqu'à 180 jours)
   const projectionDays = Math.max(7, Math.min(180, Math.max(0, daysRemaining) + 3));
-  const banister = (existingBanister && existingBanister.series?.some(s => s.dateStr === targetCompetition.date))
+  const banister: BanisterPerformanceResult = (existingBanister && existingBanister.series?.some((s: any) => s.dateStr === targetCompetition.date))
     ? existingBanister
     : computeBanisterPerformance(events, dailyMetrics, 30, projectionDays, tauFatigue, tauFitness, initialCtl);
 
@@ -1281,16 +1595,13 @@ export function getTaperingAnalysis(
   const hasInitCtl = (initialCtl !== null && Number(initialCtl) > 0);
   const tsbZone = getTsbZone(compDayData?.ctl ?? 0, compDayData?.atl ?? 0, banister.historyDays, tauFitness, hasInitCtl);
 
-  // Monotonie sur les 7 derniers jours
   const foster = computeFosterMetrics(events);
 
-  // Évaluation de la phase d'affûtage
-  let status = 'BUILD'; // BUILD, TAPER_START, TAPER_OPTIMAL, TAPER_OVERREACHING, PEAK
+  let status: 'BUILD' | 'TAPER_START' | 'TAPER_OPTIMAL' | 'TAPER_PASSIVE' | 'TAPER_OVERREACHING' | 'PEAK' | 'POST' = 'BUILD';
   let statusBadge = '🏋️ Phase de Développement';
   let statusColor = 'blue';
   let advice = '';
 
-  // Compter les séances futures planifiées entre aujourd'hui et le Jour J
   let futureSessionsCount = 0;
   banister.series
     .filter(s => s.offset > 0 && s.dateStr <= targetCompetition.date)
@@ -1372,25 +1683,25 @@ export function getTaperingAnalysis(
   };
 }
 
-/**
- * Calcul de la balance Charge Cardiovasculaire vs Musculo-Squelettique (RPE Différentiel).
- * Évalue si la fatigue actuelle est principalement respiratoire/cardiaque ou tissulaire/musculaire
- * selon deux constantes de temps physiologiques distinctes (tau Cardio = 3j vs tau Musculaire = 6j).
- * Utilise un historique continu de 56 jours (8 semaines) initialisé à 0 pour assurer la convergence
- * complète du filtre exponentiel et éviter tout biais de troncature sur la fenêtre d'observation.
- */
-export function computeCardioVsMuscularBalance(events, referenceDateStr = null, windowDays = 7) {
+// ============================================================================
+// BALANCE CARDIO VS MUSCULAIRE (RPE DIFFÉRENTIEL & TAU DÉCOUPLÉS)
+// ============================================================================
+
+export function computeCardioVsMuscularBalance(
+  events: Record<string, Record<string, any>> | undefined | null, 
+  referenceDateStr: string | null = null, 
+  windowDays: number = 7
+): CardioMuscularBalance {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
-  const dailyBreakdown = [];
+  const dailyBreakdown: CardioMuscularDailyItem[] = [];
   let totalCardioLoad = 0;
   let totalMuscLoad = 0;
   let totalGlobalLoad = 0;
   let totalEccentricSessions = 0;
 
-  // Historique étendu d'échauffement mathématique (56 jours = 8 semaines >= 9 * tauMusc)
   const filterHistoryDays = 56;
-  const allCardioLoadsChronological = [];
-  const allMuscLoadsChronological = [];
+  const allCardioLoadsChronological: number[] = [];
+  const allMuscLoadsChronological: number[] = [];
 
   for (let i = filterHistoryDays - 1; i >= 0; i--) {
     const d = new Date(refDate);
@@ -1405,7 +1716,6 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
     Object.values(events || {}).forEach(qEvents => {
       if (qEvents && qEvents[dateStr]) {
         const item = qEvents[dateStr];
-        // Exclure les impacts secondaires pour éviter de fausser la balance réelle de l'athlète
         if (!isPrimary(item)) return;
 
         let cLoad = 0;
@@ -1453,7 +1763,6 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
     allCardioLoadsChronological.push(dayCardio);
     allMuscLoadsChronological.push(dayMusc);
 
-    // Fenêtre d'observation demandée (par défaut 7 jours)
     if (i < windowDays) {
       if (dayHasEccentric) totalEccentricSessions++;
       totalCardioLoad += dayCardio;
@@ -1471,8 +1780,6 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
     }
   }
 
-  // Calcul de la double constante de temps de fatigue (tau Cardio = 3j vs tau Musculaire = 6j)
-  // Initialisation à 0 sur 56 jours pour éliminer tout biais d'initialisation sur le premier jour
   const tauCardio = 3;
   const tauMusc = 6;
   const expAtlCardio = calculateExpDecay(allCardioLoadsChronological, tauCardio, { decayToZero: true, initialValue: 0 });
@@ -1484,10 +1791,9 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
   const cardioPercent = combined > 0 ? Math.round((totalCardioLoad / combined) * 100) : 50;
   const muscPercent = 100 - cardioPercent;
 
-  // Score d'asymétrie (-100 à +100) : > 0 = Cardio domine, < 0 = Musculaire domine
   const asymmetryScore = combined > 0 ? Math.round(((totalCardioLoad - totalMuscLoad) / combined) * 100) : 0;
 
-  let state = 'BALANCED'; // 'CARDIO_DOMINANT' | 'MUSCULAR_DOMINANT' | 'BALANCED'
+  let state: 'BALANCED' | 'CARDIO_DOMINANT' | 'MUSCULAR_DOMINANT' = 'BALANCED';
   let badge = '⚖️ Équilibre Cardio-Musculaire';
   let color = 'emerald';
   let description = 'Charge harmonieusement répartie entre appareil cardiorespiratoire et chaîne musculo-squelettique.';
@@ -1529,16 +1835,16 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
   };
 }
 
-/**
- * Analyse de la distribution d'intensité selon le modèle 3 zones de Stephen Seiler (Polarisation).
- * Conforme au modèle physiologique de Seiler (2006, 2010) basé sur les seuils ventilatoires et lactiques :
- * - Analyse ciblée sur les filières et séances d'endurance cardiovasculaire (EF, Seuil, VO2max, etc.).
- * - Les séances de renforcement / musculation sont exclues de ce modèle métabolique (analysées dans la balance mécanique).
- * - Zone 1 : Basse intensité (sous VT1 / aérobie de base, RPE Cardio <= 4 ou EF)
- * - Zone 2 : Intensité seuil / tempo (entre VT1 et VT2, RPE Cardio 5-6 ou Seuil)
- * - Zone 3 : Haute intensité (au-dessus de VT2 / PMA / VO2max, RPE Cardio >= 7 ou VO2max)
- */
-export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITIES, referenceDateStr = null, windowDays = 28) {
+// ============================================================================
+// DISTRIBUTION D'INTENSITÉ (STEPHEN SEILER 3 ZONES)
+// ============================================================================
+
+export function computeIntensityDistribution(
+  events: Record<string, Record<string, any>> | undefined | null, 
+  qualities: QualityDefinition[] = DEFAULT_QUALITIES, 
+  referenceDateStr: string | null = null, 
+  windowDays: number = 28
+): IntensityDistribution {
   const refDate = parseLocalDate(referenceDateStr || new Date());
   let z1Minutes = 0;
   let z2Minutes = 0;
@@ -1562,8 +1868,6 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
         const load = extractSessionLoad(item);
         if (dur <= 0 && load <= 0) return;
 
-        // Si la séance appartient à une filière de force pure (musculation, plyo),
-        // elle ne relève pas du modèle métabolique tri-zonal de Seiler
         if (!isCardioQuality(qId, qualities)) {
           strengthSessionsCount++;
           return;
@@ -1572,7 +1876,6 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
         totalSessions++;
         const rpeC = Number(item.rpeCardio) || (Number(item.rpe) || 5);
 
-        // Classification physiologique monotone fondée strictement sur l'intensité cardiorespiratoire
         if (rpeC >= 7 || qId === 'vo2max') {
           z3Minutes += dur;
           z3Load += load;
@@ -1580,7 +1883,6 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
           z2Minutes += dur;
           z2Load += load;
         } else {
-          // rpeC <= 4 ou EF
           z1Minutes += dur;
           z1Load += load;
         }
@@ -1599,8 +1901,7 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
   const z2LoadPct = totalLoad > 0 ? Math.round((z2Load / totalLoad) * 100) : 0;
   const z3LoadPct = totalLoad > 0 ? Math.round((z3Load / totalLoad) * 100) : 0;
 
-  // Profil de distribution Seiler
-  let profile = 'BALANCED';
+  let profile: 'EMPTY' | 'POLARIZED' | 'PYRAMIDAL' | 'THRESHOLD_DOMINANT' | 'HIGH_INTENSITY' | 'BASE_BUILDING' | 'BALANCED' = 'BALANCED';
   let badge = '⚖️ Mixte';
   let color = 'sky';
   let advice = '';
@@ -1648,9 +1949,6 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
     z1TimePct,
     z2TimePct,
     z3TimePct,
-    z1Load,
-    z2Load,
-    z3Load,
     z1LoadPct,
     z2LoadPct,
     z3LoadPct,
@@ -1662,13 +1960,25 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
   };
 }
 
-/**
- * Analyse de la fatigue perçue et de l'indice de coût interne (Charge / Réponse)
- * Exploite le champ fatigue (1-10) saisi lors des séances pour détecter le surmenage fonctionnel
- */
-export function computePerceivedFatigueAnalysis(events, referenceDateStr = null, windowDays = 28) {
+// ============================================================================
+// FATIGUE PERÇUE & COÛT INTERNE (EFFORT VS RÉPONSE)
+// ============================================================================
+
+export function computePerceivedFatigueAnalysis(
+  events: Record<string, Record<string, any>> | undefined | null, 
+  referenceDateStr: string | null = null, 
+  windowDays: number = 28
+): PerceivedFatigueAnalysis {
   const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
-  const sessionEntries = [];
+  const sessionEntries: Array<{
+    dateStr: string;
+    qId: string;
+    load: number;
+    duration: number;
+    maxRpe: number;
+    fatigue: number;
+    strainDiscrepancy: number;
+  }> = [];
 
   for (let i = windowDays - 1; i >= 0; i--) {
     const d = new Date(refDate);
@@ -1688,7 +1998,6 @@ export function computePerceivedFatigueAnalysis(events, referenceDateStr = null,
         const maxRpe = Math.max(rpeM, rpeC);
 
         if (!isNaN(fatigueVal) && fatigueVal > 0) {
-          // Écart entre la fatigue ressentie (1-10) et la difficulté prévue de la séance (maxRpe)
           const strainDiscrepancy = fatigueVal - maxRpe;
           sessionEntries.push({
             dateStr,
@@ -1724,7 +2033,7 @@ export function computePerceivedFatigueAnalysis(events, referenceDateStr = null,
   const meanDiscrepancy = Math.round((totalDiscrepancy / count) * 10) / 10;
   const highStrainSessionsCount = sessionEntries.filter(s => s.fatigue >= 7 || s.strainDiscrepancy >= 2).length;
 
-  let status = 'optimal';
+  let status: 'initializing' | 'optimal' | 'elevated' | 'critical' = 'optimal';
   let badge = '🟢 Excellente Tolérance';
   let color = 'emerald';
   let interpretation = 'Vos séances sont bien assimilées. Le niveau de fatigue ressentie est en parfaite adéquation avec la difficulté prescrite.';
