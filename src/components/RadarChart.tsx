@@ -6,11 +6,31 @@ import {
 import { Table as TableIcon, Eye, Zap } from 'lucide-react';
 import { computeCellState } from '../utils/physiology';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
+import type { Quality, EventsByQuality } from '../types';
+import type { DailyMetrics } from '../hooks/useMetricsState';
+import type { TrainingBlock } from '../hooks/useBlocksState';
 
-export default function RadarChart({ qualities, events, dailyMetrics, trainingBlocks = [] }) {
+export interface RadarChartProps {
+  qualities: Quality[];
+  events: EventsByQuality;
+  dailyMetrics?: Record<string, DailyMetrics>;
+  trainingBlocks?: TrainingBlock[];
+}
+
+interface RadarDatum {
+  id: string;
+  quality: string;
+  fullName: string;
+  niveau: number;
+  statusLabel: string;
+  statusBadge: string;
+  fullMark: number;
+}
+
+export default function RadarChart({ qualities, events, dailyMetrics, trainingBlocks = [] }: RadarChartProps) {
   const [showTableMode, setShowTableMode] = useState(false);
   
-  const radarData = useMemo(() => {
+  const radarData = useMemo<RadarDatum[]>(() => {
     const todayStr = getLocalYYYYMMDD(new Date());
     const readiness = dailyMetrics?.[todayStr]?.readiness || 7;
 
@@ -167,9 +187,9 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
                   fontSize: '12px'
                 }} 
                 itemStyle={{ color: '#38bdf8', fontWeight: 'bold' }}
-                formatter={(value, name, item) => [
-                  `${value}% (${item.payload.statusLabel})`, 
-                  item.payload.fullName
+                formatter={(value, _name, item) => [
+                  `${value}% (${(item.payload as RadarDatum).statusLabel})`, 
+                  (item.payload as RadarDatum).fullName
                 ]}
               />
             </RechartsRadar>

@@ -7,7 +7,7 @@
  * @param {Date | string | number} dateObj
  * @returns {string}
  */
-export function getLocalYYYYMMDD(dateObj) {
+export function getLocalYYYYMMDD(dateObj: Date | string | number): string {
   const date = dateObj instanceof Date ? dateObj : new Date(dateObj);
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -22,7 +22,7 @@ export function getLocalYYYYMMDD(dateObj) {
  * @param {string | Date | number | null} [dateInput]
  * @returns {Date}
  */
-export function parseLocalDate(dateInput = new Date()) {
+export function parseLocalDate(dateInput: string | Date | number | null = new Date()): Date {
   if (dateInput instanceof Date) {
     return new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), 12, 0, 0);
   }
@@ -50,10 +50,21 @@ export function parseLocalDate(dateInput = new Date()) {
  * @param {number} days
  * @returns {Date}
  */
-export function addDays(date, days) {
+export function addDays(date: string | Date, days: number): Date {
   const base = parseLocalDate(date);
   base.setDate(base.getDate() + days);
   return base;
+}
+
+export interface TimelineDay {
+  offset: number;
+  dateStr: string;
+  dateObj: Date;
+}
+
+export interface DisplayDate {
+  prefix: string;
+  date: string;
 }
 
 /**
@@ -61,9 +72,13 @@ export function addDays(date, days) {
  * @param {number} [futureDays]
  * @param {Date | string} [referenceDate]
  */
-export function generateTimeline(pastDays = 14, futureDays = 14, referenceDate = new Date()) {
+export function generateTimeline(
+  pastDays: number = 14,
+  futureDays: number = 14,
+  referenceDate: Date | string = new Date()
+): TimelineDay[] {
   const today = parseLocalDate(referenceDate);
-  const timeline = [];
+  const timeline: TimelineDay[] = [];
   for (let i = -pastDays; i <= futureDays; i++) {
     const d = addDays(today, i);
     timeline.push({
@@ -79,7 +94,7 @@ export function generateTimeline(pastDays = 14, futureDays = 14, referenceDate =
  * @param {Date} dateObj
  * @param {number} offset
  */
-export function formatDisplayDate(dateObj, offset) {
+export function formatDisplayDate(dateObj: Date, offset: number): DisplayDate {
   const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
   const dayName = days[dateObj.getDay()];
   const d = String(dateObj.getDate()).padStart(2, '0');

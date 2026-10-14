@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import type { FormEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { 
   Heart, Dumbbell, Zap, Flame, ShieldAlert, Calendar, 
-  ChevronLeft, ChevronRight, CheckCircle2, Clock, RotateCcw,
-  Plus, Trash2, ChevronDown, ChevronUp, Layers, Sparkles, Scale, Info,
-  BookmarkCheck, BookmarkPlus, Eye, Copy, Check, TrendingUp, ArrowUpRight,
+  ChevronLeft, ChevronRight, CheckCircle2, Clock,
+  Plus, Trash2, ChevronDown, ChevronUp, Layers, Sparkles, Info,
+  BookmarkCheck, BookmarkPlus, Eye, Copy, Check, TrendingUp,
   ArrowDownRight, Minus, Search, X, AlertCircle
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
@@ -28,6 +29,51 @@ import {
 } from '../utils/muscleHelpers';
 import { MuscleBodyMap } from './MuscleBodyMap';
 import { haptics } from '../utils/haptics';
+import type { SessionExercise } from '../utils/muscleHelpers';
+import type { Quality, SessionData, SubSession, EventsByQuality, ExerciseCategory } from '../types';
+
+/** Valeur de formulaire : nombre saisi ou chaîne vide. */
+type FormNumber = number | string;
+
+/** Sous-séance en cours d'édition dans la modale. */
+interface SubSessionForm extends Partial<Omit<SubSession, 'duration' | 'rpeMusc' | 'rpeCardio' | 'fatigue'>> {
+  id: string;
+  name: string;
+  duration: FormNumber;
+  rpeMusc: FormNumber;
+  rpeCardio: FormNumber;
+  fatigue: FormNumber;
+  sport: string;
+  isEccentric: boolean;
+  exercises: SessionExercise[];
+  notes: string;
+}
+
+export interface ScoreModalInfo {
+  qId: string;
+  qName: string;
+  dateStr: string;
+  currentData?: SessionData | null;
+}
+
+export interface ScoreModalProps {
+  info: ScoreModalInfo;
+  qualities?: Quality[];
+  events?: EventsByQuality;
+  onClose: () => void;
+  onSave: (sessionData: SessionData | null, applyImpacts: boolean, targetDateStr?: string) => void;
+  onOpenLiveGym: () => void;
+}
+
+interface QuickScaleSelectorProps {
+  id: string;
+  value: FormNumber;
+  onChange: (value: string) => void;
+  min?: number;
+  max?: number;
+  label: string;
+  activeColor?: 'blue' | 'red' | 'sky' | 'amber';
+}
 
 const MONTH_NAMES = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -36,7 +82,7 @@ const MONTH_NAMES = [
 
 const WEEKDAY_NAMES = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
 
-function formatFrenchDate(dateStr) {
+function formatFrenchDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
@@ -45,14 +91,13 @@ function formatFrenchDate(dateStr) {
   return `${weekdays[dt.getDay()]} ${d} ${months[m - 1]} ${y}`;
 }
 
-function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, activeColor = 'blue' }) {
+function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, activeColor = 'blue' }: QuickScaleSelectorProps) {
   const numVal = Number(value);
 
-  const handleKeyDown = (e, currentNum) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, currentNum: number) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       const nextNum = currentNum >= max ? min : currentNum + 1;
-      if (haptics.selection) haptics.selection();
       onChange(String(nextNum));
       setTimeout(() => {
         document.getElementById(`${id}-option-${nextNum}`)?.focus();
@@ -60,7 +105,6 @@ function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, act
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
       const prevNum = currentNum <= min ? max : currentNum - 1;
-      if (haptics.selection) haptics.selection();
       onChange(String(prevNum));
       setTimeout(() => {
         document.getElementById(`${id}-option-${prevNum}`)?.focus();
@@ -87,8 +131,7 @@ function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, act
             tabIndex={isFocusable ? 0 : -1}
             aria-checked={isSelected}
             onClick={() => {
-              if (haptics.selection) haptics.selection();
-              onChange(String(n));
+                      onChange(String(n));
             }}
             onKeyDown={(e) => handleKeyDown(e, n)}
             className={`min-w-[44px] min-h-[44px] h-11 px-3 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all cursor-pointer border flex items-center justify-center shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
@@ -112,9 +155,9 @@ function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, act
   );
 }
 
-export default function ScoreModal({ info, qualities = [], events = {}, onClose, onSave, onOpenLiveGym }) {
-  const modalRef = useRef(null);
-  const [validationErrors, setValidationErrors] = useState({});
+export default function ScoreModal({ info, qualities = [], events = {}, onClose, onSave, onOpenLiveGym }: ScoreModalProps) {
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string | undefined>>({});
   const todayStr = getLocalYYYYMMDD(new Date());
   const isMultiSport = useMemo(() => ['vo2max', 'seuil', 'ef', 'sprint'].includes(info.qId), [info.qId]);
   
@@ -130,7 +173,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   });
 
   // Récupérer les données de séance pour la date active
-  const getSessionForDate = (dateStr) => {
+  const getSessionForDate = (dateStr: string): SessionData | null => {
     const qualityEvents = events[info.qId] || {};
     if (qualityEvents[dateStr] !== undefined) {
       return qualityEvents[dateStr];
@@ -148,10 +191,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const isIsolation = info.qId === 'isolation';
 
   // Gestion multi-séances par filière et par jour (support 2+ séances par jour sans écrasement)
-  const buildInitialSubSessions = (sess) => {
+  const buildInitialSubSessions = (sess: SessionData | null): SubSessionForm[] => {
     if (sess && !sess.isSecondary) {
       if (Array.isArray(sess.subSessions) && sess.subSessions.length > 0) {
-        return sess.subSessions.map((s, idx) => ({
+        return sess.subSessions.map((s, idx): SubSessionForm => ({
           ...s,
           id: s.id || `sub_${idx}_${Date.now()}`,
           name: s.name || `Séance ${idx + 1}`,
@@ -197,11 +240,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const activeSub = subSessionsList[activeSessionIndex] || subSessionsList[0];
 
-  const [sport, setSport] = useState(activeSub?.sport || defaultSportForQuality);
-  const [rpeMusc, setRpeMusc] = useState(activeSub?.rpeMusc ?? (isIsolation ? 8 : ''));
-  const [rpeCardio, setRpeCardio] = useState(activeSub?.rpeCardio ?? (isIsolation ? 2 : ''));
-  const [fatigue, setFatigue] = useState(activeSub?.fatigue ?? (isIsolation ? 2 : ''));
-  const [duration, setDuration] = useState(activeSub?.duration ?? (isIsolation ? 10 : ''));
+  const [sport, setSport] = useState<string>(activeSub?.sport || defaultSportForQuality);
+  const [rpeMusc, setRpeMusc] = useState<FormNumber>(activeSub?.rpeMusc ?? (isIsolation ? 8 : ''));
+  const [rpeCardio, setRpeCardio] = useState<FormNumber>(activeSub?.rpeCardio ?? (isIsolation ? 2 : ''));
+  const [fatigue, setFatigue] = useState<FormNumber>(activeSub?.fatigue ?? (isIsolation ? 2 : ''));
+  const [duration, setDuration] = useState<FormNumber>(activeSub?.duration ?? (isIsolation ? 10 : ''));
   const [isEccentric, setIsEccentric] = useState(
     activeSub?.isEccentric !== undefined 
       ? activeSub.isEccentric 
@@ -210,13 +253,14 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const [applyImpacts, setApplyImpacts] = useState(true);
 
   // --- NAVIGATION PAR ONGLETS (PARAMÈTRES vs EXERCICES) & DUPLICATION ---
-  const [activeModalTab, setActiveModalTab] = useState(isIsolation ? 'exercises' : 'parameters');
+  const [activeModalTab, setActiveModalTab] = useState<string>(isIsolation ? 'exercises' : 'parameters');
   const [duplicateSuccess, setDuplicateSuccess] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // --- MODULE MUSCULATION & EXERCICES PAR GROUPE MUSCULAIRE (OPTION A) ---
-  const [exercises, setExercises] = useState(Array.isArray(activeSub?.exercises) ? activeSub.exercises : []);
+  const [exercises, setExercises] = useState<SessionExercise[]>(Array.isArray(activeSub?.exercises) ? activeSub.exercises : []);
 
-  const syncFormWithSubSession = (sub) => {
+  const syncFormWithSubSession = (sub: SubSessionForm | undefined) => {
     if (!sub) return;
     setSport(sub.sport || defaultSportForQuality);
     setRpeMusc(sub.rpeMusc ?? (isIsolation ? 8 : ''));
@@ -227,7 +271,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     setExercises(Array.isArray(sub.exercises) ? sub.exercises : []);
   };
 
-  const handleSwitchSubSession = (targetIndex) => {
+  const handleSwitchSubSession = (targetIndex: number) => {
     if (targetIndex === activeSessionIndex || !subSessionsList[targetIndex]) return;
     setSubSessionsList(prev => {
       const next = [...prev];
@@ -252,7 +296,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const handleAddSubSession = () => {
     haptics.tap();
     const newIdx = subSessionsList.length;
-    const newSub = {
+    const newSub: SubSessionForm = {
       id: `sub_${newIdx}_${Date.now()}`,
       name: `Séance ${newIdx + 1}`,
       duration: isIsolation ? 10 : '',
@@ -284,7 +328,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     syncFormWithSubSession(newSub);
   };
 
-  const handleRemoveSubSession = (indexToRemove) => {
+  const handleRemoveSubSession = (indexToRemove: number) => {
     if (subSessionsList.length <= 1) return;
     haptics.tap();
     const updated = subSessionsList.filter((_, idx) => idx !== indexToRemove).map((s, idx) => ({
@@ -298,7 +342,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   };
 
   // Détection de la dernière séance ayant des exercices pour cette même filière (Accélérateur 1-clic)
-  const lastSessionWithExercises = useMemo(() => {
+  const lastSessionWithExercises = useMemo<{ date: string; session: SessionData & { exercises: SessionExercise[] } } | null>(() => {
     const qualityEvents = events[info.qId];
     if (!qualityEvents) return null;
 
@@ -308,9 +352,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
     if (candidateDates.length === 0) return null;
     const targetDate = candidateDates[0];
+    const session = qualityEvents[targetDate];
     return {
       date: targetDate,
-      session: qualityEvents[targetDate]
+      session: { ...session, exercises: session.exercises ?? [] }
     };
   }, [events, info.qId, selectedDate]);
 
@@ -325,7 +370,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
       setDuration(lastSessionWithExercises.session.duration);
     }
     if (!rpeMusc && (lastSessionWithExercises.session.rpeMusc || lastSessionWithExercises.session.rpeMusculaire)) {
-      setRpeMusc(lastSessionWithExercises.session.rpeMusc || lastSessionWithExercises.session.rpeMusculaire);
+      setRpeMusc(lastSessionWithExercises.session.rpeMusc || lastSessionWithExercises.session.rpeMusculaire || '');
     }
     if (!fatigue && lastSessionWithExercises.session.fatigue) {
       setFatigue(lastSessionWithExercises.session.fatigue);
@@ -349,14 +394,14 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const [selectedExId, setSelectedExId] = useState(defaultExForQuality);
   const [exerciseSearchFilter, setExerciseSearchFilter] = useState('');
   const [isExerciseDropdownOpen, setIsExerciseDropdownOpen] = useState(false);
-  const [expandedModalMuscles, setExpandedModalMuscles] = useState({}); // De base, les catalogues sont repliés
+  const [expandedModalMuscles, setExpandedModalMuscles] = useState<Record<string, boolean>>({}); // De base, les catalogues sont repliés
 
-  const isModalMuscleExpanded = (catId) => {
+  const isModalMuscleExpanded = (catId: string) => {
     if (exerciseSearchFilter.trim().length > 0) return true;
     return expandedModalMuscles[catId] === true;
   };
 
-  const toggleModalMuscle = (catId) => {
+  const toggleModalMuscle = (catId: string) => {
     setExpandedModalMuscles(prev => ({
       ...prev,
       [catId]: !prev[catId]
@@ -368,7 +413,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     if (anyOpen) {
       setExpandedModalMuscles({});
     } else {
-      const all = { frequent: true, custom: true };
+      const all: Record<string, boolean> = { frequent: true, custom: true };
       ORDERED_PRIMARY_MUSCLES.forEach(m => { all[m.id] = true; });
       setExpandedModalMuscles(all);
     }
@@ -376,7 +421,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
   const [newExName, setNewExName] = useState('');
-  const [newExCategory, setNewExCategory] = useState('lower');
+  const [newExCategory, setNewExCategory] = useState<ExerciseCategory>('lower');
   const [newExPrimaryMuscle, setNewExPrimaryMuscle] = useState('quadriceps');
   const [newExSecondaryMuscle, setNewExSecondaryMuscle] = useState('');
   const [showBodyMapInModal, setShowBodyMapInModal] = useState(false);
@@ -457,7 +502,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     setNewExName('');
   };
 
-  const handleDeleteCustomExercise = (id, e) => {
+  const handleDeleteCustomExercise = (id: string, e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     const updated = deleteCustomExercise(id);
     setCustomExercises(updated);
@@ -507,7 +552,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     setSuggestionApplied(false);
   };
 
-  const handleRemoveExercise = (indexToRemove) => {
+  const handleRemoveExercise = (indexToRemove: number) => {
     setExercises(prev => prev.filter((_, idx) => idx !== indexToRemove));
     setAppliedFeedback(false);
   };
@@ -523,7 +568,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   };
 
   // Fonction pour basculer sur une autre date et recharger son formulaire
-  const handleSelectDate = (newDateStr) => {
+  const handleSelectDate = (newDateStr: string) => {
     setSelectedDate(newDateStr);
     const session = getSessionForDate(newDateStr);
     const newSubs = buildInitialSubSessions(session);
@@ -627,6 +672,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const numCardio = Number(rpeCardio) || 0;
   const numMusc = Number(rpeMusc) || 0;
   const numFatigue = Number(fatigue) || 5;
+  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
 
   const currentDetailedLoad = useMemo(() => {
     return computeDetailedSessionLoad(info.qId, numDur, numCardio, numMusc, Boolean(isEccentric));
@@ -635,6 +681,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const loadCardio = currentDetailedLoad.loadCardio;
   const loadMusc = currentDetailedLoad.loadMusc;
   const load = currentDetailedLoad.load;
+
+  // Dominance métabolique
+  const totalFactor = (loadCardio + loadMusc) || 1;
+  const cardioPercent = Math.round((loadCardio / totalFactor) * 100);
+  const muscPercent = 100 - cardioPercent;
 
   // Cumul multi-séances pour la journée
   const totalDayStats = useMemo(() => {
@@ -654,7 +705,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     return { totalDuration: tDur, totalLoad: tLoad };
   }, [subSessionsList, activeSessionIndex, duration, rpeMusc, rpeCardio, isEccentric, isCardio, isForce]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     let finalDuration = duration;
     let finalRpeMusc = rpeMusc;
@@ -678,7 +729,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
       }
     }
 
-    const errors = {};
+    const errors: Record<string, string> = {};
     if (!finalDuration || Number(finalDuration) <= 0) {
       errors.duration = 'Veuillez renseigner la durée effective (ex: 45 min).';
     }
@@ -733,11 +784,12 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     let sumCardioWeighted = 0;
     let maxFatigue = 0;
     let anyEccentric = false;
-    let allExs = [];
+    let allExs: SessionExercise[] = [];
 
     const computedSubs = updatedSubs.map((sub, sIdx) => {
       const d = Number(sub.duration) || 0;
       const rM = Number(sub.rpeMusc) || 5;
+      const rC = Number(sub.rpeCardio) || 5;
       const { load: subLoad, loadCardio: subCardio, loadMusc: subMusc } = computeDetailedSessionLoad(
         info.qId,
         d,
@@ -804,7 +856,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     onClose();
   };
 
-  const handleTabKeyDown = (e) => {
+  const handleTabKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       e.preventDefault();
       const nextTab = activeModalTab === 'parameters' ? 'exercises' : 'parameters';
@@ -977,7 +1029,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
             {/* Indicateur si une séance est déjà enregistrée pour cette date */}
             {currentSessionData && (
               <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-full">
-                <CheckCircle2 size={14} className="text-amber-400" aria-hidden="true" /> Séance existante ({currentSessionData.load || (currentSessionData * 5)} pts)
+                <CheckCircle2 size={14} className="text-amber-400" aria-hidden="true" /> Séance existante ({currentSessionData.load || (Number(currentSessionData) * 5)} pts)
               </span>
             )}
           </div>
@@ -1608,7 +1660,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   </div>
                 )}
                 
-                {existing?.isSecondary && (
+                {currentSessionData?.isSecondary && (
                   <div className="text-[11px] text-amber-400 flex items-center gap-1">
                     <ShieldAlert size={12} /> Séance calculée automatiquement comme impact secondaire.
                   </div>
@@ -2022,7 +2074,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         <select
                           id="custom-new-ex-category"
                           value={newExCategory}
-                          onChange={(e) => setNewExCategory(e.target.value)}
+                          onChange={(e) => setNewExCategory(e.target.value as ExerciseCategory)}
                           className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-400 cursor-pointer"
                         >
                           <option value="lower">Bas du corps (Lower)</option>
