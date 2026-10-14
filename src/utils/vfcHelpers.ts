@@ -37,15 +37,10 @@ export interface HrRestAnalysisResult {
   dataPointsCount: number;
 }
 
-import { getLocalYYYYMMDD } from './dateHelpers.js';
+import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers.js';
 
-function parseRefDate(referenceDateStr: string | null): Date {
-  if (!referenceDateStr) return new Date();
-  const parts = referenceDateStr.split('-');
-  if (parts.length === 3) {
-    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  }
-  return new Date(referenceDateStr);
+function parseRefDate(referenceDateStr: string | Date | null): Date {
+  return parseLocalDate(referenceDateStr || new Date());
 }
 
 /**
@@ -58,7 +53,7 @@ function parseRefDate(referenceDateStr: string | null): Date {
  */
 export function computeVfcAnalysis(
   dailyMetrics: Record<string, { vfc?: number; [key: string]: any }>,
-  referenceDateStr: string | null = null,
+  referenceDateStr: string | Date | null = null,
   baselineWindowDays: number = 60
 ): VfcAnalysisResult {
   const refDate = parseRefDate(referenceDateStr);
@@ -70,8 +65,7 @@ export function computeVfcAnalysis(
   let currentValue: number | null = null;
 
   for (let daysDiff = 0; daysDiff <= baselineWindowDays; daysDiff++) {
-    const curDate = new Date(refDate);
-    curDate.setDate(refDate.getDate() - daysDiff);
+    const curDate = addDays(refDate, -daysDiff);
     const dateStr = getLocalYYYYMMDD(curDate);
     const metrics = dailyMetrics?.[dateStr];
 
@@ -247,7 +241,7 @@ export function computeVfcAnalysis(
  */
 export function computeHrRestAnalysis(
   dailyMetrics: Record<string, { hrRest?: number; [key: string]: any }>,
-  referenceDateStr: string | null = null
+  referenceDateStr: string | Date | null = null
 ): HrRestAnalysisResult {
   const refDate = parseRefDate(referenceDateStr);
 
@@ -255,8 +249,7 @@ export function computeHrRestAnalysis(
   let currentValue: number | null = null;
 
   for (let daysDiff = 0; daysDiff <= 28; daysDiff++) {
-    const curDate = new Date(refDate);
-    curDate.setDate(refDate.getDate() - daysDiff);
+    const curDate = addDays(refDate, -daysDiff);
     const dateStr = getLocalYYYYMMDD(curDate);
     const metrics = dailyMetrics?.[dateStr];
 

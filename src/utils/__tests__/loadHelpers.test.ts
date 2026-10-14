@@ -136,5 +136,27 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
     // getDailyAthleteSessionCount compte bien les 2 séances distinctes
     expect(getDailyAthleteSessionCount(multiSessionEvents, testDate)).toBe(2);
   });
+
+  it('computes isolation as Force with deducted joint load multiplier (0.85)', () => {
+    // Séance isolation 20 min @ RPE Musc 8 -> 20 * 8 * 0.85 = 136 UA
+    const loadIso = computeSessionLoad('isolation', 20, 2, 8);
+    expect(loadIso).toBe(136);
+
+    // Comparaison avec une séance de force standard : 20 * 8 * 1.0 = 160 UA
+    const loadStandard = computeSessionLoad('pull', 20, 2, 8);
+    expect(loadStandard).toBe(160);
+    expect(loadIso).toBeLessThan(loadStandard);
+  });
+
+  it('auto-detects legacy RPE (<= 10) vs already consolidated Foster UA (> 10)', () => {
+    // Si la valeur est <= 10 (ex: 8), c'est une note RPE sans durée -> forfait 45 min = 8 * 45 = 360 UA
+    expect(extractSessionLoad(8)).toBe(360);
+    expect(extractSessionLoad(5)).toBe(225);
+
+    // Si la valeur est > 10 (ex: 280), c'est une charge Foster UA déjà consolidée -> conservation directe
+    expect(extractSessionLoad(280)).toBe(280);
+    expect(extractSessionLoad(450)).toBe(450);
+  });
 });
+
 

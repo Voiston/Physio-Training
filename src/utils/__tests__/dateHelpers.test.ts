@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateTimeline, getLocalYYYYMMDD, formatDisplayDate } from '../dateHelpers';
+import { generateTimeline, getLocalYYYYMMDD, formatDisplayDate, parseLocalDate, addDays } from '../dateHelpers';
 import { computeAllWeeksStats } from '../weekHelpers';
 
 describe('dateHelpers & dynamic today handling', () => {
@@ -40,4 +40,44 @@ describe('dateHelpers & dynamic today handling', () => {
     expect(currentWeekSunday?.startDate).not.toBe(currentWeekMonday?.startDate);
     expect(currentWeekMonday?.startDate).toBe('2026-10-12');
   });
+
+  it('parseLocalDate instantiates local date safely anchored at noon (12:00)', () => {
+    const d1 = parseLocalDate('2026-10-25');
+    expect(d1.getFullYear()).toBe(2026);
+    expect(d1.getMonth()).toBe(9); // 0-indexed month 9 = October
+    expect(d1.getDate()).toBe(25);
+    expect(d1.getHours()).toBe(12);
+    expect(getLocalYYYYMMDD(d1)).toBe('2026-10-25');
+  });
+
+  it('addDays is Daylight Saving Time (DST) safe across 25 October 2026', () => {
+    // Le 25 octobre 2026 en Europe est le jour du changement d'heure d'hiver (journée de 25h).
+    // Une addition naïve de 86400000 ms produirait un artefact d'arrondi horaire.
+    const oct24 = parseLocalDate('2026-10-24');
+    const oct25 = addDays(oct24, 1);
+    const oct26 = addDays(oct24, 2);
+
+    expect(getLocalYYYYMMDD(oct25)).toBe('2026-10-25');
+    expect(getLocalYYYYMMDD(oct26)).toBe('2026-10-26');
+
+    // Soustraction de jours
+    const oct23 = addDays(oct25, -2);
+    expect(getLocalYYYYMMDD(oct23)).toBe('2026-10-23');
+  });
+
+  it('generateTimeline produces unique consecutive days without DST duplication or skips', () => {
+    // Génère une timeline de 7 jours passés et 7 jours futurs centrée sur le 25 octobre 2026
+    const oct25 = parseLocalDate('2026-10-25');
+    const timeline = generateTimeline(7, 7, oct25);
+
+    expect(timeline.length).toBe(15);
+    const dateStrings = timeline.map(t => t.dateStr);
+    const uniqueDates = new Set(dateStrings);
+    // Aucune duplication de date
+    expect(uniqueDates.size).toBe(15);
+    expect(dateStrings).toContain('2026-10-24');
+    expect(dateStrings).toContain('2026-10-25');
+    expect(dateStrings).toContain('2026-10-26');
+  });
 });
+

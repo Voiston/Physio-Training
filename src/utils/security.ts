@@ -6,6 +6,8 @@
  * 3. L'altération des formats de dates et de filières à l'import JSON ou Firestore.
  */
 
+import { getLocalYYYYMMDD } from './dateHelpers.js';
+
 // Format sécurisé pour les identifiants de filières/qualités : lettres, chiffres, underscores (1 à 32 caractères)
 export const SAFE_ID_REGEX = /^[a-z][a-z0-9_]{0,31}$/i;
 
@@ -639,8 +641,8 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
           id: b.id,
           name: String(b.name || 'Bloc').slice(0, 50),
           type: String(b.type || 'standard').slice(0, 30),
-          startDate: isSafeDate(b.startDate) ? b.startDate : new Date().toISOString().split('T')[0],
-          endDate: isSafeDate(b.endDate) ? b.endDate : new Date().toISOString().split('T')[0],
+          startDate: isSafeDate(b.startDate) ? b.startDate : getLocalYYYYMMDD(new Date()),
+          endDate: isSafeDate(b.endDate) ? b.endDate : getLocalYYYYMMDD(new Date()),
           durationWeeks: Math.max(1, Math.min(52, Number(b.durationWeeks) || 4)),
           focusQualities: Array.isArray(b.focusQualities) 
             ? b.focusQualities.filter((q: any) => typeof q === 'string' && isSafeId(q)).slice(0, 10)

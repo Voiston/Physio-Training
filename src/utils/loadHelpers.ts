@@ -1,4 +1,5 @@
 import { SessionData } from '../hooks/useData';
+import { getLocalYYYYMMDD, addDays } from './dateHelpers.js';
 
 /**
  * Détermine si une entrée d'entraînement est une séance principale (réalisée par l'athlète)
@@ -18,9 +19,10 @@ export function isPrimary(session: any): boolean {
  */
 export function extractSessionLoad(data: any): number {
   if (data === null || data === undefined) return 0;
-  // Donnée historique au format RPE brut seul : durée forfaitaire de référence 45 min (45 * RPE)
-  // identique au comportement de ScoreModal pour éliminer tout facteur d'échelle parasite
-  if (typeof data === 'number') return Math.round(data * 45);
+  // Donnée historique : auto-détection de l'échelle (RPE brut <= 10 vs charge Foster UA > 10)
+  if (typeof data === 'number') {
+    return data <= 10 ? Math.round(data * 45) : Math.round(data);
+  }
   if (typeof data === 'object') {
     if (typeof data.load === 'number') return data.load;
     const duration = Number(data.duration) || 0;
@@ -140,14 +142,66 @@ export function getQualityDayLoad(
   return extractSessionLoad(session);
 }
 
-export const CARDIO_QUALITIES = ['vo2max', 'seuil', 'ef', 'co2', 'gut'];
-export const FORCE_QUALITIES = ['pull', 'push', 'leg', 'plyo', 'descente', 'abdos', 'proprio', 'isolation'];
+import { 
+  CARDIO_QUALITY_IDS, 
+  FORCE_QUALITY_IDS, 
+  isCardioQuality, 
+  isForceQuality 
+} from './qualities';
+
+export const CARDIO_QUALITIES = CARDIO_QUALITY_IDS as readonly string[];
+export const FORCE_QUALITIES = FORCE_QUALITY_IDS as readonly string[];
+
+export interface DetailedSessionLoad {
+  load: number;
+  loadCardio: number;
+  loadMusc: number;
+}
+
+/**
+ * SOURCE UNIQUE DE CALCUL DE CHARGE PHYSIOLOGIQUE (Foster UA = RPE * Durée)
+ * - Filière Cardio : Durée * RPE Cardio (ex: VO2max 35 min @ RPE 8 = 280 UA)
+ * - Filière Force standard : Durée * RPE Musculaire * (1.15 si excentrique)
+ * - Filière Force Isolation : Durée * RPE Musculaire * 0.85 (charge articulaire déduite)
+ * - Filière Mixte : Moyenne Cardio & Musculaire
+ */
+export function computeDetailedSessionLoad(
+  qualityId: string,
+  duration: number,
+  rpeCardio: number,
+  rpeMusc: number,
+  isEccentric: boolean = false
+): DetailedSessionLoad {
+  const numDur = Math.max(0, Number(duration) || 0);
+  if (numDur === 0) return { load: 0, loadCardio: 0, loadMusc: 0 };
+
+  const numCardio = Math.max(0, Math.min(10, Number(rpeCardio) || 5));
+  const numMusc = Math.max(0, Math.min(10, Number(rpeMusc) || 5));
+  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
+  // L'isolation est classée en Force avec contrainte articulaire et systémique réduite (x0.85)
+  const isIsolation = qualityId === 'isolation';
+  const isolationMultiplier = isIsolation ? 0.85 : 1.0;
+
+  const loadCardio = Math.round(numDur * numCardio);
+  const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier * isolationMultiplier);
+
+  const isCardio = isCardioQuality(qualityId);
+  const isForce = isForceQuality(qualityId);
+
+  let load: number;
+  if (isCardio) {
+    load = loadCardio;
+  } else if (isForce) {
+    load = loadMusc;
+  } else {
+    load = Math.round((loadCardio + loadMusc) / 2);
+  }
+
+  return { load, loadCardio, loadMusc };
+}
 
 /**
  * Calcule la charge d'entraînement (en UA Foster) selon le domaine physiologique de la filière.
- * - Filière Cardio : Durée * RPE Cardio (ex: VO2max 35 min @ RPE 8 = 280 UA)
- * - Filière Force : Durée * RPE Musculaire * (1.15 si excentrique)
- * - Filière Mixte : Moyenne Cardio & Musculaire
  */
 export function computeSessionLoad(
   qualityId: string,
@@ -156,21 +210,7 @@ export function computeSessionLoad(
   rpeMusc: number,
   isEccentric: boolean = false
 ): number {
-  const numDur = Math.max(0, Number(duration) || 0);
-  if (numDur === 0) return 0;
-  const numCardio = Math.max(0, Math.min(10, Number(rpeCardio) || 5));
-  const numMusc = Math.max(0, Math.min(10, Number(rpeMusc) || 5));
-  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
-
-  const loadCardio = Math.round(numDur * numCardio);
-  const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier);
-
-  const isCardio = CARDIO_QUALITIES.includes(qualityId);
-  const isForce = FORCE_QUALITIES.includes(qualityId);
-
-  if (isCardio) return loadCardio;
-  if (isForce) return loadMusc;
-  return Math.round((loadCardio + loadMusc) / 2);
+  return computeDetailedSessionLoad(qualityId, duration, rpeCardio, rpeMusc, isEccentric).load;
 }
 
 /**
@@ -190,8 +230,8 @@ export function getAthleteBaselineDailyLoad(
   let activeDays = 0;
 
   for (let i = 1; i <= daysCount; i++) {
-    const d = new Date(referenceDate.getTime() - i * 86400000);
-    const dateStr = d.toISOString().split('T')[0];
+    const d = addDays(referenceDate, -i);
+    const dateStr = getLocalYYYYMMDD(d);
     const dayLoad = getDailyAthleteLoad(events, dateStr);
     if (dayLoad > 0) {
       totalHistoricalLoad += dayLoad;

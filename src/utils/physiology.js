@@ -1,8 +1,11 @@
 import { calculateEMA, calculateExpDecay } from './mathHelpers';
-import { getLocalYYYYMMDD } from './dateHelpers';
-import { getDailyAthleteLoad, isPrimary, extractSessionLoad as loadExtract } from './loadHelpers';
+import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers';
+import { getDailyAthleteLoad, isPrimary, extractSessionLoad } from './loadHelpers';
+import { isCardioQuality, isForceQuality, CARDIO_QUALITY_IDS } from './qualities';
 import { getTsbZone, calculateTsbPercent } from './zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from './vfcHelpers';
+
+export { extractSessionLoad };
 
 /**
  * Qualités physiques et filières d'entraînement par défaut.
@@ -149,7 +152,7 @@ export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIE
 
       for (let j = 0; j < primaryList.length; j++) {
         const { qId: parentId, session: parentSession } = primaryList[j];
-        const isParentCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(parentId);
+        const isParentCardio = isCardioQuality(parentId, qualities);
         const parentSport = parentSession.sport || (isParentCardio ? 'run' : 'muscu');
         const parentImpacts = getQualityImpacts(parentId, parentSport, qualities);
         const imp = parentImpacts ? parentImpacts.find(it => it.id === targetQ.id) : null;
@@ -180,7 +183,7 @@ export function computeDerivedEvents(primaryEvents, qualities = DEFAULT_QUALITIE
       }
 
       if (totalSecLoad > 0) {
-        const isTargetCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(targetQ.id);
+        const isTargetCardio = isCardioQuality(targetQ.id, qualities);
         const parentQIds = Object.keys(contributions);
         derived[targetQ.id][dateStr] = {
           load: totalSecLoad,
@@ -569,20 +572,6 @@ export function getTrainingRecommendations(qualities, events, dailyMetrics, acti
   return list.sort((a, b) => b.urgencyScore - a.urgencyScore);
 }
 
-export function extractSessionLoad(data) {
-  if (data === null || data === undefined) return 0;
-  // Donnée historique au format RPE brut seul : durée forfaitaire de référence 45 min (45 * RPE)
-  if (typeof data === 'number') return Math.round(data * 45);
-  if (typeof data === 'object') {
-    if (typeof data.load === 'number') return data.load;
-    const duration = Number(data.duration) || 0;
-    const rpeM = Number(data.rpeMusculaire ?? data.rpeMusc ?? 5);
-    const rpeC = Number(data.rpeCardio ?? 5);
-    return Math.round(((rpeM + rpeC) / 2) * duration);
-  }
-  const parsed = Number(data);
-  return isNaN(parsed) ? 0 : parsed * 5;
-}
 
 // Cache WeakMap pour pré-indexer les dates de séances principales par qualité
 const primaryDatesCache = new WeakMap();
@@ -842,13 +831,12 @@ export function computeCellState(qDef, targetDateStr, eventsForQuality, readines
  * de la plage d'affichage sélectionnée (ex: 14j vs 45j vs 90j).
  */
 export function computeQualityEMAData(qualityId, eventsForQuality, daysHistory = 45, daysFuture = 0) {
-  const today = new Date();
+  const today = parseLocalDate(new Date());
   const warmupDays = Math.max(90, daysHistory + 63);
   const fullRawData = [];
 
   for (let i = -warmupDays; i <= daysFuture; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    const d = addDays(today, i);
     const dateStr = getLocalYYYYMMDD(d);
     
     let load = 0;
@@ -1099,7 +1087,7 @@ export function computeBanisterPerformance(
   tauFitness = 28,
   initialCtl = null
 ) {
-  const today = new Date();
+  const today = parseLocalDate(new Date());
 
   // Déterminer la date de la plus ancienne séance enregistrée pour connaître l'historique réel
   let earliestSessionDate = null;
@@ -1107,7 +1095,7 @@ export function computeBanisterPerformance(
     if (qDates) {
       Object.entries(qDates).forEach(([dateStr, session]) => {
         if (session && isPrimary(session) && extractSessionLoad(session) > 0) {
-          const d = new Date(dateStr);
+          const d = parseLocalDate(dateStr);
           if (!isNaN(d.getTime())) {
             if (!earliestSessionDate || d < earliestSessionDate) {
               earliestSessionDate = d;
@@ -1127,8 +1115,7 @@ export function computeBanisterPerformance(
   const fullRawData = [];
 
   for (let i = -warmupDays; i <= daysFuture; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    const d = addDays(today, i);
     const dateStr = getLocalYYYYMMDD(d);
 
     // Charge réelle de l'athlète (exclut les impacts secondaires pour éviter toute surévaluation)
@@ -1552,7 +1539,7 @@ export function computeCardioVsMuscularBalance(events, referenceDateStr = null, 
  * - Zone 3 : Haute intensité (au-dessus de VT2 / PMA / VO2max, RPE Cardio >= 7 ou VO2max)
  */
 export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITIES, referenceDateStr = null, windowDays = 28) {
-  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
+  const refDate = parseLocalDate(referenceDateStr || new Date());
   let z1Minutes = 0;
   let z2Minutes = 0;
   let z3Minutes = 0;
@@ -1562,11 +1549,8 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
   let totalSessions = 0;
   let strengthSessionsCount = 0;
 
-  const CARDIO_ENDURANCE_QUALITIES = new Set(['ef', 'seuil', 'vo2max', 'co2', 'gut']);
-
   for (let i = windowDays - 1; i >= 0; i--) {
-    const d = new Date(refDate);
-    d.setDate(refDate.getDate() - i);
+    const d = addDays(refDate, -i);
     const dateStr = getLocalYYYYMMDD(d);
 
     Object.entries(events || {}).forEach(([qId, qDates]) => {
@@ -1580,7 +1564,7 @@ export function computeIntensityDistribution(events, qualities = DEFAULT_QUALITI
 
         // Si la séance appartient à une filière de force pure (musculation, plyo),
         // elle ne relève pas du modèle métabolique tri-zonal de Seiler
-        if (!CARDIO_ENDURANCE_QUALITIES.has(qId)) {
+        if (!isCardioQuality(qId, qualities)) {
           strengthSessionsCount++;
           return;
         }

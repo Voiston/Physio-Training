@@ -26,6 +26,7 @@ import {
   triggerVibration 
 } from '../utils/audioHelpers';
 import { haptics } from '../utils/haptics';
+import { computeDetailedSessionLoad } from '../utils/loadHelpers';
 
 export interface LiveSet {
   id: string;
@@ -981,9 +982,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       };
     });
 
-    const lMusc = Math.round(sessionDurationMin * sessionRpeMusc);
-    const lCardio = Math.round(sessionDurationMin * sessionRpeCardio);
-    const lTotal = lMusc; // Musculation
+    const { load: lTotal, loadCardio: lCardio, loadMusc: lMusc } = computeDetailedSessionLoad(
+      selectedQualityId,
+      sessionDurationMin,
+      sessionRpeCardio,
+      sessionRpeMusc,
+      false
+    );
 
     const sessionData = {
       duration: sessionDurationMin,

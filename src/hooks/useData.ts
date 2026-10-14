@@ -19,11 +19,12 @@ import {
   computePerceivedFatigueAnalysis,
   computeDerivedEvents
 } from '../utils/physiology';
-import { getLocalYYYYMMDD } from '../utils/dateHelpers';
+import { getLocalYYYYMMDD, addDays, parseLocalDate } from '../utils/dateHelpers';
 import { computeAllWeeksStats, WeekStats } from '../utils/weekHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
 import { isPrimary, computeSessionLoad, getAthleteBaselineDailyLoad } from '../utils/loadHelpers';
+import { isCardioQuality } from '../utils/qualities';
 import { SessionExercise, getSavedCustomExercises } from '../utils/muscleHelpers';
 import { 
   isSafeId, 
@@ -465,11 +466,11 @@ export function useData() {
 
     if (scenarioType === 'tapering') {
       // Affûtage Compétition : volume réduit de ~35%, maintien de l'intensité sur rappels toniques ciblés
-      const d2 = getLocalYYYYMMDD(new Date(today.getTime() + 2 * 86400000));
-      const d5 = getLocalYYYYMMDD(new Date(today.getTime() + 5 * 86400000));
-      const d7 = getLocalYYYYMMDD(new Date(today.getTime() + 7 * 86400000));
-      const d9 = getLocalYYYYMMDD(new Date(today.getTime() + 9 * 86400000));
-      const d12 = getLocalYYYYMMDD(new Date(today.getTime() + 12 * 86400000));
+      const d2 = getLocalYYYYMMDD(addDays(today, 2));
+      const d5 = getLocalYYYYMMDD(addDays(today, 5));
+      const d7 = getLocalYYYYMMDD(addDays(today, 7));
+      const d9 = getLocalYYYYMMDD(addDays(today, 9));
+      const d12 = getLocalYYYYMMDD(addDays(today, 12));
 
       const scale = Math.max(0.6, Math.min(1.4, baseline.dailyAvg / 350));
       const durVo2 = Math.round(35 * scale);
@@ -523,7 +524,7 @@ export function useData() {
       // Surcharge de bloc : +30% de charge quotidienne répartie sur 7 jours
       const targetDailyLoad = Math.round(baseline.dailyAvg * 1.3);
       for (let i = 1; i <= 7; i++) {
-        const d = getLocalYYYYMMDD(new Date(today.getTime() + i * 86400000));
+        const d = getLocalYYYYMMDD(addDays(today, i));
         const isCardioDay = i % 2 === 0;
         const qId = isCardioDay ? 'seuil' : 'leg';
         const rpeCardio = isCardioDay ? 8 : 6;
@@ -545,9 +546,9 @@ export function useData() {
       }
     } else if (scenarioType === 'recovery') {
       // Récupération active : séances douces à charge minimale (< 100 UA)
-      const d1 = getLocalYYYYMMDD(new Date(today.getTime() + 1 * 86400000));
-      const d3 = getLocalYYYYMMDD(new Date(today.getTime() + 3 * 86400000));
-      const d5 = getLocalYYYYMMDD(new Date(today.getTime() + 5 * 86400000));
+      const d1 = getLocalYYYYMMDD(addDays(today, 1));
+      const d3 = getLocalYYYYMMDD(addDays(today, 3));
+      const d5 = getLocalYYYYMMDD(addDays(today, 5));
 
       newSim['proprio'] = {
         [d1]: { duration: 30, rpeCardio: 2, rpeMusc: 2, load: computeSessionLoad('proprio', 30, 2, 2), isSimulated: true },
@@ -1036,7 +1037,7 @@ export function useData() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `physiotracker_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `physiotracker_${getLocalYYYYMMDD(new Date())}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1168,7 +1169,7 @@ export function useData() {
     if (!sessionData) {
       saveEvent(qId, dateStr, null);
     } else {
-      const isCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(qId);
+      const isCardio = isCardioQuality(qId, qualities);
       const normalizedSport = sessionData.sport || (isCardio ? 'run' : 'muscu');
       const normalizedSession: SessionData = {
         ...sessionData,

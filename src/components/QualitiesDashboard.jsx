@@ -11,6 +11,7 @@ import {
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeCellState, extractSessionLoad } from '../utils/physiology';
 import { isPrimary } from '../utils/loadHelpers';
+import { isCardioQuality, isForceQuality } from '../utils/qualities';
 
 function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }) {
   if (!data || data.length < 2) return null;
@@ -124,11 +125,11 @@ export default function QualitiesDashboard({
     }
 
     if (selectedCategory === 'cardio') {
-      list = list.filter(q => ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(q.id.toLowerCase()) || q.name.toLowerCase().includes('cardio') || q.name.toLowerCase().includes('endurance') || q.name.toLowerCase().includes('seuil') || q.name.toLowerCase().includes('vo2'));
+      list = list.filter(q => isCardioQuality(q.id, qualities) || q.name.toLowerCase().includes('cardio') || q.name.toLowerCase().includes('endurance') || q.name.toLowerCase().includes('seuil') || q.name.toLowerCase().includes('vo2'));
     } else if (selectedCategory === 'force') {
-      list = list.filter(q => ['pull', 'push', 'leg', 'abdos', 'descente'].includes(q.id.toLowerCase()) || q.name.toLowerCase().includes('force') || q.name.toLowerCase().includes('muscu'));
+      list = list.filter(q => isForceQuality(q.id, qualities) || q.name.toLowerCase().includes('force') || q.name.toLowerCase().includes('muscu'));
     } else if (selectedCategory === 'specific') {
-      list = list.filter(q => ['sprint', 'plyo', 'proprio'].includes(q.id.toLowerCase()) || q.name.toLowerCase().includes('vitesse') || q.name.toLowerCase().includes('technique'));
+      list = list.filter(q => !isCardioQuality(q.id, qualities) && !isForceQuality(q.id, qualities) || q.name.toLowerCase().includes('vitesse') || q.name.toLowerCase().includes('technique'));
     }
 
     if (!qualitySearch.trim()) return list;

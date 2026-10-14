@@ -13,6 +13,8 @@
  *     * Pull:Push ratio (Tirage / Poussée) : visée >= 1.0 (centrage huméral et santé de la coiffe des rotateurs)
  */
 
+import { getLocalYYYYMMDD, parseLocalDate, addDays } from './dateHelpers.js';
+
 export interface MuscleGroup {
   id: string;
   name: string;
@@ -1640,7 +1642,7 @@ let memoryUsageCache: Record<string, { count: number; lastUsed: string }> = {};
  */
 export function recordExerciseUsage(exerciseId: string): void {
   if (!exerciseId) return;
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalYYYYMMDD(new Date());
   const prevMem = memoryUsageCache[exerciseId] || { count: 0, lastUsed: today };
   memoryUsageCache[exerciseId] = {
     count: (prevMem.count || 0) + 1,
@@ -1716,8 +1718,8 @@ export function getFrequentRecentExercises(
   }
 
   // Calcul du seuil de date récente (60 jours en arrière par rapport à la date de référence ou aujourd'hui)
-  const refDate = referenceDateStr ? new Date(referenceDateStr) : new Date();
-  const recentThreshold = new Date(refDate.getTime() - (60 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+  const refDate = parseLocalDate(referenceDateStr || new Date());
+  const recentThreshold = getLocalYYYYMMDD(addDays(refDate, -60));
 
   // 1. Scanner l'historique de toutes les séances réelles dans events
   if (events && typeof events === 'object') {

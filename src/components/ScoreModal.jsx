@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { getQualityImpacts } from '../utils/physiology';
+import { isCardioQuality, isForceQuality } from '../utils/qualities';
+import { computeDetailedSessionLoad } from '../utils/loadHelpers';
 import { 
   EXERCISE_CATALOG, 
   computeSessionMuscularBreakdown, 
@@ -140,9 +142,10 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   };
 
   const currentSessionData = getSessionForDate(selectedDate);
-  const defaultSportForQuality = ['vo2max', 'seuil', 'ef', 'sprint'].includes(info.qId) ? 'run' : 'muscu';
+  const isCardio = isCardioQuality(info.qId, qualities);
+  const isForce = isForceQuality(info.qId, qualities);
+  const defaultSportForQuality = (isCardio || info.qId === 'sprint') ? 'run' : 'muscu';
   const isIsolation = info.qId === 'isolation';
-  const isForce = ['pull', 'push', 'leg', 'plyo', 'descente', 'abdos', 'proprio', 'isolation'].includes(info.qId);
 
   // Gestion multi-séances par filière et par jour (support 2+ séances par jour sans écrasement)
   const buildInitialSubSessions = (sess) => {
@@ -625,16 +628,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const numMusc = Number(rpeMusc) || 0;
   const numFatigue = Number(fatigue) || 5;
 
-  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
-  const loadCardio = Math.round(numDur * numCardio);
-  const loadMusc = Math.round(numDur * numMusc * eccentricMultiplier);
-  
-  // RPE et Charge globale selon le domaine physiologique de la filière
-  const isCardio = ['vo2max', 'seuil', 'ef', 'co2', 'gut'].includes(info.qId);
-  
-  const load = numDur > 0
-    ? (isCardio ? loadCardio : isForce ? loadMusc : Math.round((loadCardio + loadMusc) / 2))
-    : 0;
+  const currentDetailedLoad = useMemo(() => {
+    return computeDetailedSessionLoad(info.qId, numDur, numCardio, numMusc, Boolean(isEccentric));
+  }, [info.qId, numDur, numCardio, numMusc, isEccentric]);
+
+  const loadCardio = currentDetailedLoad.loadCardio;
+  const loadMusc = currentDetailedLoad.loadMusc;
+  const load = currentDetailedLoad.load;
 
   // Cumul multi-séances pour la journée
   const totalDayStats = useMemo(() => {
@@ -738,11 +738,13 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     const computedSubs = updatedSubs.map((sub, sIdx) => {
       const d = Number(sub.duration) || 0;
       const rM = Number(sub.rpeMusc) || 5;
-      const rC = Number(sub.rpeCardio) || 5;
-      const subMult = sub.isEccentric ? 1.15 : 1.0;
-      const subCardio = Math.round(d * rC);
-      const subMusc = Math.round(d * rM * subMult);
-      const subLoad = isCardio ? subCardio : isForce ? subMusc : Math.round((subCardio + subMusc) / 2);
+      const { load: subLoad, loadCardio: subCardio, loadMusc: subMusc } = computeDetailedSessionLoad(
+        info.qId,
+        d,
+        rC,
+        rM,
+        Boolean(sub.isEccentric)
+      );
 
       totalDur += d;
       totalLoad += subLoad;

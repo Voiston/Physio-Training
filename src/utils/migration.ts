@@ -14,12 +14,12 @@ export interface AppExportData {
   [key: string]: any;
 }
 
-const CARDIO_QUALITIES = new Set(['vo2max', 'seuil', 'ef', 'co2', 'gut']);
-const FORCE_QUALITIES = new Set(['pull', 'push', 'leg', 'plyo', 'descente', 'abdos', 'proprio']);
+import { isCardioQuality, isForceQuality } from './qualities';
+import { computeDetailedSessionLoad } from './loadHelpers';
 
 /**
  * Calcule la charge pure d'une séance (stimulus) selon le type de filière,
- * sans corrompre le stimulus par le marqueur de réponse (fatigue perçue).
+ * en déléguant à la source unique de vérité loadHelpers.ts.
  */
 export function calculateCleanSessionLoad(
   qualityId: string, 
@@ -28,25 +28,7 @@ export function calculateCleanSessionLoad(
   rpeCardio: number,
   isEccentric: boolean = false
 ): { load: number; loadCardio: number; loadMusc: number } {
-  const dur = Math.max(0, Number(duration) || 0);
-  const rM = Math.max(0, Math.min(10, Number(rpeMusc) || 5));
-  const rC = Math.max(0, Math.min(10, Number(rpeCardio) || 5));
-
-  let rpeGlobal: number;
-  if (CARDIO_QUALITIES.has(qualityId)) {
-    rpeGlobal = rC;
-  } else if (FORCE_QUALITIES.has(qualityId)) {
-    rpeGlobal = isEccentric ? rM * 1.15 : rM;
-  } else {
-    // Mixte (sprint, etc.)
-    rpeGlobal = (rM + rC) / 2;
-  }
-
-  const load = Math.round(dur * rpeGlobal);
-  const loadCardio = Math.round(dur * rC);
-  const loadMusc = Math.round(dur * rM * (isEccentric ? 1.15 : 1.0));
-
-  return { load, loadCardio, loadMusc };
+  return computeDetailedSessionLoad(qualityId, duration, rpeCardio, rpeMusc, isEccentric);
 }
 
 /**
@@ -88,18 +70,23 @@ export function migrateData(rawData: any): AppExportData {
           Object.keys(dates).forEach(dateStr => {
             const session = dates[dateStr];
             if (typeof session === 'number') {
-              const dur = 45;
-              const rpe = session;
+              // Auto-détection de l'échelle validée par l'utilisateur :
+              // session <= 10 : RPE brut sur échelle 1-10 -> forfait 45 min
+              // session > 10 : Charge Foster déjà consolidée en UA
+              const isRawRpe = session <= 10;
+              const dur = isRawRpe ? 45 : 45;
+              const rpe = isRawRpe ? session : Math.min(10, Math.max(1, Math.round(session / 45)));
               const { load, loadCardio, loadMusc } = calculateCleanSessionLoad(qId, dur, rpe, rpe, false);
+              const effectiveLoad = isRawRpe ? load : Math.round(session);
               dates[dateStr] = {
                 duration: dur,
                 rpeMusc: rpe,
                 rpeCardio: rpe,
                 fatigue: rpe,
-                load,
-                loadCardio,
-                loadMusc,
-                sport: CARDIO_QUALITIES.has(qId) ? 'run' : 'muscu',
+                load: effectiveLoad,
+                loadCardio: isRawRpe ? loadCardio : effectiveLoad,
+                loadMusc: isRawRpe ? loadMusc : effectiveLoad,
+                sport: isCardioQuality(qId) ? 'run' : 'muscu',
                 isSecondary: false
               };
             } else if (session && typeof session === 'object') {
@@ -180,7 +167,7 @@ export function migrateLocalStorage(): void {
         const dateStr = match[1];
         const qualityId = match[2];
         if (!isSafeDate(dateStr) || !isSafeId(qualityId)) continue;
-        if (CARDIO_QUALITIES.has(qualityId) || FORCE_QUALITIES.has(qualityId) || qualityId === 'sprint') {
+        if (isCardioQuality(qualityId) || isForceQuality(qualityId) || qualityId === 'sprint') {
           const raw = localStorage.getItem(key);
           if (raw) {
             try {
