@@ -4,6 +4,8 @@ import {
   sanitizeEventsPayload,
   sanitizeTombstonesPayload,
   mergeEventsNonDestructive,
+  mergeDailyMetricsNonDestructive,
+  sanitizeDailyMetricsPayload,
   validateAndStageImportPayload
 } from '../security';
 
@@ -182,3 +184,129 @@ describe('Synchronisation & Tombstones - Résolution de Conflits & Suppressions'
     expect(sanitized['leg']?.['2026-10-13']).toBeUndefined();
   });
 });
+
+describe('Assainissement - entrées corrompues ou hostiles', () => {
+  it.each([null, undefined, 42, 'session', [], [{ load: 10 }]])('sanitizeSessionData rejette %s', (raw) => {
+    expect(sanitizeSessionData(raw)).toBeNull();
+  });
+
+  it('écarte les nombres non finis et borne les valeurs hors plage', () => {
+    const session = sanitizeSessionData({
+      load: Number.POSITIVE_INFINITY,
+      duration: Number.NaN,
+      rpeMusc: 42,
+      rpeCardio: -3,
+      fatigue: '9',
+      sport: 'run; DROP TABLE',
+      exercises: 'not-an-array'
+    });
+    expect(session).not.toBeNull();
+    expect(session?.load).toBeUndefined();
+    expect(session?.duration).toBeUndefined();
+    expect(session?.rpeMusc).toBe(10);
+    expect(session?.rpeCardio).toBe(0);
+    expect(session?.fatigue).toBeUndefined();
+    expect(session?.sport).toBeUndefined();
+    expect(session?.exercises).toBeUndefined();
+  });
+
+  it('filtre les exercices et sous-séances invalides au lieu de planter', () => {
+    const session = sanitizeSessionData({
+      load: 100,
+      exercises: [null, 3, { sets: 4 }, { name: 'Squat', sets: 'x', weightKg: 2000, customRatios: { quadriceps: 3, 'bad id!': 1, glutes: 'x' } }],
+      subSessions: [null, 'x', { duration: 'abc', load: -5 }]
+    });
+    expect(session?.exercises).toHaveLength(1);
+    const ex = session?.exercises?.[0];
+    expect(ex?.name).toBe('Squat');
+    expect(ex?.sets).toBe(0);
+    expect(ex?.weightKg).toBe(1000);
+    expect(ex?.customRatios).toEqual({ quadriceps: 1 });
+    expect(session?.subSessions).toHaveLength(1);
+    expect(session?.subSessions?.[0]).toMatchObject({ duration: 0, load: 0 });
+  });
+
+  it('ignore les clés de pollution de prototype et les dates invalides', () => {
+    const raw = JSON.parse('{"__proto__": {"2026-01-01": {"load": 1}}, "leg": {"2026-13-45": {"load": 5}, "nope": {"load": 5}, "2026-01-02": {"load": 7}}}');
+    const clean = sanitizeEventsPayload(raw);
+    expect(Object.keys(clean)).toEqual(['leg']);
+    expect(Object.keys(clean.leg)).toEqual(['2026-01-02']);
+    expect(({} as Record<string, unknown>)['2026-01-01']).toBeUndefined();
+  });
+
+  it.each([null, undefined, 'x', [1, 2]])('sanitizeEventsPayload / sanitizeDailyMetricsPayload / tombstones renvoient {} pour %s', (raw) => {
+    expect(sanitizeEventsPayload(raw)).toEqual({});
+    expect(sanitizeDailyMetricsPayload(raw)).toEqual({});
+    expect(sanitizeTombstonesPayload(raw)).toEqual({});
+  });
+
+  it('ne garde que les métriques autorisées, finies et dans [0, 1000]', () => {
+    const clean = sanitizeDailyMetricsPayload({
+      '2026-01-01': { vfc: '65.4', hrRest: -1, readiness: 1e6, steps: 9000 },
+      'bad-date': { vfc: 60 }
+    });
+    expect(clean).toEqual({ '2026-01-01': { vfc: 65 } });
+  });
+
+  it('ignore les tombstones dans le futur (horloge falsifiée) et non numériques', () => {
+    const clean = sanitizeTombstonesPayload({
+      '2026-10-13_leg': Date.now() + 10 * 86400000,
+      '2026-10-13_push': 'abc'
+    });
+    expect(clean).toEqual({});
+  });
+});
+
+describe('Import & fusion - échecs dégradés', () => {
+  it.each([null, undefined, 'json', [], 12])('validateAndStageImportPayload refuse %s', (raw) => {
+    const result = validateAndStageImportPayload(raw);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toMatch(/invalide/);
+    expect(result.entriesToSet.size).toBe(0);
+  });
+
+  it('refuse un objet sans aucune donnée exploitable', () => {
+    const result = validateAndStageImportPayload({ events: { 'bad id!': {} }, foo: 1 });
+    expect(result.isValid).toBe(false);
+    expect(result.error).toMatch(/Aucune donnée valide/);
+  });
+
+  it('remonte une erreur lisible quand un getter du payload lève une exception', () => {
+    const hostile = {
+      get events() {
+        throw new Error('boom');
+      }
+    };
+    const result = validateAndStageImportPayload(hostile);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toBe("Erreur d'analyse des données : boom");
+  });
+
+  it('borne les blocs importés et ignore une compétition sans date valide', () => {
+    const result = validateAndStageImportPayload({
+      trainingBlocks: [null, { id: 'b1', durationWeeks: 999, focusQualities: ['leg', 3, 'bad id!'] }],
+      targetCompetition: { name: 'Trail', date: 'demain' }
+    });
+    expect(result.isValid).toBe(true);
+    expect(result.summary.blocksCount).toBe(1);
+    const blocks = JSON.parse(result.entriesToSet.get('physio_training_blocks') ?? '[]');
+    expect(blocks[0]).toMatchObject({ id: 'b1', durationWeeks: 52, focusQualities: ['leg'] });
+    expect(result.entriesToSet.has('physio_target_competition')).toBe(false);
+  });
+
+  it('mergeEventsNonDestructive tolère des côtés vides et ignore les filières invalides', () => {
+    const result = mergeEventsNonDestructive({ 'bad id!': { '2026-01-01': { load: 1 } } }, {});
+    expect(result.merged).toEqual({});
+    expect(result.deletedKeysToPurge).toEqual([]);
+  });
+
+  it('mergeDailyMetricsNonDestructive préfère la valeur distante et signale une valeur locale seule', () => {
+    const { merged, hasNewLocalData } = mergeDailyMetricsNonDestructive(
+      { '2026-01-01': { vfc: 60, hrRest: 50 }, 'bad-date': { vfc: 1 } },
+      { '2026-01-01': { vfc: 70, hrRest: undefined } }
+    );
+    expect(merged).toEqual({ '2026-01-01': { vfc: 70, hrRest: 50 } });
+    expect(hasNewLocalData).toBe(true);
+  });
+});
+

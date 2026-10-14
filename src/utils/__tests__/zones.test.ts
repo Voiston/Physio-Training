@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTsbZone } from '../zones';
+import { getTsbZone, calculateTsbPercent } from '../zones';
 
 describe('zones - TSB Relative Zones (% of CTL)', () => {
   it('detects cold start / initialization when CTL is low or history is short (< 3 * tauFitness = 84 days)', () => {
@@ -56,5 +56,36 @@ describe('zones - TSB Relative Zones (% of CTL)', () => {
     const zone = getTsbZone(100, 60, 90);
     expect(zone.zoneId).toBe('DETRAINING_RISK');
     expect(zone.status).toBe('recovery');
+  });
+});
+
+describe('zones - edge cases', () => {
+  it('calculateTsbPercent returns null for negligible, zero or negative CTL', () => {
+    expect(calculateTsbPercent(0, 0)).toBeNull();
+    expect(calculateTsbPercent(3, 1)).toBeNull();
+    expect(calculateTsbPercent(-20, 10)).toBeNull();
+    expect(calculateTsbPercent(100, 100)).toBe(0);
+  });
+
+  it('stays INITIALIZING (unreliable) with zero load or CTL just under the 10 UA floor', () => {
+    const zero = getTsbZone(0, 0, 200);
+    expect(zero.zoneId).toBe('INITIALIZING');
+    expect(zero.tsbPercent).toBeNull();
+    expect(zero.isReliable).toBe(false);
+
+    expect(getTsbZone(9.9, 30, 200).zoneId).toBe('INITIALIZING');
+  });
+
+  it('applies exact boundaries: -35% is overload, -10% neutral, +5% neutral, +25% tapering', () => {
+    expect(getTsbZone(100, 135, 90).zoneId).toBe('OPTIMAL_OVERLOAD');
+    expect(getTsbZone(100, 110, 90).zoneId).toBe('NEUTRAL_MAINTENANCE');
+    expect(getTsbZone(100, 95, 90).zoneId).toBe('NEUTRAL_MAINTENANCE');
+    expect(getTsbZone(100, 75, 90).zoneId).toBe('PEAK_TAPERING');
+  });
+
+  it('requires 3 * tauFitness days of history unless an initial CTL is set', () => {
+    expect(getTsbZone(100, 150, 125, 42).zoneId).toBe('INITIALIZING');
+    expect(getTsbZone(100, 150, 126, 42).zoneId).toBe('CRITICAL_FATIGUE');
+    expect(getTsbZone(100, 150, 0, 42, true).zoneId).toBe('CRITICAL_FATIGUE');
   });
 });
