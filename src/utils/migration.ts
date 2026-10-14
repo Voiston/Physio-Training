@@ -1,17 +1,42 @@
 export const CURRENT_SCHEMA_VERSION = 2;
 import { isSafeDate, isSafeId } from './security';
+import type { SessionData, Quality, TrainingBlock, BlockTemplate, TargetCompetition, PhysiologicalSettings } from '../hooks/useData';
 
 export interface AppExportData {
   schemaVersion?: number;
-  events?: Record<string, Record<string, any>>;
+  events?: Record<string, Record<string, SessionData>>;
   dailyMetrics?: Record<string, Record<string, number>>;
-  trainingBlocks?: any[];
-  qualities?: any[];
-  blockTemplates?: any[];
-  targetCompetition?: any;
-  physioSettings?: any;
+  trainingBlocks?: TrainingBlock[];
+  qualities?: Quality[];
+  blockTemplates?: BlockTemplate[];
+  targetCompetition?: TargetCompetition | null;
+  physioSettings?: PhysiologicalSettings;
   exportDate?: string;
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+/** Séance telle qu'elle peut exister dans d'anciens schémas (champs non garantis). */
+interface LegacySession {
+  duration?: number;
+  rpeMusculaire?: number;
+  rpeMusc?: number;
+  rpeCardio?: number;
+  isEccentric?: boolean;
+  isSecondary?: boolean;
+  load?: number;
+  loadLegacy?: number;
+  loadCardio?: number;
+  loadMusc?: number;
+  originalLoad?: number;
+  [key: string]: unknown;
+}
+
+/** Vue mutable des données brutes pendant la migration. */
+interface MigratableData {
+  schemaVersion?: number;
+  events?: Record<string, Record<string, LegacySession | number>>;
+  targetCompetition?: { targetTsbUnit?: string; [key: string]: unknown } | null;
+  [key: string]: unknown;
 }
 
 import { isCardioQuality, isForceQuality } from './qualities';
@@ -34,19 +59,20 @@ export function calculateCleanSessionLoad(
 /**
  * Migration automatique et ascendante des données de l'application
  */
-export function migrateData(rawData: any): AppExportData {
+export function migrateData(rawData: unknown): AppExportData {
   if (!rawData || typeof rawData !== 'object') {
     return { schemaVersion: CURRENT_SCHEMA_VERSION };
   }
 
-  const version = Number(rawData.schemaVersion) || 0;
-  let migrated = { ...rawData };
+  let migrated: MigratableData = { ...(rawData as MigratableData) };
+  const version = Number(migrated.schemaVersion) || 0;
 
   // Migration v0 -> v1 (Normalisation initiale, détection des secondaires)
   if (version < 1) {
-    if (migrated.events && typeof migrated.events === 'object') {
-      Object.keys(migrated.events).forEach(qId => {
-        const dates = migrated.events[qId];
+    const events = migrated.events;
+    if (events && typeof events === 'object') {
+      Object.keys(events).forEach(qId => {
+        const dates = events[qId];
         if (dates && typeof dates === 'object') {
           Object.keys(dates).forEach(dateStr => {
             const session = dates[dateStr];
@@ -63,9 +89,10 @@ export function migrateData(rawData: any): AppExportData {
 
   // Migration v1 -> v2 (Dissociation charge pure / réponse de fatigue, recalcul de load depuis les champs bruts)
   if (version < 2) {
-    if (migrated.events && typeof migrated.events === 'object') {
-      Object.keys(migrated.events).forEach(qId => {
-        const dates = migrated.events[qId];
+    const events = migrated.events;
+    if (events && typeof events === 'object') {
+      Object.keys(events).forEach(qId => {
+        const dates = events[qId];
         if (dates && typeof dates === 'object') {
           Object.keys(dates).forEach(dateStr => {
             const session = dates[dateStr];
@@ -132,7 +159,7 @@ export function migrateData(rawData: any): AppExportData {
     migrated.schemaVersion = 2;
   }
 
-  return migrated;
+  return migrated as AppExportData;
 }
 
 /**

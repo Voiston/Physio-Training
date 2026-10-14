@@ -7,7 +7,7 @@ export interface GymActiveExerciseProps {
   exercise: LiveExercise;
   exerciseIndex: number;
   adaptiveSuggestion?: ReturnType<typeof computeAdaptiveProgression>;
-  onUpdateSetValue: (exIdx: number, sIdx: number, field: keyof LiveSet, value: any) => void;
+  onUpdateSetValue: (exIdx: number, sIdx: number, field: keyof LiveSet, value: LiveSet[keyof LiveSet]) => void;
   onQuickAdjustWeight: (exIdx: number, sIdx: number, delta: number) => void;
   onQuickAdjustReps: (exIdx: number, sIdx: number, delta: number) => void;
   onValidateSet: (exIdx: number, sIdx: number) => void;

@@ -78,6 +78,10 @@ export interface SessionData {
   parentQId?: string;
   parentContributions?: Record<string, SecondaryContribution>;
   originalLoad?: number;
+  /** Charge d'origine conservée par la migration v1 -> v2. */
+  loadLegacy?: number;
+  /** Tonnage total (kg) des séances de musculation en direct. */
+  tonnageKg?: number;
   isSimulated?: boolean;
   updatedAt?: number;
   notes?: string;
@@ -146,6 +150,9 @@ export type QualityEvents = Record<string, SessionData>;
 /** Séances de toutes les qualités, indexées par id de qualité puis par date. */
 export type EventsByQuality = Record<string, QualityEvents>;
 
+/** Événements dont les séances peuvent être incomplètes (historique, imports, saisies partielles). */
+export type PartialEventsByQuality = Record<string, Record<string, Partial<SessionData>>>;
+
 /** Jour de la timeline affichée (grille, tableaux de bord). */
 export interface GridDay {
   offset: number;
@@ -176,3 +183,18 @@ export interface ExerciseDefinition {
   /** Ratio d'activation par id de MUSCLE_GROUPS, dans ]0, 1]. */
   muscleRatios: Record<string, number>;
 }
+
+// Résultats des modèles physiologiques partagés entre vues (dérivés des calculateurs).
+import type {
+  getTaperingAnalysis,
+  computeFosterMetrics,
+  computeBanisterPerformance,
+  computeCardioVsMuscularBalance
+} from '../utils/physiology';
+import type { PhysiologicalSettings } from '../hooks/useMetricsState';
+
+export type TaperingAnalysis = ReturnType<typeof getTaperingAnalysis>;
+export type FosterMetrics = ReturnType<typeof computeFosterMetrics>;
+export type BanisterPerformance = ReturnType<typeof computeBanisterPerformance>;
+export type CardioMuscularBalanceResult = ReturnType<typeof computeCardioVsMuscularBalance>;
+export type { PhysiologicalSettings };

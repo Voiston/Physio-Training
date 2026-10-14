@@ -3,6 +3,7 @@ import {
   Radar, RadarChart as RechartsRadar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   ResponsiveContainer, Tooltip 
 } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 import { WeeklyMuscleItem, MUSCLE_GROUPS, getVolumeLandmark } from '../utils/muscleHelpers';
 
 interface MuscleRadarChartProps {
@@ -28,9 +29,15 @@ const SHORT_NAMES: Record<string, string> = {
   lombaires: 'Lombaires'
 };
 
-const CustomRadarTooltip = memo(function CustomRadarTooltip({ active, payload }: any) {
+interface RadarTooltipDatum {
+  sets?: number;
+  fullName?: string;
+  category?: string;
+}
+
+const CustomRadarTooltip = memo(function CustomRadarTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload || !payload.length) return null;
-  const data = payload[0]?.payload;
+  const data = payload[0]?.payload as RadarTooltipDatum | undefined;
   if (!data) return null;
 
   const sets = Number(data.sets) || 0;

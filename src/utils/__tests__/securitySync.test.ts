@@ -18,7 +18,7 @@ describe('Synchronisation & Tombstones - Résolution de Conflits & Suppressions'
     });
 
     expect(session).not.toBeNull();
-    expect(session.updatedAt).toBe(timestamp);
+    expect(session?.updatedAt).toBe(timestamp);
   });
 
   it('filtre et assainit les tombstones invalides ou corrompues', () => {

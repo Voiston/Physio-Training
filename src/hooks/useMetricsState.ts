@@ -186,7 +186,7 @@ export function useMetricsState(
 
   // Distribution d'intensité selon Stephen Seiler (Polarisation Z1 / Z2 / Z3)
   const intensityDistribution = useMemo(() => {
-    return computeIntensityDistribution(effectiveEvents, qualities as any);
+    return computeIntensityDistribution(effectiveEvents, qualities);
   }, [effectiveEvents, qualities]);
 
   // Analyse de la fatigue perçue & tolérance à l'effort

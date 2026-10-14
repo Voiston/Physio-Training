@@ -5,11 +5,11 @@ import { getLocalYYYYMMDD, addDays } from './dateHelpers';
  * Détermine si une entrée d'entraînement est une séance principale (réalisée par l'athlète)
  * ou un impact secondaire rémanent (transfert physiologique calculé).
  */
-export function isPrimary(session: any): boolean {
+export function isPrimary(session: unknown): boolean {
   if (!session) return false;
   if (typeof session === 'number') return true;
   if (typeof session === 'object') {
-    return !session.isSecondary;
+    return !(session as { isSecondary?: unknown }).isSecondary;
   }
   return false;
 }
@@ -17,17 +17,18 @@ export function isPrimary(session: any): boolean {
 /**
  * Extrait la charge numérique d'une séance de manière robuste.
  */
-export function extractSessionLoad(data: any): number {
+export function extractSessionLoad(data: unknown): number {
   if (data === null || data === undefined) return 0;
   // Donnée historique : auto-détection de l'échelle (RPE brut <= 10 vs charge Foster UA > 10)
   if (typeof data === 'number') {
     return data <= 10 ? Math.round(data * 45) : Math.round(data);
   }
   if (typeof data === 'object') {
-    if (typeof data.load === 'number') return data.load;
-    const duration = Number(data.duration) || 0;
-    const rpeMusc = Number(data.rpeMusc) || 5;
-    const rpeCardio = Number(data.rpeCardio) || 5;
+    const session = data as { load?: unknown; duration?: unknown; rpeMusc?: unknown; rpeCardio?: unknown };
+    if (typeof session.load === 'number') return session.load;
+    const duration = Number(session.duration) || 0;
+    const rpeMusc = Number(session.rpeMusc) || 5;
+    const rpeCardio = Number(session.rpeCardio) || 5;
     const meanRpe = (rpeMusc + rpeCardio) / 2;
     return Math.round(duration * meanRpe);
   }

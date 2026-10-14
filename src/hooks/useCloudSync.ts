@@ -12,8 +12,8 @@ export interface UserAccount {
 }
 
 export interface CloudSyncOptions {
-  onRemoteDataReceived: (remoteData: any, senderDeviceId?: string) => void;
-  getExportableData: () => any;
+  onRemoteDataReceived: (remoteData: unknown, senderDeviceId?: string) => void;
+  getExportableData: () => unknown;
   onClearLocalHealthData?: () => void;
 }
 
@@ -81,6 +81,18 @@ export function hasLocalHealthData(): boolean {
   return false;
 }
 
+/** Code d'une erreur Firebase (`permission-denied`, `auth/popup-closed-by-user`…), si présent. */
+function errorCode(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'code' in err && typeof err.code === 'string') return err.code;
+  return undefined;
+}
+
+/** Message d'une erreur quelconque, si présent. */
+function errorMessage(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') return err.message;
+  return undefined;
+}
+
 export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearLocalHealthData }: CloudSyncOptions) {
   // 1. Device identity (distinguish PC vs Mobile to avoid self-echo)
   const [deviceId] = useState<string>(() => {
@@ -122,7 +134,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
 
   const [confirmFirstPush, setConfirmFirstPush] = useState<boolean>(false);
 
-  const debounceTimerRef = useRef<any>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRemoteUpdatingRef = useRef<boolean>(false);
 
   const onRemoteDataReceivedRef = useRef(onRemoteDataReceived);
@@ -149,7 +161,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
 
   // Push local data to Firestore user document
   const pushToCloud = useCallback(
-    async (overrideData?: any) => {
+    async (overrideData?: unknown) => {
       if (isRemoteUpdatingRef.current) return;
       if (!navigator.onLine) {
         setSyncStatus('offline');
@@ -217,14 +229,14 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         setSyncErrorDetail(null);
         setLastSyncedAt(new Date());
         setConfirmFirstPush(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('Firestore push error:', err);
         setSyncStatus(navigator.onLine ? 'error' : 'offline');
-        const desc = err?.code === 'permission-denied'
+        const desc = errorCode(err) === 'permission-denied'
           ? 'Accès refusé par les règles de sécurité Firestore (compte Google non autorisé ou session expirée).'
-          : err?.code === 'resource-exhausted'
+          : errorCode(err) === 'resource-exhausted'
           ? 'Quota Firestore temporairement saturé. Nouvelle tentative dans un instant.'
-          : err?.message || 'Erreur réseau lors de la synchronisation cloud.';
+          : errorMessage(err) || 'Erreur réseau lors de la synchronisation cloud.';
         setSyncErrorDetail(desc);
         try {
           fb.handleFirestoreError(err, fb.OperationType.WRITE, path);
@@ -293,12 +305,12 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       }
       setSyncStatus('synced');
       setSyncErrorDetail(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Firestore pull notice:', err);
       setSyncStatus('error');
-      const desc = err?.code === 'permission-denied'
+      const desc = errorCode(err) === 'permission-denied'
         ? 'Accès refusé par les règles Firestore (compte non autorisé).'
-        : err?.message || 'Impossible de récupérer vos données depuis le Cloud.';
+        : errorMessage(err) || 'Impossible de récupérer vos données depuis le Cloud.';
       setSyncErrorDetail(desc);
       try {
         fb.handleFirestoreError(err, fb.OperationType.GET, path);
@@ -332,17 +344,17 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       
       // Pull remote data or handle snapshot
       pullFromCloudRef.current();
-    } catch (err: any) {
-      console.warn('Google sign-in exception:', err?.message || err);
+    } catch (err: unknown) {
+      console.warn('Google sign-in exception:', errorMessage(err) || err);
       try {
         const fb = await getFirebase();
         setSyncStatus(fb.auth.currentUser ? 'synced' : 'unpaired');
       } catch {
         setSyncStatus('unpaired');
       }
-      if (err?.code === 'auth/popup-closed-by-user') {
+      if (errorCode(err) === 'auth/popup-closed-by-user') {
         setSyncNotification('Connexion Google annulée');
-      } else if (err?.code === 'auth/cancelled-popup-request') {
+      } else if (errorCode(err) === 'auth/cancelled-popup-request') {
         setSyncNotification('Demande de popup annulée');
       } else {
         setSyncNotification('Connexion Google impossible (vérifiez le bloqueur de popups)');

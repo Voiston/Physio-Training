@@ -26,6 +26,7 @@ import {
 } from '../utils/audioHelpers';
 import { haptics } from '../utils/haptics';
 import { computeDetailedSessionLoad } from '../utils/loadHelpers';
+import type { EventsByQuality, SessionData } from '../types';
 
 export interface LiveSet {
   id: string;
@@ -75,9 +76,11 @@ function isValidLiveDraft(data: unknown): data is LiveSessionDraft {
   const d = data as Record<string, unknown>;
   if (typeof d.qualityId !== 'string') return false;
   if (!Array.isArray(d.exercises)) return false;
-  return d.exercises.every((ex: any) => (
-    ex && typeof ex === 'object' && typeof ex.name === 'string' && Array.isArray(ex.sets)
-  ));
+  return d.exercises.every((ex: unknown) => {
+    if (!ex || typeof ex !== 'object') return false;
+    const e = ex as Record<string, unknown>;
+    return typeof e.name === 'string' && Array.isArray(e.sets);
+  });
 }
 
 // Module-level pure time formatter
@@ -126,9 +129,9 @@ interface LiveGymModalProps {
   isOpen: boolean;
   onClose: () => void;
   qualities: QualityOption[];
-  events: Record<string, Record<string, any>>;
+  events: EventsByQuality;
   initialDateStr: string;
-  onSaveSession: (qualityId: string, dateStr: string, sessionData: any, applyImpacts: boolean) => void;
+  onSaveSession: (qualityId: string, dateStr: string, sessionData: SessionData, applyImpacts: boolean) => void;
 }
 
 const STORAGE_DRAFT_KEY = 'training_live_session_draft_v1';
@@ -289,7 +292,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   }, [events, initialDateStr, exerciseIdsKey]);
 
   // Gestion du Wake Lock API pour empêcher l'écran du smartphone de se verrouiller
-  const wakeLockRef = useRef<any>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const [keepScreenAwake, setKeepScreenAwake] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('physio_wake_lock_enabled');
@@ -327,7 +330,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     const requestWakeLock = async () => {
       try {
         if ('wakeLock' in navigator) {
-          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
         }
       } catch (err) {
         // Le navigateur ou les réglages économie d'énergie peuvent refuser
@@ -507,7 +510,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       return;
     }
 
-    const clonedExercises: LiveExercise[] = lastSessionForQuality.session.exercises.map((rawEx: any, idx: number) => {
+    const clonedExercises: LiveExercise[] = lastSessionForQuality.session.exercises.map((rawEx, idx) => {
       const def = allExercises.find(e => e.id === rawEx.id) || {
         id: rawEx.id,
         name: rawEx.name || 'Exercice',
@@ -664,7 +667,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     });
   };
 
-  const handleUpdateSetValue = (exerciseIndex: number, setIndex: number, field: keyof LiveSet, value: any) => {
+  const handleUpdateSetValue = (exerciseIndex: number, setIndex: number, field: keyof LiveSet, value: LiveSet[keyof LiveSet]) => {
     setActiveExercises(prev => {
       const clone = [...prev];
       const targetEx = { ...clone[exerciseIndex] };

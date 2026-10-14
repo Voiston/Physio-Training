@@ -7,6 +7,8 @@
  */
 
 import { getLocalYYYYMMDD } from './dateHelpers';
+import type { SessionData, SubSession, SecondaryContribution } from '../types';
+import type { SessionExercise } from './muscleHelpers';
 
 // Format sécurisé pour les identifiants de filières/qualités : lettres, chiffres, underscores (1 à 32 caractères)
 export const SAFE_ID_REGEX = /^[a-z][a-z0-9_]{0,31}$/i;
@@ -58,20 +60,41 @@ export function isSafeDate(dateStr: unknown): dateStr is string {
 /**
  * Crée un dictionnaire sans prototype pour se prémunir de toute pollution d'héritage
  */
-export function createSafeNullDict<T = any>(): Record<string, T> {
+export function createSafeNullDict<T = unknown>(): Record<string, T> {
   return Object.create(null) as Record<string, T>;
 }
+
+/** Objet brut non fiable (JSON importé, Firestore, localStorage). */
+type UnknownRecord = Record<string, unknown>;
+
+/** Vrai pour toute valeur objet non nulle (tableaux inclus, comme le test `v && typeof v === 'object'`). */
+function isLooseObject(value: unknown): value is UnknownRecord {
+  return Boolean(value) && typeof value === 'object';
+}
+
+/** Exercice assaini (séries détaillées du Mode Salle incluses). */
+interface SanitizedExercise extends SessionExercise {
+  detailSets?: Array<{ weightKg?: number; reps?: number; rir?: number; completed: boolean }>;
+}
+
+/** Séance en cours d'assainissement : seuls les champs valides sont recopiés. */
+type SanitizedSessionDraft = Partial<Omit<SessionData, 'exercises'>> & {
+  exercises?: SanitizedExercise[];
+  source?: string;
+  completedAt?: string;
+};
 
 /**
  * Valide et assainit une session d'entraînement brute
  */
-export function sanitizeSessionData(rawSession: any): any | null {
-  if (!rawSession || typeof rawSession !== 'object' || Array.isArray(rawSession)) {
+export function sanitizeSessionData(input: unknown): SessionData | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return null;
   }
+  const rawSession = input as UnknownRecord;
 
   // Cloner de manière étanche sans prototype
-  const safeSession: any = createSafeNullDict();
+  const safeSession: SanitizedSessionDraft = createSafeNullDict();
 
   if (typeof rawSession.duration === 'number' && Number.isFinite(rawSession.duration)) {
     safeSession.duration = Math.max(0, Math.min(1440, Math.round(rawSession.duration)));
@@ -144,15 +167,15 @@ export function sanitizeSessionData(rawSession: any): any | null {
 
   // Préservation des contributions parentes (pour les séances secondaires calculées)
   if (rawSession.parentContributions && typeof rawSession.parentContributions === 'object') {
-    const safeContribs: Record<string, any> = createSafeNullDict();
+    const safeContribs: Record<string, SecondaryContribution> = createSafeNullDict();
     for (const [pKey, pVal] of Object.entries(rawSession.parentContributions)) {
-      if (!isSafeId(pKey) || !pVal || typeof pVal !== 'object') continue;
+      if (!isSafeId(pKey) || !isLooseObject(pVal)) continue;
       safeContribs[pKey] = {
-        load: Math.max(0, Number((pVal as any).load) || 0),
-        loadCardio: typeof (pVal as any).loadCardio === 'number' ? Math.max(0, Number((pVal as any).loadCardio)) : undefined,
-        loadMusc: typeof (pVal as any).loadMusc === 'number' ? Math.max(0, Number((pVal as any).loadMusc)) : undefined,
-        ratio: Math.max(0, Math.min(1, Number((pVal as any).ratio) || 0)),
-        parentName: typeof (pVal as any).parentName === 'string' ? String((pVal as any).parentName).slice(0, 50) : undefined
+        load: Math.max(0, Number(pVal.load) || 0),
+        loadCardio: typeof pVal.loadCardio === 'number' ? Math.max(0, Number(pVal.loadCardio)) : undefined,
+        loadMusc: typeof pVal.loadMusc === 'number' ? Math.max(0, Number(pVal.loadMusc)) : undefined,
+        ratio: Math.max(0, Math.min(1, Number(pVal.ratio) || 0)),
+        parentName: typeof pVal.parentName === 'string' ? String(pVal.parentName).slice(0, 50) : undefined
       };
     }
     safeSession.parentContributions = Object.assign({}, safeContribs);
@@ -161,10 +184,10 @@ export function sanitizeSessionData(rawSession: any): any | null {
   // Préservation détaillée des exercices de musculation (Mode Salle & Tracker)
   if (Array.isArray(rawSession.exercises)) {
     safeSession.exercises = rawSession.exercises
-      .filter((ex: any) => ex && typeof ex === 'object' && typeof ex.name === 'string')
+      .filter((ex: unknown): ex is UnknownRecord => isLooseObject(ex) && typeof ex.name === 'string')
       .slice(0, 50)
-      .map((ex: any) => {
-        const item: any = {
+      .map((ex) => {
+        const item: SanitizedExercise = {
           id: typeof ex.id === 'string' ? ex.id.slice(0, 64) : `ex_${Date.now()}`,
           name: String(ex.name).slice(0, 100),
           sets: Math.max(0, Math.min(100, Number(ex.sets) || 0)),
@@ -194,7 +217,7 @@ export function sanitizeSessionData(rawSession: any): any | null {
 
         // Préservation des séries détaillées saisies en Mode Salle
         if (Array.isArray(ex.detailSets)) {
-          item.detailSets = ex.detailSets.slice(0, 50).map((s: any) => ({
+          item.detailSets = ex.detailSets.slice(0, 50).map((s: UnknownRecord) => ({
             weightKg: typeof s.weightKg === 'number' ? Math.max(0, Math.min(1000, s.weightKg)) : undefined,
             reps: typeof s.reps === 'number' ? Math.max(0, Math.min(1000, s.reps)) : undefined,
             rir: typeof s.rir === 'number' ? Math.max(0, Math.min(10, s.rir)) : undefined,
@@ -219,10 +242,10 @@ export function sanitizeSessionData(rawSession: any): any | null {
   // Préservation des sous-séances multiples par filière et par jour
   if (Array.isArray(rawSession.subSessions)) {
     safeSession.subSessions = rawSession.subSessions
-      .filter((sub: any) => sub && typeof sub === 'object')
+      .filter((sub: unknown): sub is UnknownRecord => isLooseObject(sub))
       .slice(0, 10)
-      .map((sub: any, idx: number) => {
-        const item: any = {
+      .map((sub, idx: number) => {
+        const item: SubSession = {
           id: typeof sub.id === 'string' ? sub.id.slice(0, 64) : `sub_${idx}_${Date.now()}`,
           duration: Math.max(0, Math.min(1440, Math.round(Number(sub.duration) || 0))),
           load: Math.max(0, Math.min(100000, Math.round(Number(sub.load) || 0))),
@@ -240,17 +263,18 @@ export function sanitizeSessionData(rawSession: any): any | null {
       });
   }
 
-  // Convertir en objet standard sécurisé pour compatibilité JSON / React
-  return Object.assign({}, safeSession);
+  // Convertir en objet standard sécurisé pour compatibilité JSON / React.
+  // `load` peut manquer si la source n'en avait pas : les lecteurs passent par extractSessionLoad.
+  return Object.assign({}, safeSession) as SessionData;
 }
 
 /**
  * Assainit un dictionnaire complet d'événements : Record<qId, Record<date, SessionData>>
  */
 export function sanitizeEventsPayload(
-  rawEvents: any
-): Record<string, Record<string, any>> {
-  const result: Record<string, Record<string, any>> = createSafeNullDict();
+  rawEvents: unknown
+): Record<string, Record<string, SessionData>> {
+  const result: Record<string, Record<string, SessionData>> = createSafeNullDict();
 
   if (!rawEvents || typeof rawEvents !== 'object' || Array.isArray(rawEvents)) {
     return Object.assign({}, result);
@@ -259,14 +283,14 @@ export function sanitizeEventsPayload(
   for (const qId of Object.keys(rawEvents)) {
     if (!isSafeId(qId)) continue;
 
-    const datesObj = rawEvents[qId];
+    const datesObj = (rawEvents as UnknownRecord)[qId];
     if (!datesObj || typeof datesObj !== 'object' || Array.isArray(datesObj)) continue;
 
-    const safeDates: Record<string, any> = createSafeNullDict();
+    const safeDates: Record<string, SessionData> = createSafeNullDict();
     for (const dateStr of Object.keys(datesObj)) {
       if (!isSafeDate(dateStr)) continue;
 
-      const rawSession = datesObj[dateStr];
+      const rawSession = (datesObj as UnknownRecord)[dateStr];
       const cleaned = sanitizeSessionData(rawSession);
       // Les impacts secondaires sont calculés dynamiquement à la lecture par computeDerivedEvents
       // et ne doivent jamais être persistés ou synchronisés
@@ -285,7 +309,7 @@ export function sanitizeEventsPayload(
  * Assainit les métriques journalières physiologiques (VFC, FC repos, Readiness)
  */
 export function sanitizeDailyMetricsPayload(
-  rawMetrics: any
+  rawMetrics: unknown
 ): Record<string, Record<string, number>> {
   const result: Record<string, Record<string, number>> = createSafeNullDict();
 
@@ -298,14 +322,14 @@ export function sanitizeDailyMetricsPayload(
   for (const dateStr of Object.keys(rawMetrics)) {
     if (!isSafeDate(dateStr)) continue;
 
-    const metrics = rawMetrics[dateStr];
+    const metrics = (rawMetrics as UnknownRecord)[dateStr];
     if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) continue;
 
     const safeDayMetrics: Record<string, number> = createSafeNullDict();
     for (const metricKey of Object.keys(metrics)) {
       if (!ALLOWED_METRIC_KEYS.has(metricKey)) continue;
 
-      const val = Number(metrics[metricKey]);
+      const val = Number((metrics as UnknownRecord)[metricKey]);
       if (Number.isFinite(val) && val >= 0 && val <= 1000) {
         safeDayMetrics[metricKey] = Math.round(val);
       }
@@ -321,7 +345,7 @@ export function sanitizeDailyMetricsPayload(
  * Assainit un dictionnaire de tombstones (enregistrements de suppression de séances)
  * Format : Record<`${dateStr}_${qId}`, timestampNumber>
  */
-export function sanitizeTombstonesPayload(raw: any): Record<string, number> {
+export function sanitizeTombstonesPayload(raw: unknown): Record<string, number> {
   const result: Record<string, number> = createSafeNullDict();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return Object.assign({}, result);
@@ -402,18 +426,18 @@ export function removeTombstone(eventKey: string): Record<string, number> {
  * 3. La préservation hors-ligne : une séance créée hors-ligne (sans tombstone correspondante)
  *    est conservée et synchronisée vers le cloud.
  */
-export function mergeEventsNonDestructive(
-  localEvents: Record<string, Record<string, any>>,
-  remoteEvents: Record<string, Record<string, any>>,
+export function mergeEventsNonDestructive<S extends Partial<SessionData>>(
+  localEvents: Record<string, Record<string, S>>,
+  remoteEvents: Record<string, Record<string, S>>,
   localTombstones?: Record<string, number>,
   remoteTombstones?: Record<string, number>
 ): { 
-  merged: Record<string, Record<string, any>>; 
+  merged: Record<string, Record<string, S>>; 
   hasNewLocalData: boolean;
   mergedTombstones: Record<string, number>;
   deletedKeysToPurge: string[];
 } {
-  const merged: Record<string, Record<string, any>> = createSafeNullDict();
+  const merged: Record<string, Record<string, S>> = createSafeNullDict();
   let hasNewLocalData = false;
   const deletedKeysToPurge: string[] = [];
 
@@ -447,7 +471,7 @@ export function mergeEventsNonDestructive(
 
     const localDates = (localEvents && localEvents[qId]) || {};
     const remoteDates = (remoteEvents && remoteEvents[qId]) || {};
-    const mergedDates: Record<string, any> = createSafeNullDict();
+    const mergedDates: Record<string, S> = createSafeNullDict();
 
     const allDates = new Set([
       ...Object.keys(localDates),
@@ -532,10 +556,10 @@ export function mergeEventsNonDestructive(
  * Fusion non destructrice des métriques journalières physiologiques (VFC, FC repos, Readiness)
  */
 export function mergeDailyMetricsNonDestructive(
-  localMetrics: Record<string, any>,
-  remoteMetrics: Record<string, any>
-): { merged: Record<string, any>; hasNewLocalData: boolean } {
-  const merged: Record<string, any> = createSafeNullDict();
+  localMetrics: Record<string, Record<string, number | undefined>>,
+  remoteMetrics: Record<string, Record<string, number | undefined>>
+): { merged: Record<string, Record<string, number>>; hasNewLocalData: boolean } {
+  const merged: Record<string, Record<string, number>> = createSafeNullDict();
   let hasNewLocalData = false;
 
   const allDates = new Set([
@@ -590,8 +614,8 @@ export interface StagedImportResult {
  * Valide et prépare en mémoire l'intégralité d'un export JSON (transactions atomiques).
  * Ne modifie aucunement le localStorage ni l'état de l'application.
  */
-export function validateAndStageImportPayload(imported: any): StagedImportResult {
-  if (!imported || typeof imported !== 'object' || Array.isArray(imported)) {
+export function validateAndStageImportPayload(importedRaw: unknown): StagedImportResult {
+  if (!importedRaw || typeof importedRaw !== 'object' || Array.isArray(importedRaw)) {
     return {
       isValid: false,
       error: 'Structure du fichier JSON invalide ou corrompue.',
@@ -600,6 +624,7 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
     };
   }
 
+  const imported = importedRaw as UnknownRecord;
   const entriesToSet = new Map<string, string>();
   let sessionsCount = 0;
   let metricsCount = 0;
@@ -635,9 +660,9 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
     // 3. Validation des blocs d'entraînement
     if (Array.isArray(imported.trainingBlocks)) {
       const safeBlocks = imported.trainingBlocks
-        .filter((b: any) => b && typeof b === 'object' && typeof b.id === 'string' && isSafeId(b.id))
+        .filter((b: unknown): b is UnknownRecord => isLooseObject(b) && typeof b.id === 'string' && isSafeId(b.id))
         .slice(0, 50)
-        .map((b: any) => ({
+        .map((b) => ({
           id: b.id,
           name: String(b.name || 'Bloc').slice(0, 50),
           type: String(b.type || 'standard').slice(0, 30),
@@ -645,7 +670,7 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
           endDate: isSafeDate(b.endDate) ? b.endDate : getLocalYYYYMMDD(new Date()),
           durationWeeks: Math.max(1, Math.min(52, Number(b.durationWeeks) || 4)),
           focusQualities: Array.isArray(b.focusQualities) 
-            ? b.focusQualities.filter((q: any) => typeof q === 'string' && isSafeId(q)).slice(0, 10)
+            ? b.focusQualities.filter((q: unknown) => typeof q === 'string' && isSafeId(q)).slice(0, 10)
             : [],
           // Multiplicateurs conformes au modèle d'Issurin (0.45 cible / 1.0 maintien par défaut)
           targetMultiplier: Math.max(0.1, Math.min(3, Number(b.targetMultiplier) || 0.45)),
@@ -660,9 +685,9 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
     // 4. Validation des qualités
     if (Array.isArray(imported.qualities)) {
       const safeQualities = imported.qualities
-        .filter((q: any) => q && typeof q === 'object' && typeof q.id === 'string' && isSafeId(q.id))
+        .filter((q: unknown): q is UnknownRecord => isLooseObject(q) && typeof q.id === 'string' && isSafeId(q.id))
         .slice(0, 50)
-        .map((q: any) => ({
+        .map((q) => ({
           id: q.id,
           name: String(q.name || q.id).slice(0, 50),
           g: Math.max(0.1, Math.min(20, Number(q.g) || 1)),
@@ -671,9 +696,9 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
           category: typeof q.category === 'string' ? q.category.slice(0, 30) : undefined,
           impacts: Array.isArray(q.impacts)
             ? q.impacts
-                .filter((imp: any) => imp && typeof imp === 'object' && typeof imp.id === 'string' && isSafeId(imp.id))
+                .filter((imp: unknown): imp is UnknownRecord => isLooseObject(imp) && typeof imp.id === 'string' && isSafeId(imp.id))
                 .slice(0, 10)
-                .map((imp: any) => ({
+                .map((imp) => ({
                   id: imp.id,
                   ratio: Math.max(0, Math.min(1, Number(imp.ratio) || 0)),
                 }))
@@ -687,14 +712,14 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
     // 5. Validation des modèles de blocs (blockTemplates)
     if (Array.isArray(imported.blockTemplates)) {
       const safeTemplates = imported.blockTemplates
-        .filter((t: any) => t && typeof t === 'object' && typeof t.id === 'string' && isSafeId(t.id))
+        .filter((t: unknown): t is UnknownRecord => isLooseObject(t) && typeof t.id === 'string' && isSafeId(t.id))
         .slice(0, 50)
-        .map((t: any) => ({
+        .map((t) => ({
           id: t.id,
           name: String(t.name || t.id).slice(0, 50),
           durationWeeks: Math.max(1, Math.min(52, Number(t.durationWeeks) || 4)),
           focusQualities: Array.isArray(t.focusQualities)
-            ? t.focusQualities.filter((q: any) => typeof q === 'string' && isSafeId(q)).slice(0, 10)
+            ? t.focusQualities.filter((q: unknown) => typeof q === 'string' && isSafeId(q)).slice(0, 10)
             : [],
           description: String(t.description || '').slice(0, 200),
           targetMultiplier: Math.max(0.1, Math.min(3, Number(t.targetMultiplier) || 0.45)),
@@ -707,7 +732,7 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
 
     // 6. Validation de l'objectif de compétition (targetCompetition)
     if (imported.targetCompetition && typeof imported.targetCompetition === 'object') {
-      const comp = imported.targetCompetition;
+      const comp = imported.targetCompetition as UnknownRecord;
       if (typeof comp.name === 'string' && isSafeDate(comp.date)) {
         const safeComp = {
           name: comp.name.slice(0, 100),
@@ -724,8 +749,8 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
 
     // 7. Validation des réglages physiologiques (physioSettings) avec initialCtl
     if (imported.physioSettings && typeof imported.physioSettings === 'object') {
-      const ps = imported.physioSettings;
-      const safePs: Record<string, any> = {
+      const ps = imported.physioSettings as UnknownRecord;
+      const safePs: Record<string, number | string> = {
         tauFatigue: Math.max(3, Math.min(20, Number(ps.tauFatigue) || 7)),
         tauFitness: Math.max(15, Math.min(60, Number(ps.tauFitness) || 28)),
         profileName: typeof ps.profileName === 'string' ? ps.profileName.slice(0, 50) : 'Standard',
@@ -739,10 +764,10 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
     // 8. Validation des exercices personnalisés (customExercises) au format réel { id, name, category, muscleRatios, isCompound }
     if (Array.isArray(imported.customExercises)) {
       const safeEx = imported.customExercises
-        .filter((ex: any) => ex && typeof ex === 'object' && typeof ex.name === 'string')
+        .filter((ex: unknown): ex is UnknownRecord => isLooseObject(ex) && typeof ex.name === 'string')
         .slice(0, 200)
-        .map((ex: any) => {
-          const item: any = {
+        .map((ex) => {
+          const item: UnknownRecord = {
             id: typeof ex.id === 'string' ? ex.id.slice(0, 64) : `custom_ex_${Date.now()}`,
             name: String(ex.name).slice(0, 100),
             category: typeof ex.category === 'string' ? ex.category.slice(0, 30) : 'upper_push',
@@ -798,10 +823,10 @@ export function validateAndStageImportPayload(imported: any): StagedImportResult
         blocksCount,
       },
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       isValid: false,
-      error: `Erreur d'analyse des données : ${err?.message || 'Format inattendu'}`,
+      error: `Erreur d'analyse des données : ${(err instanceof Error && err.message) || 'Format inattendu'}`,
       entriesToSet: new Map(),
       summary: { sessionsCount: 0, metricsCount: 0, blocksCount: 0 },
     };

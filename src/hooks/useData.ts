@@ -162,7 +162,7 @@ export function useData() {
     return DEFAULT_QUALITIES;
   });
   // Cloud Synchronization for Smartphone ↔ PC Real-Time Sync
-  const cloudSyncRef = useRef<any>(null);
+  const cloudSyncRef = useRef<ReturnType<typeof useCloudSync> | null>(null);
   const triggerSyncPush = useCallback(() => {
     cloudSyncRef.current?.triggerDebouncedPush();
   }, []);
@@ -259,7 +259,7 @@ export function useData() {
         Object.assign(basePrimary[q.id], simulatedEvents[q.id]);
       }
     });
-    return computeDerivedEvents(basePrimary, qualities as any) as Record<string, Record<string, SessionData>>;
+    return computeDerivedEvents(basePrimary, qualities) as Record<string, Record<string, SessionData>>;
   }, [events, simulatedEvents, isSimulationActive, qualities]);
 
   // Sous-hook 3 : Métriques journalières, paramètres physiologiques, objectifs et calculs Banister/Foster
@@ -304,7 +304,7 @@ export function useData() {
     localStorage.removeItem('physio_tombstones');
   }, []);
 
-  const onRemoteDataReceived = useCallback((remoteData: any) => {
+  const onRemoteDataReceived = useCallback((remoteData: unknown) => {
     if (!remoteData) return;
     try {
       const imported = migrateData(remoteData);
@@ -619,7 +619,7 @@ export function useData() {
           throw new Error('Fichier de sauvegarde vide ou illisible');
         }
 
-        let rawImported: any;
+        let rawImported: unknown;
         try {
           rawImported = JSON.parse(content);
         } catch {
@@ -687,9 +687,9 @@ export function useData() {
 
         // Rechargement propre pour hydrater immédiatement tous les contextes et hooks
         window.location.reload();
-      } catch (err: any) {
+      } catch (err: unknown) {
         inputElement.value = '';
-        const msg = err?.message || 'Erreur lors du décodage du fichier JSON';
+        const msg = (err instanceof Error && err.message) || 'Erreur lors du décodage du fichier JSON';
         console.error('Import error:', err);
         if (onError) onError(msg);
       }

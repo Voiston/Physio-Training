@@ -52,7 +52,7 @@ function parseRefDate(referenceDateStr: string | Date | null): Date {
  * @param baselineWindowDays - Fenêtre d'historique de base (défaut : 60 jours)
  */
 export function computeVfcAnalysis(
-  dailyMetrics: Record<string, { vfc?: number; [key: string]: any }>,
+  dailyMetrics: Record<string, { vfc?: number; [key: string]: unknown }>,
   referenceDateStr: string | Date | null = null,
   baselineWindowDays: number = 60
 ): VfcAnalysisResult {
@@ -236,11 +236,11 @@ export function computeVfcAnalysis(
 /**
  * Calcule l'analyse de la Fréquence Cardiaque de Repos relative à la médiane personnelle.
  * 
- * @param dailyMetrics - Objet Record<dateStr, { hrRest?: number, [key: string]: any }>
+ * @param dailyMetrics - Objet Record<dateStr, { hrRest?: number, [key: string]: unknown }>
  * @param referenceDateStr - Date de référence
  */
 export function computeHrRestAnalysis(
-  dailyMetrics: Record<string, { hrRest?: number; [key: string]: any }>,
+  dailyMetrics: Record<string, { hrRest?: number; [key: string]: unknown }>,
   referenceDateStr: string | Date | null = null
 ): HrRestAnalysisResult {
   const refDate = parseRefDate(referenceDateStr);

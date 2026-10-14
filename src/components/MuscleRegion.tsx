@@ -9,7 +9,7 @@ export interface MuscleRegionProps {
   fatigueLevel?: number;
   effectiveSets?: number;
   isSelected: boolean;
-  onSelect: (id: any) => void;
+  onSelect: (id: MuscleGroup | string) => void;
   onHover?: (id: string | null) => void;
   gradientId?: string;
   glowFilter?: string;
