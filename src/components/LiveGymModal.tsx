@@ -304,7 +304,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       const next = !prev;
       try {
         localStorage.setItem('physio_wake_lock_enabled', String(next));
-      } catch {}
+      } catch (err) { console.warn("[LiveGym] Impossible d'enregistrer la préférence wake lock", err); }
       return next;
     });
   };
@@ -371,7 +371,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       }
     } catch (e) {
       // Nettoyer si corrompu
-      try { localStorage.removeItem(STORAGE_DRAFT_KEY); } catch {}
+      try { localStorage.removeItem(STORAGE_DRAFT_KEY); } catch (err) { console.warn('[LiveGym] Impossible de supprimer le brouillon corrompu', err); }
     }
   }, [isOpen]);
 

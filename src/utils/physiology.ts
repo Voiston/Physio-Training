@@ -658,14 +658,14 @@ export function getSavedBlockTemplates(): BlockTemplate[] {
         }));
       }
     }
-  } catch {}
+  } catch (err) { console.warn('[physiology] Modèles de blocs illisibles, préréglages utilisés', err); }
   return BLOCK_PRESETS;
 }
 
 export function saveBlockTemplates(templates: BlockTemplate[]): void {
   try {
     localStorage.setItem('physio_block_templates', JSON.stringify(templates));
-  } catch {}
+  } catch (err) { console.warn('[physiology] Sauvegarde des modèles de blocs impossible', err); }
 }
 
 export function reorderQualitiesForBlock(qualities: QualityDefinition[], focusQualities: string[] = []): QualityDefinition[] {

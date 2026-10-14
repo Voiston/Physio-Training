@@ -68,7 +68,7 @@ export function getInitialDailyMetrics(): Record<string, DailyMetrics> {
         }
       }
     }
-  } catch {}
+  } catch (err) { console.warn('[metrics] Lecture des métriques journalières impossible', err); }
   return loadedMetrics;
 }
 
@@ -91,7 +91,7 @@ export function useMetricsState(
     try {
       const raw = localStorage.getItem('physio_target_competition');
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (err) { console.warn('[metrics] Objectif compétition illisible, ignoré', err); }
     return null;
   });
 
@@ -110,7 +110,7 @@ export function useMetricsState(
     try {
       const raw = localStorage.getItem('physio_settings');
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (err) { console.warn('[metrics] Paramètres physio illisibles, valeurs par défaut', err); }
     return DEFAULT_PHYSIO_SETTINGS;
   });
 

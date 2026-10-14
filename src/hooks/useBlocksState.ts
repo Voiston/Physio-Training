@@ -56,7 +56,7 @@ export function useBlocksState(options: UseBlocksStateOptions = {}) {
           }));
         }
       }
-    } catch {}
+    } catch (err) { console.warn("[blocks] Blocs d'entraînement illisibles, liste vide", err); }
     return [];
   });
 

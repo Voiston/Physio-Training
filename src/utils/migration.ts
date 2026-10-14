@@ -193,11 +193,11 @@ export function migrateLocalStorage(): void {
                   localStorage.setItem(key, JSON.stringify(session));
                 }
               }
-            } catch (e) {}
+            } catch (e) { console.warn('[migration] Session ignorée (JSON illisible ou écriture impossible)', e); }
           }
         }
       }
     }
     localStorage.setItem('physio_schema_version', String(CURRENT_SCHEMA_VERSION));
-  } catch (e) {}
+  } catch (e) { console.warn('[migration] Migration de schéma interrompue', e); }
 }

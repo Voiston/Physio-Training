@@ -120,7 +120,7 @@ function getInitialEvents(): Record<string, Record<string, SessionData>> {
         }
       }
     }
-  } catch {}
+  } catch (err) { console.warn('[data] Lecture des séances locales impossible', err); }
   return loadedEvents;
 }
 
@@ -158,7 +158,7 @@ export function useData() {
         const missing = DEFAULT_QUALITIES.filter(q => !existingIds.has(q.id));
         return [...updated, ...missing];
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[data] Qualités locales illisibles, valeurs par défaut', e); }
     return DEFAULT_QUALITIES;
   });
   // Cloud Synchronization for Smartphone ↔ PC Real-Time Sync

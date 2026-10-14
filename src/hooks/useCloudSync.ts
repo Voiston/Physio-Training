@@ -77,7 +77,7 @@ export function hasLocalHealthData(): boolean {
         return true;
       }
     }
-  } catch {}
+  } catch (err) { console.warn('[cloudSync] Lecture du localStorage impossible', err); }
   return false;
 }
 
@@ -102,7 +102,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     try {
       const raw = localStorage.getItem('physio_user_account');
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (err) { console.warn('[cloudSync] Compte utilisateur local illisible', err); }
     return null;
   });
 
@@ -302,7 +302,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       setSyncErrorDetail(desc);
       try {
         fb.handleFirestoreError(err, fb.OperationType.GET, path);
-      } catch {}
+      } catch (err) { console.warn("[cloudSync] Journalisation de l'erreur Firestore échouée", err); }
     }
   }, []);
 
@@ -355,7 +355,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     try {
       const fb = await getFirebase();
       await fb.signOut(fb.auth);
-    } catch {}
+    } catch (err) { console.warn('[cloudSync] Déconnexion Firebase échouée, purge locale poursuivie', err); }
 
     // 1. Purge du compte Google enregistré
     localStorage.removeItem('physio_user_account');
@@ -402,7 +402,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         } else {
           await fb.disableNetwork(fb.db);
         }
-      } catch {}
+      } catch (err) { console.warn("[cloudSync] Changement d'état réseau Firestore échoué", err); }
     }
   }, []);
 
