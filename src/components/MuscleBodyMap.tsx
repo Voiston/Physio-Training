@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { MUSCLE_GROUPS, VolumeStatus, getVolumeLandmark } from '../utils/muscleHelpers';
+import { MUSCLE_GROUPS, VolumeStatus, getVolumeLandmark, MuscleGroup } from '../utils/muscleHelpers';
 import { Layers, Dumbbell, Sparkles, Check, ChevronRight, Eye, Info, X, Activity, Target, Flame, ShieldAlert, Zap } from 'lucide-react';
 import { haptics } from '../utils/haptics';
+import { MuscleRegion, type MuscleRegionProps } from './MuscleRegion';
+
+export { MuscleRegion, type MuscleRegionProps };
 
 interface MuscleData {
   effectiveSets: number;
@@ -109,7 +112,8 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
     return 'none';
   };
 
-  const handleMuscleClick = (muscleId: string) => {
+  const handleMuscleClick = (muscle: MuscleGroup | string) => {
+    const muscleId = typeof muscle === 'object' && muscle !== null ? (muscle as MuscleGroup).id : String(muscle);
     haptics.tap();
     onSelectMuscle?.(muscleId);
   };
@@ -448,24 +452,14 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
               </g>
 
               {/* TRAPÈZES SUPÉRIEURS (FACE) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Trapèzes supérieurs : ${muscleLoads['trapezes']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'trapezes'}
-                onMouseEnter={() => setHoveredMuscle('trapezes')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('trapezes')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('trapezes')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('trapezes');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('trapezes') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="trapezes"
+                label="Trapèzes supérieurs"
+                effectiveSets={muscleLoads['trapezes']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'trapezes'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('trapezes')}
               >
                 <path
                   d="M91 52 L89 64 L78 64 C82 58 86 54 91 52 Z"
@@ -479,27 +473,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   stroke={selectedMuscleId === 'trapezes' ? '#38bdf8' : '#ffffff20'}
                   strokeWidth="1.2"
                 />
-              </g>
+              </MuscleRegion>
 
               {/* DELTOÏDES (ANTÉRIEUR & LATÉRAL) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Épaules et deltoïdes : ${muscleLoads['deltoides_ant']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'deltoides_ant'}
-                onMouseEnter={() => setHoveredMuscle('deltoides_ant')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('deltoides_ant')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('deltoides_ant')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('deltoides_ant');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('deltoides_ant') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="deltoides_ant"
+                label="Épaules et deltoïdes"
+                effectiveSets={muscleLoads['deltoides_ant']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'deltoides_ant'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('deltoides_ant')}
               >
                 {/* Deltoïde gauche */}
                 <path
@@ -520,27 +504,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                 />
                 {/* Fibres deltoïdiennes droite */}
                 <path d="M136 74 C142 84 142 92 140 98" stroke="#ffffff18" strokeWidth="1" fill="none" />
-              </g>
+              </MuscleRegion>
 
               {/* PECTORAUX (GRAND PECTORAL) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Pectoraux : ${muscleLoads['pectoraux']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'pectoraux'}
-                onMouseEnter={() => setHoveredMuscle('pectoraux')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('pectoraux')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('pectoraux')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('pectoraux');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('pectoraux') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="pectoraux"
+                label="Pectoraux"
+                effectiveSets={muscleLoads['pectoraux']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'pectoraux'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('pectoraux')}
               >
                 {/* Pec gauche avec courbe claviculaire et sternale */}
                 <path
@@ -566,27 +540,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
 
                 {/* Sillon sterno-pectoral */}
                 <line x1="100" y1="68" x2="100" y2="114" stroke="#00000050" strokeWidth="1.3" />
-              </g>
+              </MuscleRegion>
 
               {/* BICEPS & FLÉCHISSEURS (BRAS & AVANT-BRAS) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Biceps et avant-bras : ${muscleLoads['biceps']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'biceps'}
-                onMouseEnter={() => setHoveredMuscle('biceps')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('biceps')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('biceps')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('biceps');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('biceps') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="biceps"
+                label="Biceps et avant-bras"
+                effectiveSets={muscleLoads['biceps']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'biceps'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('biceps')}
               >
                 {/* Biceps gauche */}
                 <path
@@ -623,27 +587,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   strokeWidth="1.2"
                   opacity="0.9"
                 />
-              </g>
+              </MuscleRegion>
 
               {/* SANGLE ABDOMINALE & CORE (RECTUS ABDOMINIS + OBLIQUES) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Sangle abdominale et gainage : ${muscleLoads['abdos']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'abdos'}
-                onMouseEnter={() => setHoveredMuscle('abdos')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('abdos')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('abdos')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('abdos');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('abdos') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="abdos"
+                label="Sangle abdominale et gainage"
+                effectiveSets={muscleLoads['abdos']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'abdos'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('abdos')}
               >
                 {/* Abdos gauche (3 segments) */}
                 <path
@@ -682,7 +636,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   fill={`url(#${getMuscleGradientId('abdos')})`}
                   opacity="0.85"
                 />
-              </g>
+              </MuscleRegion>
 
               {/* BASSIN & CRÊTE ILIAQUE (NEUTRE) */}
               <path
@@ -693,24 +647,14 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
               />
 
               {/* QUADRICEPS (RECTUS FEMORIS + VASTUS LATERALIS + VASTUS MEDIALIS) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Quadriceps : ${muscleLoads['quadriceps']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'quadriceps'}
-                onMouseEnter={() => setHoveredMuscle('quadriceps')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('quadriceps')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('quadriceps')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('quadriceps');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('quadriceps') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="quadriceps"
+                label="Quadriceps"
+                effectiveSets={muscleLoads['quadriceps']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'quadriceps'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('quadriceps')}
               >
                 {/* Cuisses gauche (Galbe externe + vaste interne) */}
                 <path
@@ -737,27 +681,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                 {/* Rotules anatomiques (Genoux neutres) */}
                 <ellipse cx="77" cy="302" rx="6" ry="5" fill="#111827" stroke="#334155" strokeWidth="1" />
                 <ellipse cx="123" cy="302" rx="6" ry="5" fill="#111827" stroke="#334155" strokeWidth="1" />
-              </g>
+              </MuscleRegion>
 
               {/* MOLLETS & TIBIAS (FACE) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Mollets antérieurs : ${muscleLoads['mollets']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'mollets'}
-                onMouseEnter={() => setHoveredMuscle('mollets')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('mollets')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('mollets')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('mollets');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('mollets') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="mollets"
+                label="Mollets antérieurs"
+                effectiveSets={muscleLoads['mollets']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'mollets'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('mollets')}
               >
                 {/* Mollet antérieur gauche */}
                 <path
@@ -776,7 +710,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   strokeWidth="1.4"
                 />
                 <line x1="123" y1="324" x2="123" y2="384" stroke="#ffffff15" strokeWidth="1" />
-              </g>
+              </MuscleRegion>
 
               {/* BADGES NUMÉRIQUES FLOTTANTS DE SÉRIES SUR LE MANNEQUIN FACE */}
               {renderBadge('deltoides_ant', 44, 76)}
@@ -814,24 +748,14 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
               </g>
 
               {/* TRAPÈZES & HAUT DU DOS (GRAND LOSANGE ANATOMIQUE C1-T12) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Trapèzes et haut du dos : ${muscleLoads['trapezes']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'trapezes'}
-                onMouseEnter={() => setHoveredMuscle('trapezes')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('trapezes')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('trapezes')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('trapezes');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('trapezes') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="trapezes"
+                label="Trapèzes et haut du dos"
+                effectiveSets={muscleLoads['trapezes']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'trapezes'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('trapezes')}
               >
                 {/* Losange dorsal complet */}
                 <path
@@ -846,27 +770,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                 <path d="M100 68 L120 66" stroke="#ffffff15" strokeWidth="1" />
                 <path d="M100 90 L88 78" stroke="#ffffff15" strokeWidth="1" />
                 <path d="M100 90 L112 78" stroke="#ffffff15" strokeWidth="1" />
-              </g>
+              </MuscleRegion>
 
               {/* DELTOÏDES POSTÉRIEURS (ARRIÈRE D'ÉPAULE) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Deltoïdes postérieurs : ${muscleLoads['deltoides_post']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'deltoides_post'}
-                onMouseEnter={() => setHoveredMuscle('deltoides_post')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('deltoides_post')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('deltoides_post')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('deltoides_post');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('deltoides_post') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="deltoides_post"
+                label="Deltoïdes postérieurs"
+                effectiveSets={muscleLoads['deltoides_post']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'deltoides_post'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('deltoides_post')}
               >
                 {/* Deltoïde post gauche */}
                 <path
@@ -882,27 +796,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   stroke={selectedMuscleId === 'deltoides_post' ? '#38bdf8' : '#ffffff20'}
                   strokeWidth="1.4"
                 />
-              </g>
+              </MuscleRegion>
 
               {/* TRICEPS BRACHII (FER À CHEVAL POSTÉRIEUR) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Triceps : ${muscleLoads['triceps']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'triceps'}
-                onMouseEnter={() => setHoveredMuscle('triceps')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('triceps')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('triceps')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('triceps');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('triceps') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="triceps"
+                label="Triceps"
+                effectiveSets={muscleLoads['triceps']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'triceps'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('triceps')}
               >
                 {/* Triceps gauche */}
                 <path
@@ -939,27 +843,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   strokeWidth="1.2"
                   opacity="0.85"
                 />
-              </g>
+              </MuscleRegion>
 
               {/* GRAND DORSAL (LATISSIMUS DORSI - LARGEUR DOS) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Dorsaux et grand dorsal : ${muscleLoads['dorsaux']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'dorsaux'}
-                onMouseEnter={() => setHoveredMuscle('dorsaux')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('dorsaux')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('dorsaux')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('dorsaux');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('dorsaux') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="dorsaux"
+                label="Dorsaux et grand dorsal"
+                effectiveSets={muscleLoads['dorsaux']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'dorsaux'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('dorsaux')}
               >
                 {/* Dorsal gauche (V-taper) */}
                 <path
@@ -979,27 +873,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   strokeWidth="1.5"
                 />
                 <path d="M128 98 C122 114 114 128 108 136" stroke="#ffffff18" strokeWidth="1" fill="none" />
-              </g>
+              </MuscleRegion>
 
               {/* LOMBAIRES / ÉRECTEURS DU RACHIS (BAS DU DOS) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Lombaires et bas du dos : ${muscleLoads['lombaires']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'lombaires'}
-                onMouseEnter={() => setHoveredMuscle('lombaires')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('lombaires')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('lombaires')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('lombaires');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('lombaires') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="lombaires"
+                label="Lombaires et bas du dos"
+                effectiveSets={muscleLoads['lombaires']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'lombaires'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('lombaires')}
               >
                 {/* Colonne lombaire gauche */}
                 <path
@@ -1016,27 +900,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                   strokeWidth="1.3"
                 />
                 <line x1="100" y1="146" x2="100" y2="184" stroke="#00000050" strokeWidth="1.2" />
-              </g>
+              </MuscleRegion>
 
               {/* FESSIERS (GLUTEUS MAXIMUS) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Fessiers : ${muscleLoads['glutes']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'glutes'}
-                onMouseEnter={() => setHoveredMuscle('glutes')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('glutes')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('glutes')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('glutes');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('glutes') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="glutes"
+                label="Fessiers"
+                effectiveSets={muscleLoads['glutes']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'glutes'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('glutes')}
               >
                 {/* Fessier gauche avec courbe athlétique */}
                 <path
@@ -1059,27 +933,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
 
                 {/* Sillon interfessier */}
                 <line x1="100" y1="184" x2="100" y2="236" stroke="#00000050" strokeWidth="1.4" />
-              </g>
+              </MuscleRegion>
 
               {/* ISCHIO-JAMBIERS (BICEPS FEMORIS & SEMITENDINOSUS) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Ischio-jambiers : ${muscleLoads['ischios']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'ischios'}
-                onMouseEnter={() => setHoveredMuscle('ischios')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('ischios')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('ischios')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('ischios');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('ischios') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="ischios"
+                label="Ischio-jambiers"
+                effectiveSets={muscleLoads['ischios']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'ischios'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('ischios')}
               >
                 {/* Ischios gauche */}
                 <path
@@ -1103,27 +967,17 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                 {/* Creux poplité neutre dos */}
                 <ellipse cx="78" cy="304" rx="5" ry="4" fill="#111827" stroke="#334155" strokeWidth="1" />
                 <ellipse cx="122" cy="304" rx="5" ry="4" fill="#111827" stroke="#334155" strokeWidth="1" />
-              </g>
+              </MuscleRegion>
 
               {/* MOLLETS POSTÉRIEURS (GASTROCNÉMIEN JUMEAUX & SOLÉAIRE) */}
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={`Mollets postérieurs : ${muscleLoads['mollets']?.effectiveSets || 0} séries effectives`}
-                aria-pressed={selectedMuscleId === 'mollets'}
-                onMouseEnter={() => setHoveredMuscle('mollets')}
-                onMouseLeave={() => setHoveredMuscle(null)}
-                onFocus={() => setHoveredMuscle('mollets')}
-                onBlur={() => setHoveredMuscle(null)}
-                onClick={() => handleMuscleClick('mollets')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleMuscleClick('mollets');
-                  }
-                }}
-                style={{ filter: getMuscleGlow('mollets') }}
-                className="transition-all cursor-pointer outline-none focus-visible:stroke-sky-400 focus-visible:stroke-[2.5]"
+              <MuscleRegion
+                id="mollets"
+                label="Mollets postérieurs"
+                effectiveSets={muscleLoads['mollets']?.effectiveSets || 0}
+                isSelected={selectedMuscleId === 'mollets'}
+                onSelect={handleMuscleClick}
+                onHover={setHoveredMuscle}
+                glowFilter={getMuscleGlow('mollets')}
               >
                 {/* Mollet dos gauche (double chef) */}
                 <path
@@ -1147,7 +1001,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
                 {/* Tendons d'Achille */}
                 <line x1="78" y1="384" x2="78" y2="400" stroke="#ffffff18" strokeWidth="1.5" />
                 <line x1="122" y1="384" x2="122" y2="400" stroke="#ffffff18" strokeWidth="1.5" />
-              </g>
+              </MuscleRegion>
 
               {/* BADGES NUMÉRIQUES FLOTTANTS DE SÉRIES SUR LE MANNEQUIN DOS */}
               {renderBadge('trapezes', 100, 78)}

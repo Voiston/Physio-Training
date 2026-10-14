@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { 
   Heart, Dumbbell, Zap, Flame, ShieldAlert, Calendar, 
   ChevronLeft, ChevronRight, CheckCircle2, Clock, RotateCcw,
@@ -113,7 +114,6 @@ function QuickScaleSelector({ id, value, onChange, min = 1, max = 10, label, act
 
 export default function ScoreModal({ info, qualities = [], events = {}, onClose, onSave, onOpenLiveGym }) {
   const modalRef = useRef(null);
-  const previousActiveElementRef = useRef(null);
   const [validationErrors, setValidationErrors] = useState({});
   const todayStr = getLocalYYYYMMDD(new Date());
   const isMultiSport = useMemo(() => ['vo2max', 'seuil', 'ef', 'sprint'].includes(info.qId), [info.qId]);
@@ -816,67 +816,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     }
   };
 
-  useEffect(() => {
-    // Sauvegarde du trigger d'origine pour restitution de focus (WCAG 2.2 SC 2.4.3)
-    previousActiveElementRef.current = document.activeElement;
-
-    // Focus initial sur le premier élément pertinent
-    const timer = setTimeout(() => {
-      if (modalRef.current) {
-        const firstFocusable = modalRef.current.querySelector(
-          'button:not([disabled]), input:not([disabled]), select:not([disabled])'
-        );
-        if (firstFocusable) {
-          firstFocusable.focus();
-        } else {
-          modalRef.current.focus();
-        }
-      }
-    }, 50);
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-
-      // Focus Trap (WCAG 2.2 SC 2.1.2)
-      if (e.key === 'Tab' && modalRef.current) {
-        const focusables = Array.from(
-          modalRef.current.querySelectorAll(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-          )
-        ).filter(el => el.offsetParent !== null);
-
-        if (focusables.length === 0) return;
-
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === first || document.activeElement === modalRef.current) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
-        previousActiveElementRef.current.focus();
-      }
-    };
-  }, [onClose]);
+  useModalA11y(true, onClose, modalRef);
 
   return (
     <div 

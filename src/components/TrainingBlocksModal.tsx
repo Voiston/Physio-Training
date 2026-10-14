@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { 
   X, Calendar, Zap, Shield, Flame, Activity, Sparkles, 
   Trash2, Plus, Check, Clock, AlertCircle, Dumbbell, Settings,
@@ -37,7 +38,6 @@ export default function TrainingBlocksModal({
   onReorderByBlock
 }: TrainingBlocksModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
-  const previousActiveElementRef = useRef<HTMLElement | null>(null);
   const todayStr = getLocalYYYYMMDD(new Date());
 
   // Modal navigation tab: 'blocks' or 'templates'
@@ -104,65 +104,7 @@ export default function TrainingBlocksModal({
   };
 
   // Focus trap & Escape listener & Focus restoration (WCAG 2.2 SC 2.1.2 & 2.4.3)
-  useEffect(() => {
-    previousActiveElementRef.current = document.activeElement as HTMLElement | null;
-
-    const timer = setTimeout(() => {
-      if (modalRef.current) {
-        const firstFocusable = modalRef.current.querySelector<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
-        );
-        if (firstFocusable) {
-          firstFocusable.focus();
-        } else {
-          modalRef.current.focus();
-        }
-      }
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-
-      // Trap focus within modalRef
-      if (e.key === 'Tab' && modalRef.current) {
-        const focusables = Array.from(
-          modalRef.current.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-          )
-        ).filter(el => el.offsetParent !== null);
-
-        if (focusables.length === 0) return;
-
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === first || document.activeElement === modalRef.current) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
-        previousActiveElementRef.current.focus();
-      }
-    };
-  }, [onClose]);
+  useModalA11y(true, onClose, modalRef);
 
   // Apply a preset to the block form
   const handleSelectPreset = (presetId: string) => {

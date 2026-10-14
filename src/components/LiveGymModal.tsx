@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, memo, useCallback, useReducer } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { 
   Play, Pause, RotateCcw, Plus, Trash2, Check, Clock, Dumbbell, 
   ChevronDown, ChevronUp, AlertCircle, Sparkles, Volume2, VolumeX,
@@ -1038,6 +1039,19 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     }
   };
 
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  const handleEscape = useCallback(() => {
+    if (stage === 'active') {
+      handleAbandonWorkout();
+    } else {
+      onClose();
+    }
+  }, [stage, onClose]);
+
+  // Focus trap, Escape listener & Focus restoration (WCAG 2.2 SC 2.1.2 & 2.4.3)
+  useModalA11y(isOpen, onClose, modalRef, handleEscape);
+
   // Suspension des animations GPU de la grille d'arrière-plan pendant que la modale de salle est ouverte
   useEffect(() => {
     if (!isOpen) return;
@@ -1057,7 +1071,9 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       aria-labelledby="live-gym-title"
     >
       <div 
-        className="relative w-full max-w-4xl bg-slate-900 border-0 sm:border border-slate-700/80 rounded-none sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[96vh] animate-fadeIn"
+        ref={modalRef}
+        tabIndex={-1}
+        className="relative w-full max-w-4xl bg-slate-900 border-0 sm:border border-slate-700/80 rounded-none sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[96vh] animate-fadeIn focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ==================================================================== */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent } from 'react';
+import { usePersistentState } from './usePersistentState';
 import { useCloudSync } from './useCloudSync';
 import { 
   DEFAULT_QUALITIES, 
@@ -328,7 +329,12 @@ function getInitialDailyMetrics(): Record<string, DailyMetrics> {
 export function useData() {
   const [events, setEvents] = useState<Record<string, Record<string, SessionData>>>(() => getInitialEvents());
   const [tombstones, setTombstones] = useState<Record<string, number>>(() => getSavedTombstones());
-  const [qualities, setQualitiesState] = useState<Quality[]>(() => {
+  const tombstonesRef = useRef(tombstones);
+  useEffect(() => {
+    tombstonesRef.current = tombstones;
+  }, [tombstones]);
+
+  const [qualities, setQualitiesState] = usePersistentState<Quality[]>('physio_qualities', () => {
     try {
       const raw = localStorage.getItem('physio_qualities');
       if (raw) {
@@ -357,11 +363,11 @@ export function useData() {
 
   const [dailyMetrics, setDailyMetrics] = useState<Record<string, DailyMetrics>>(() => getInitialDailyMetrics());
   
-  const [blockTemplates, setBlockTemplates] = useState<BlockTemplate[]>(() => {
+  const [blockTemplates, setBlockTemplates] = usePersistentState<BlockTemplate[]>('physio_block_templates', () => {
     return getSavedBlockTemplates();
   });
 
-  const [trainingBlocks, setTrainingBlocks] = useState<TrainingBlock[]>(() => {
+  const [trainingBlocks, setTrainingBlocks] = usePersistentState<TrainingBlock[]>('physio_training_blocks', () => {
     try {
       const raw = localStorage.getItem('physio_training_blocks');
       if (raw !== null) {
@@ -375,7 +381,6 @@ export function useData() {
         }
       }
     } catch (e) {}
-    // Empty state propre : aucun bloc imposé par défaut
     return [];
   });
 
@@ -385,7 +390,6 @@ export function useData() {
       const raw = localStorage.getItem('physio_target_competition');
       if (raw) return JSON.parse(raw);
     } catch (e) {}
-    // Empty state propre : aucune compétition imposée par défaut
     return null;
   });
 
@@ -400,7 +404,7 @@ export function useData() {
   };
 
   // Constantes physiologiques individuelles (tauFatigue, tauFitness)
-  const [physioSettings, setPhysioSettingsState] = useState<PhysiologicalSettings>(() => {
+  const [physioSettings, setPhysioSettingsState] = usePersistentState<PhysiologicalSettings>('physio_settings', () => {
     try {
       const raw = localStorage.getItem('physio_settings');
       if (raw) return JSON.parse(raw);
@@ -410,7 +414,6 @@ export function useData() {
 
   const savePhysioSettings = (newSettings: PhysiologicalSettings) => {
     setPhysioSettingsState(newSettings);
-    localStorage.setItem('physio_settings', JSON.stringify(newSettings));
     triggerSyncPush();
   };
 
@@ -605,6 +608,11 @@ export function useData() {
       }
 
       // 2. FUSION NON DESTRUCTRICE DES SÉANCES (Préserve les séances hors-ligne, propage les suppressions et arbitrages récents)
+      let needPush = false;
+      let newMergedTombstones: Record<string, number> | null = null;
+      let keysToDelete: string[] = [];
+      let sessionsToSave: Record<string, Record<string, SessionData>> = {};
+
       setEvents(prevLocalEvents => {
         const incomingRemoteEvents = imported.events ? sanitizeEventsPayload(imported.events) : {};
         const incomingRemoteTombstones = imported.tombstones ? sanitizeTombstonesPayload(imported.tombstones) : {};
@@ -612,51 +620,52 @@ export function useData() {
         const { merged, hasNewLocalData, mergedTombstones, deletedKeysToPurge } = mergeEventsNonDestructive(
           prevLocalEvents,
           incomingRemoteEvents,
-          tombstones,
+          tombstonesRef.current,
           incomingRemoteTombstones
         );
 
-        // Mettre à jour l'état et le stockage des tombstones
-        setTombstones(mergedTombstones);
-        localStorage.setItem('physio_tombstones', JSON.stringify(mergedTombstones));
-
-        // Purger physiquement les séances supprimées du stockage local
-        deletedKeysToPurge.forEach(k => {
-          localStorage.removeItem(k);
-        });
-
-        // Répercuter les séances fusionnées dans le stockage local
-        Object.entries(merged).forEach(([qId, dates]) => {
-          if (!isSafeId(qId)) return;
-          Object.entries(dates).forEach(([date, data]) => {
-            if (!isSafeDate(date)) return;
-            localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));
-          });
-        });
-
-        // Si l'athlète avait des séances locales plus complètes créées hors-ligne ou des suppressions à synchroniser,
-        // déclencher un push automatique vers le cloud pour consolider la base distante
-        if (hasNewLocalData) {
-          setTimeout(() => triggerSyncPush(), 1000);
-        }
+        newMergedTombstones = mergedTombstones;
+        keysToDelete = deletedKeysToPurge;
+        sessionsToSave = merged;
+        if (hasNewLocalData) needPush = true;
 
         return merged;
       });
 
+      // Effets de bord exécutés en dehors du reducer (pureté React 19)
+      if (newMergedTombstones) {
+        setTombstones(newMergedTombstones);
+        localStorage.setItem('physio_tombstones', JSON.stringify(newMergedTombstones));
+      }
+      keysToDelete.forEach(k => {
+        localStorage.removeItem(k);
+      });
+      Object.entries(sessionsToSave).forEach(([qId, dates]) => {
+        if (!isSafeId(qId)) return;
+        Object.entries(dates).forEach(([date, data]) => {
+          if (!isSafeDate(date)) return;
+          localStorage.setItem(`${date}_${qId}`, JSON.stringify(data));
+        });
+      });
+      if (needPush) {
+        setTimeout(() => triggerSyncPush(), 1000);
+      }
+
       // 3. FUSION NON DESTRUCTRICE DES MÉTRIQUES JOURNALIÈRES
+      let metricsToPersist: Record<string, DailyMetrics> = {};
       setDailyMetrics(prevLocalMetrics => {
         const incomingRemoteMetrics = imported.dailyMetrics ? sanitizeDailyMetricsPayload(imported.dailyMetrics) : {};
         const { merged } = mergeDailyMetricsNonDestructive(prevLocalMetrics, incomingRemoteMetrics);
-
-        Object.entries(merged).forEach(([dateStr, metrics]) => {
-          if (!isSafeDate(dateStr)) return;
-          Object.entries(metrics).forEach(([type, value]) => {
-            if (!['readiness', 'vfc', 'hrRest'].includes(type)) return;
-            localStorage.setItem(`${dateStr}_${type}`, String(value));
-          });
-        });
-
+        metricsToPersist = merged;
         return merged;
+      });
+
+      Object.entries(metricsToPersist).forEach(([dateStr, metrics]) => {
+        if (!isSafeDate(dateStr)) return;
+        Object.entries(metrics).forEach(([type, value]) => {
+          if (!['readiness', 'vfc', 'hrRest'].includes(type)) return;
+          localStorage.setItem(`${dateStr}_${type}`, String(value));
+        });
       });
 
       // 4. APPLICATION VALIDÉE DES BLOCS, QUALITÉS, COMPÉTITION ET RÉGLAGES
@@ -665,19 +674,16 @@ export function useData() {
       if (stagedEntries.has('physio_training_blocks')) {
         const val = JSON.parse(stagedEntries.get('physio_training_blocks')!);
         setTrainingBlocks(val);
-        localStorage.setItem('physio_training_blocks', JSON.stringify(val));
       }
 
       if (stagedEntries.has('physio_qualities')) {
         const val = JSON.parse(stagedEntries.get('physio_qualities')!);
         setQualitiesState(val);
-        localStorage.setItem('physio_qualities', JSON.stringify(val));
       }
 
       if (stagedEntries.has('physio_block_templates')) {
         const val = JSON.parse(stagedEntries.get('physio_block_templates')!);
         setBlockTemplates(val);
-        localStorage.setItem('physio_block_templates', JSON.stringify(val));
       }
 
       if (stagedEntries.has('physio_target_competition')) {
@@ -692,7 +698,6 @@ export function useData() {
       if (stagedEntries.has('physio_settings')) {
         const val = JSON.parse(stagedEntries.get('physio_settings')!);
         setPhysioSettingsState(val);
-        localStorage.setItem('physio_settings', JSON.stringify(val));
       }
 
       if (stagedEntries.has('physio_custom_exercises')) {
@@ -875,18 +880,13 @@ export function useData() {
       } else {
         updated = [...prev, block];
       }
-      localStorage.setItem('physio_training_blocks', JSON.stringify(updated));
       return updated;
     });
     triggerSyncPush();
   };
 
   const deleteTrainingBlock = (blockId: string) => {
-    setTrainingBlocks(prev => {
-      const updated = prev.filter(b => b.id !== blockId);
-      localStorage.setItem('physio_training_blocks', JSON.stringify(updated));
-      return updated;
-    });
+    setTrainingBlocks(prev => prev.filter(b => b.id !== blockId));
     triggerSyncPush();
   };
 
@@ -897,7 +897,6 @@ export function useData() {
 
   const setQualities = (newQualities: Quality[]) => {
     setQualitiesState(newQualities);
-    localStorage.setItem('physio_qualities', JSON.stringify(newQualities));
     triggerSyncPush();
   };
 
@@ -913,7 +912,6 @@ export function useData() {
       const item = next[idx];
       next[idx] = next[targetIdx];
       next[targetIdx] = item;
-      localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
     triggerSyncPush();
@@ -926,7 +924,6 @@ export function useData() {
       const next = [...prev];
       const [item] = next.splice(idx, 1);
       next.unshift(item);
-      localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
     triggerSyncPush();
@@ -947,7 +944,6 @@ export function useData() {
       const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
       next.splice(insertIndex, 0, movedItem);
 
-      localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
     triggerSyncPush();
@@ -960,7 +956,6 @@ export function useData() {
       const next = [...prev];
       const [movedItem] = next.splice(sourceIndex, 1);
       next.splice(targetIndex, 0, movedItem);
-      localStorage.setItem('physio_qualities', JSON.stringify(next));
       return next;
     });
     triggerSyncPush();
@@ -970,9 +965,7 @@ export function useData() {
     const targetBlock = block || activeBlockToday;
     if (!targetBlock || !targetBlock.focusQualities) return;
     setQualitiesState(prev => {
-      const next = reorderQualitiesForBlock(prev, targetBlock.focusQualities);
-      localStorage.setItem('physio_qualities', JSON.stringify(next));
-      return next;
+      return reorderQualitiesForBlock(prev, targetBlock.focusQualities);
     });
     triggerSyncPush();
   };
@@ -991,7 +984,6 @@ export function useData() {
       } else {
         updated = [...prev, template];
       }
-      saveBlockTemplates(updated);
       return updated;
     });
     triggerSyncPush();
@@ -1011,9 +1003,7 @@ export function useData() {
   const reorderByUrgency = () => {
     const sortedIds = trainingRecommendations.map(r => r.quality.id);
     setQualitiesState(prev => {
-      const next = [...prev].sort((a, b) => sortedIds.indexOf(a.id) - sortedIds.indexOf(b.id));
-      localStorage.setItem('physio_qualities', JSON.stringify(next));
-      return next;
+      return [...prev].sort((a, b) => sortedIds.indexOf(a.id) - sortedIds.indexOf(b.id));
     });
     triggerSyncPush();
   };
