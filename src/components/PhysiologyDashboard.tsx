@@ -19,7 +19,7 @@ import {
 import { isPrimary } from '../utils/loadHelpers';
 import { getTsbZone, calculateTsbPercent } from '../utils/zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from '../utils/vfcHelpers';
-import type { TooltipContentProps } from 'recharts';
+import type { TooltipContentProps, MouseHandlerDataParam } from 'recharts';
 import type {
   BanisterPerformanceResult, FosterMetricsResult, TaperingAnalysisResult,
   CardioMuscularBalance, IntensityDistribution, PerceivedFatigueAnalysis
@@ -1469,11 +1469,12 @@ export default function PhysiologyDashboard({
             <ComposedChart 
               data={chartData} 
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              onClick={(e) => {
-                // recharts 2 fournissait activePayload ; absent des types recharts 3.
-                const activePayload = (e as { activePayload?: Array<{ payload: ChartDay }> } | null)?.activePayload;
-                if (activePayload && activePayload.length > 0) {
-                  const clickedDay = activePayload[0].payload;
+              onClick={(state: MouseHandlerDataParam) => {
+                // recharts 3 : l'état de clic expose activeIndex / activeLabel (plus d'activePayload).
+                const index = state.activeIndex === null || state.activeIndex === undefined ? NaN : Number(state.activeIndex);
+                const clickedDay = (Number.isInteger(index) ? chartData[index] : undefined)
+                  ?? chartData.find(d => d.dateStr === state.activeLabel);
+                if (clickedDay) {
                   setSelectedBanisterDay(clickedDay);
                   setIsDayPinned(true);
                 }
