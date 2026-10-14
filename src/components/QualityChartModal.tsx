@@ -1,14 +1,22 @@
 import { useState, useMemo, memo } from 'react';
 import { 
-  LineChart, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
+  Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { computeQualityEMAData } from '../utils/physiology';
 import { X, TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
+import type { TooltipContentProps } from 'recharts';
+import type { Quality, QualityEvents } from '../types';
 
-const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
+export interface QualityChartModalProps {
+  quality: Quality;
+  events: QualityEvents;
+  onClose: () => void;
+}
+
+const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: TooltipContentProps) {
   if (active && payload && payload.length) {
-    const dataPoint = payload[0]?.payload;
+    const dataPoint = payload[0]?.payload as { dateStr?: string } | undefined;
     return (
       <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.6)] text-xs">
         <p className="m-0 mb-2 font-bold text-slate-200 uppercase text-[10px] tracking-wider border-b border-white/10 pb-1">
@@ -26,7 +34,7 @@ const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
   return null;
 });
 
-export default function QualityChartModal({ quality, events, onClose }) {
+export default function QualityChartModal({ quality, events, onClose }: QualityChartModalProps) {
   const [timeframe, setTimeframe] = useState(30);
 
   const emaData = useMemo(() => {

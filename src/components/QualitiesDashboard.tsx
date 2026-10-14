@@ -1,4 +1,4 @@
-import React, { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer 
@@ -12,15 +12,39 @@ import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeCellState, extractSessionLoad } from '../utils/physiology';
 import { isPrimary } from '../utils/loadHelpers';
 import { isCardioQuality, isForceQuality } from '../utils/qualities';
+import { indexToX, valueToY } from '../utils/chartMath';
+import type { TooltipContentProps } from 'recharts';
+import type { Quality, EventsByQuality, QualitiesEMAMap } from '../types';
+import type { TrainingBlock } from '../hooks/useBlocksState';
 
-function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }) {
+interface MiniSparklineProps {
+  data?: number[];
+  color?: string;
+  height?: number;
+  width?: number;
+}
+
+interface CircularRemanenceGaugeProps {
+  percent?: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+}
+
+export interface QualitiesDashboardProps {
+  events?: EventsByQuality;
+  qualities?: Quality[];
+  qualitiesEMA?: QualitiesEMAMap;
+  trainingBlocks?: TrainingBlock[];
+}
+
+function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }: MiniSparklineProps) {
   if (!data || data.length < 2) return null;
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
-  const range = max - min || 1;
   const points = data.map((val, idx) => {
-    const x = (idx / (data.length - 1)) * width;
-    const y = height - ((val - min) / range) * (height - 4) - 2;
+    const x = indexToX(idx, data.length, 0, width);
+    const y = valueToY(val, min, max, height - 2, height - 4);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
 
@@ -41,7 +65,7 @@ function MiniSparkline({ data = [], color = '#38bdf8', height = 24, width = 76 }
 /**
  * Mini-jauge circulaire de rémanence restante (SVG haute précision)
  */
-function CircularRemanenceGauge({ percent = 0, size = 42, strokeWidth = 3.5, color = '#10b981' }) {
+function CircularRemanenceGauge({ percent = 0, size = 42, strokeWidth = 3.5, color = '#10b981' }: CircularRemanenceGaugeProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clampedPercent = Math.max(0, Math.min(100, percent));
@@ -80,9 +104,9 @@ function CircularRemanenceGauge({ percent = 0, size = 42, strokeWidth = 3.5, col
   );
 }
 
-const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
+const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: TooltipContentProps) {
   if (active && payload && payload.length) {
-    const dataItem = payload[0]?.payload;
+    const dataItem = payload[0]?.payload as { dateStr?: string } | undefined;
     return (
       <div className="bg-[#121216]/95 backdrop-blur-md p-3 border border-white/10 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.5)] max-w-xs pointer-events-none select-none">
         <div className="flex items-center justify-between gap-3 mb-2 pb-1 border-b border-white/10">
@@ -107,13 +131,13 @@ export default function QualitiesDashboard({
   qualities = [],
   qualitiesEMA = {},
   trainingBlocks = []
-}) {
+}: QualitiesDashboardProps) {
   const [selectedQualityId, setSelectedQualityId] = useState(qualities[0]?.id || 'vo2max');
-  const [selectedCategory, setSelectedCategory] = useState('all'); // 'all' | 'cardio' | 'force' | 'specific' | 'active'
+  const [selectedCategory] = useState<'all' | 'cardio' | 'force' | 'specific' | 'active'>('all'); // 'all' | 'cardio' | 'force' | 'specific' | 'active'
   const [hideZeroOnly, setHideZeroOnly] = useState(false);
-  const [trendBasis, setTrendBasis] = useState('period'); // 'period' | 'daily' | 'week'
+  const [trendBasis, setTrendBasis] = useState<'period' | 'daily' | 'week'>('period'); // 'period' | 'daily' | 'week'
   const [qualitySearch, setQualitySearch] = useState('');
-  const [remanenceFilter, setRemanenceFilter] = useState('all'); // 'all' | 'urgent' | 'recall' | 'optimal'
+  const [remanenceFilter, setRemanenceFilter] = useState<'all' | 'urgent' | 'recall' | 'optimal'>('all'); // 'all' | 'urgent' | 'recall' | 'optimal'
 
   const filteredQualities = useMemo(() => {
     let list = qualities;
@@ -312,7 +336,7 @@ export default function QualitiesDashboard({
     };
   }, [activeQualityData.series]);
 
-  const getTrendMagnitudeInfo = (delta, percent) => {
+  const getTrendMagnitudeInfo = (delta: number, percent: number) => {
     const absD = Math.abs(delta);
     const absP = Math.abs(percent);
 
@@ -341,7 +365,13 @@ export default function QualitiesDashboard({
     return { isUp, isDown, level, label, absD, absP };
   };
 
-  const renderTrendIndicator = (delta, percent, prevVal, currentVal, mode = 'compact') => {
+  const renderTrendIndicator = (
+    delta: number,
+    percent: number,
+    prevVal: number | undefined,
+    currentVal: number,
+    mode: 'compact' | 'card' = 'compact'
+  ) => {
     const { isUp, isDown, level, label } = getTrendMagnitudeInfo(delta, percent);
 
     const periodRefName = 

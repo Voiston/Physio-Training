@@ -1,8 +1,13 @@
-import React from 'react';
 import PhysiologyDashboard from './PhysiologyDashboard';
+import type { PhysiologyDashboardProps } from './PhysiologyDashboard';
 import QualitiesDashboard from './QualitiesDashboard';
+import type { QualitiesDashboardProps } from './QualitiesDashboard';
 
-export default function MetricsDashboard(props) {
+export type MetricsDashboardProps = PhysiologyDashboardProps & QualitiesDashboardProps & {
+  viewMode?: 'all' | 'physiology' | 'qualities';
+};
+
+export default function MetricsDashboard(props: MetricsDashboardProps) {
   const { viewMode = 'all' } = props;
 
   if (viewMode === 'physiology') {

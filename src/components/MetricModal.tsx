@@ -1,11 +1,30 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { Calendar, CheckCircle2 } from 'lucide-react';
 
-export default function MetricModal({ info, onClose, onSave }) {
-  const existing = info.currentValue !== '-' ? info.currentValue : '';
-  const [value, setValue] = useState(existing);
+export interface MetricModalInfo {
+  type: 'readiness' | 'vfc' | 'hrRest' | string;
+  dateStr: string;
+  /** Valeur actuelle, ou '-' si aucune saisie. */
+  currentValue: number | string;
+  title: string;
+  label: string;
+  min?: number;
+  max?: number;
+  placeholder?: string;
+}
 
-  const handleSubmit = (e) => {
+export interface MetricModalProps {
+  info: MetricModalInfo;
+  onClose: () => void;
+  onSave: (value: number | null) => void;
+}
+
+export default function MetricModal({ info, onClose, onSave }: MetricModalProps) {
+  const existing = info.currentValue !== '-' ? info.currentValue : '';
+  const [value, setValue] = useState<number | string>(existing);
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     onSave(value ? Number(value) : null);
     onClose();

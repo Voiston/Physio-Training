@@ -1,12 +1,18 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { 
-  LineChart, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
+  Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer 
 } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
+import type { QualityEMASeriesPoint } from '../types';
 
-const CustomInlineTooltip = memo(function CustomInlineTooltip({ active, payload, label }) {
+export interface GridQualityChartProps {
+  series?: QualityEMASeriesPoint[];
+}
+
+const CustomInlineTooltip = memo(function CustomInlineTooltip({ active, payload, label }: TooltipContentProps) {
   if (active && payload && payload.length) {
-    const dataPoint = payload[0]?.payload;
+    const dataPoint = payload[0]?.payload as QualityEMASeriesPoint | undefined;
     return (
       <div className="bg-slate-950/95 backdrop-blur-md p-3 border border-white/15 rounded-xl shadow-2xl text-xs min-w-[170px]">
         <p className="m-0 mb-1.5 font-bold text-white uppercase text-[10px] tracking-wider border-b border-white/10 pb-1 flex items-center justify-between">
@@ -28,7 +34,7 @@ const CustomInlineTooltip = memo(function CustomInlineTooltip({ active, payload,
   return null;
 });
 
-const GridQualityChart = memo(function GridQualityChart({ series = [] }) {
+const GridQualityChart = memo(function GridQualityChart({ series = [] }: GridQualityChartProps) {
   return (
     <div className="h-44 w-full">
       <ResponsiveContainer width="100%" height="100%">

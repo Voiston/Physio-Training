@@ -1,8 +1,21 @@
 import { useState, useRef, memo } from 'react';
+import type { MouseEvent } from 'react';
+import type { QualityEMASeriesPoint } from '../types';
+import { indexToX, valueToY, xToNearestIndex } from '../utils/chartMath';
 
-const QualitySparkline = memo(function QualitySparkline({ data, current, width = 115, height = 30 }) {
-  const [hoverIndex, setHoverIndex] = useState(null);
-  const containerRef = useRef(null);
+type EmaKey = 'ema3' | 'ema7' | 'ema21';
+
+export interface QualitySparklineProps {
+  data: QualityEMASeriesPoint[] | null | undefined;
+  /** Non utilisé par le rendu, conservé pour compatibilité des appelants. */
+  current?: unknown;
+  width?: number;
+  height?: number;
+}
+
+const QualitySparkline = memo(function QualitySparkline({ data, width = 115, height = 30 }: QualitySparklineProps) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   if (!data || data.length < 2) {
     return (
@@ -20,10 +33,11 @@ const QualitySparkline = memo(function QualitySparkline({ data, current, width =
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
 
-  const getX = (index) => padding + (index / (data.length - 1)) * usableWidth;
-  const getY = (val) => height - padding - ((val || 0) / maxVal) * usableHeight;
+  const getX = (index: number): number => indexToX(index, data.length, padding, usableWidth);
+  const getY = (val: number | undefined): number =>
+    valueToY(val || 0, 0, maxVal, height - padding, usableHeight);
 
-  const createPath = (key) => {
+  const createPath = (key: EmaKey): string => {
     return data
       .map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(d[key]).toFixed(1)}`)
       .join(' ');
@@ -36,18 +50,13 @@ const QualitySparkline = memo(function QualitySparkline({ data, current, width =
   const lastIndex = data.length - 1;
   const lastX = getX(lastIndex);
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
-    
-    // Clamp inside usable boundaries
-    const clampedX = Math.max(padding, Math.min(width - padding, mouseX));
-    const ratio = (clampedX - padding) / usableWidth;
-    const closestIdx = Math.round(ratio * (data.length - 1));
-    const safeIdx = Math.max(0, Math.min(data.length - 1, closestIdx));
-    
-    setHoverIndex(safeIdx);
+
+    // Index borné à l'intérieur de la zone utile
+    setHoverIndex(xToNearestIndex(mouseX, data.length, padding, usableWidth));
   };
 
   const handleMouseLeave = () => {
@@ -141,7 +150,7 @@ const QualitySparkline = memo(function QualitySparkline({ data, current, width =
           }}
         >
           <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-0.5 mb-1 text-[9px]">
-            <span className="font-bold text-slate-300">{activePoint.dateStr || `J-${data.length - 1 - hoverIndex}`}</span>
+            <span className="font-bold text-slate-300">{activePoint.dateStr || `J-${data.length - 1 - (hoverIndex ?? lastIndex)}`}</span>
             {activePoint.load > 0 && (
               <span className="text-amber-300 font-bold bg-amber-500/20 px-1 rounded">
                 ⚡ {activePoint.load} pts

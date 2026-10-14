@@ -1,30 +1,100 @@
-import React, { useState, useMemo, useEffect, memo } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { 
   ComposedChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, ReferenceLine 
 } from 'recharts';
 import { 
   AlertTriangle, TrendingUp, TrendingDown, Activity, Sparkles, 
-  Minus, ArrowUp, ArrowDown, Info, Gauge, Trophy, FileText, 
-  ShieldAlert, CheckCircle2, Sliders, Heart, Dumbbell, Flame,
+  Info, Gauge, Trophy, FileText, 
+  ShieldAlert, Sliders, Heart, Dumbbell, Flame,
   Calendar, Clock, Pin, Zap, ChevronLeft, ChevronRight, Target, Table as TableIcon
 } from 'lucide-react';
 import { calculateEMA } from '../utils/mathHelpers';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { 
   computeCardioVsMuscularBalance, 
-  extractSessionLoad,
   computeIntensityDistribution,
   computePerceivedFatigueAnalysis
 } from '../utils/physiology';
 import { isPrimary } from '../utils/loadHelpers';
 import { getTsbZone, calculateTsbPercent } from '../utils/zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from '../utils/vfcHelpers';
+import type { TooltipContentProps } from 'recharts';
+import type {
+  BanisterPerformanceResult, FosterMetricsResult, TaperingAnalysisResult,
+  CardioMuscularBalance, IntensityDistribution, PerceivedFatigueAnalysis
+} from '../utils/physiology';
+import type { Quality, EventsByQuality } from '../types';
+import type { DailyMetrics, PhysiologicalSettings } from '../hooks/useMetricsState';
+
+/** Séance agrégée affichée dans l'inspection d'un jour. */
+interface DaySession {
+  qualityId: string;
+  qualityName: string;
+  load: number;
+  duration: number;
+  rpeM: number;
+  rpeC: number;
+  fatigue: number | null;
+  notes: string;
+  sessionType: string;
+}
+
+/** Point de la série affichée (Banister / VFC). */
+interface ChartDay {
+  dateStr: string;
+  day: number;
+  offset: number;
+  isToday: boolean;
+  isFuture: boolean;
+  vfc: number | null;
+  hrRest: number | null;
+  readiness: number | null;
+  load: number;
+  vfcEMA3: number | null;
+  vfcEMA7: number | null;
+  loadEMA3: number;
+  loadEMA7: number;
+  loadEMA21: number;
+  tsb: number;
+  tsbPercent: number | null;
+  sessions: DaySession[];
+  month?: number;
+  atl?: number;
+  ctl?: number;
+  acwr?: number;
+  acwrUncoupled?: number;
+}
+
+/** Valeurs minimales utilisées par l'interprétation Banister. */
+interface BanisterDayInput {
+  tsb?: number;
+  loadEMA7?: number;
+  loadEMA21?: number;
+}
+
+export interface PhysiologyDashboardProps {
+  events?: EventsByQuality;
+  dailyMetrics?: Record<string, DailyMetrics>;
+  qualities?: Quality[];
+  fosterMetrics?: FosterMetricsResult | null;
+  banisterPerformance?: BanisterPerformanceResult | null;
+  taperingAnalysis?: TaperingAnalysisResult | null;
+  cardioMuscularBalance?: CardioMuscularBalance | null;
+  intensityDistribution?: IntensityDistribution | null;
+  perceivedFatigueAnalysis?: PerceivedFatigueAnalysis | null;
+  isSimulationActive?: boolean;
+  physioSettings?: PhysiologicalSettings | null;
+  onOpenCompetitionModal?: (() => void) | null;
+  onOpenReportModal?: (() => void) | null;
+  onOpenPhysioSettingsModal?: (() => void) | null;
+  onToggleSimulation?: (() => void) | null;
+}
 
 /**
  * Formate une date YYYY-MM-DD en français complet pour l'inspection de séance
  */
-function formatFullInspectionDate(dateStr) {
+function formatFullInspectionDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
@@ -36,9 +106,15 @@ function formatFullInspectionDate(dateStr) {
 /**
  * Interprétation dynamique en langage clair du bilan Banister / Coggan PMC
  */
-function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 28, historyDays = 30, hasInitialCtl = false) {
+function getDynamicBanisterInterpretation(
+  dayData: BanisterDayInput | null | undefined,
+  _tauFatigue: number = 7,
+  tauFitness: number = 28,
+  historyDays: number = 30,
+  hasInitialCtl: boolean = false
+) {
   if (!dayData) return null;
-  const { tsb = 0, loadEMA7 = 0, loadEMA21 = 0 } = dayData;
+  const { loadEMA7 = 0, loadEMA21 = 0 } = dayData;
   const atl = loadEMA7;
   const ctl = loadEMA21;
   const acwr = ctl > 0 ? (atl / ctl).toFixed(2) : '1.0';
@@ -76,9 +152,9 @@ function getDynamicBanisterInterpretation(dayData, tauFatigue = 7, tauFitness = 
 /**
  * Tooltip hautement optimisé à l'échelle du module
  */
-const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
+const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: TooltipContentProps) {
   if (active && payload && payload.length) {
-    const dataItem = payload[0]?.payload;
+    const dataItem = payload[0]?.payload as ChartDay | undefined;
     const isFut = dataItem?.isFuture;
     const isTod = dataItem?.isToday;
 
@@ -153,19 +229,19 @@ export default function PhysiologyDashboard({
   onOpenReportModal = null,
   onOpenPhysioSettingsModal = null,
   onToggleSimulation = null
-}) {
-  const [activeTooltip, setActiveTooltip] = useState(null); // 'tsb' | 'atl' | 'ctl' | null
+}: PhysiologyDashboardProps) {
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null); // 'tsb' | 'atl' | 'ctl' | null
   const [banisterCurves, setBanisterCurves] = useState({ atl: true, ctl: true, tsb: true });
   const [vfcCurves, setVfcCurves] = useState({ vfc: true, ema3: true, ema7: true });
 
   // Inspection d'un point Banister, affichage tableau accessible
-  const [selectedBanisterDay, setSelectedBanisterDay] = useState(null);
+  const [selectedBanisterDay, setSelectedBanisterDay] = useState<ChartDay | null>(null);
   const [isDayPinned, setIsDayPinned] = useState(false);
   const [showDataTable, setShowDataTable] = useState(false);
 
   // Écouteur clavier pour fermeture accessible des infobulles scientifiques (Touche Escape - WCAG 2.1)
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && activeTooltip) {
         setActiveTooltip(null);
       }
@@ -178,7 +254,7 @@ export default function PhysiologyDashboard({
   const tauFitness = physioSettings?.tauFitness || 28;
 
   // 1. Préparation des données globales Banister & VFC pour Recharts
-  const chartData = useMemo(() => {
+  const chartData = useMemo<ChartDay[]>(() => {
     if (banisterPerformance && banisterPerformance.series && banisterPerformance.series.length > 0) {
       const vfcRaw = banisterPerformance.series.map(point => dailyMetrics[point.dateStr]?.vfc || null);
       const vfcEMA3 = calculateEMA(vfcRaw, 3, false);
@@ -190,7 +266,7 @@ export default function PhysiologyDashboard({
         const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
         const readiness = dailyMetrics[dateStr]?.readiness || null;
         
-        const daySessions = [];
+        const daySessions: DaySession[] = [];
         Object.entries(events).forEach(([qualityId, qualityDates]) => {
           if (qualityDates && qualityDates[dateStr]) {
             const item = qualityDates[dateStr];
@@ -251,7 +327,7 @@ export default function PhysiologyDashboard({
     }
 
     const today = new Date();
-    const rawData = [];
+    const rawData: Array<Pick<ChartDay, 'dateStr' | 'day' | 'offset' | 'isToday' | 'isFuture' | 'vfc' | 'hrRest' | 'readiness' | 'load' | 'sessions'>> = [];
     const futureDays = isSimulationActive ? 14 : (taperingAnalysis ? 7 : 0);
     
     for (let i = -29; i <= futureDays; i++) {
@@ -263,7 +339,7 @@ export default function PhysiologyDashboard({
       const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
       const readiness = dailyMetrics[dateStr]?.readiness || null;
       let totalLoad = 0;
-      const daySessions = [];
+      const daySessions: DaySession[] = [];
       
       Object.entries(events).forEach(([qualityId, qualityDates]) => {
         if (qualityDates && qualityDates[dateStr]) {
@@ -804,7 +880,7 @@ export default function PhysiologyDashboard({
             ) : (
               <button
                 type="button"
-                onClick={onOpenCompetitionModal}
+                onClick={onOpenCompetitionModal ?? undefined}
                 className="min-h-[44px] px-3 inline-flex items-center text-xs font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 rounded-lg"
               >
                 Définir
@@ -1066,7 +1142,7 @@ export default function PhysiologyDashboard({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {['tsb', 'atl', 'ctl'].map((key) => {
+          {(['tsb', 'atl', 'ctl'] as const).map((key) => {
             const info = physioTooltips[key];
             const isActive = activeTooltip === key;
             const isTsb = key === 'tsb';
@@ -1079,8 +1155,6 @@ export default function PhysiologyDashboard({
             let mainNumber = '0';
             let unitLabel = '';
             let secondaryDetail = '';
-            let shortFormula = '';
-            let statusColor = 'text-slate-300';
 
             let gaugePercent = 50;
             let gaugeSubtextLeft = '';
@@ -1096,7 +1170,6 @@ export default function PhysiologyDashboard({
                 mainNumber = tsbVal > 0 ? `+${tsbVal}` : `${tsbVal}`;
                 unitLabel = 'pts';
                 secondaryDetail = '(Étalonnage CTL)';
-                shortFormula = 'CTL − ATL';
                 gaugePercent = 50;
                 gaugeSubtextLeft = 'Calibration';
                 gaugeSubtextCenter = 'Convergence en cours';
@@ -1104,12 +1177,10 @@ export default function PhysiologyDashboard({
                 cardBorder = 'border-slate-700/60 bg-gradient-to-b from-slate-900/60 to-slate-950/80';
                 valueColor = 'text-slate-300';
                 badgeClass = 'bg-slate-700/60 text-slate-300 border-slate-600';
-                statusColor = 'text-slate-400';
               } else {
                 mainNumber = tsbPct !== null && tsbPct !== undefined ? (tsbPct > 0 ? `+${tsbPct}%` : `${tsbPct}%`) : (tsbVal > 0 ? `+${tsbVal}` : `${tsbVal}`);
                 unitLabel = 'CTL';
                 secondaryDetail = `(${tsbVal > 0 ? `+${tsbVal}` : tsbVal} pts)`;
-                shortFormula = 'Forme relative';
 
                 const clampPct = Math.max(-50, Math.min(30, tsbPct ?? tsbVal));
                 gaugePercent = Math.max(4, Math.min(96, ((clampPct + 50) / 80) * 100));
@@ -1121,22 +1192,18 @@ export default function PhysiologyDashboard({
                   cardBorder = 'border-red-500/40 bg-gradient-to-b from-red-950/25 to-slate-900/80 hover:border-red-400/60';
                   valueColor = 'text-red-400';
                   badgeClass = 'bg-red-500/20 text-red-300 border-red-500/30';
-                  statusColor = 'text-red-400';
                 } else if (banisterSummary?.tsbZone?.color === 'amber') {
                   cardBorder = 'border-amber-500/35 bg-gradient-to-b from-amber-950/20 to-slate-900/80 hover:border-amber-400/50';
                   valueColor = 'text-amber-400';
                   badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-                  statusColor = 'text-amber-400';
                 } else if (banisterSummary?.tsbZone?.color === 'emerald') {
                   cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
                   valueColor = 'text-emerald-400';
                   badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-                  statusColor = 'text-emerald-400';
                 } else {
                   cardBorder = 'border-sky-500/30 bg-gradient-to-b from-sky-950/20 to-slate-900/80 hover:border-sky-400/50';
                   valueColor = 'text-sky-400';
                   badgeClass = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
-                  statusColor = 'text-sky-400';
                 }
               }
             } else if (isAtl) {
@@ -1145,7 +1212,6 @@ export default function PhysiologyDashboard({
               mainNumber = `${atlVal}`;
               unitLabel = 'pts';
               secondaryDetail = `(ACWR : ${acwr}x)`;
-              shortFormula = `MME τ=${tauFatigue}j`;
 
               const clampAcwr = Math.max(0.4, Math.min(2.0, Number(acwr) || 1.0));
               gaugePercent = Math.max(4, Math.min(96, ((clampAcwr - 0.4) / 1.6) * 100));
@@ -1157,22 +1223,18 @@ export default function PhysiologyDashboard({
                 cardBorder = 'border-red-500/40 bg-gradient-to-b from-red-950/25 to-slate-900/80 hover:border-red-400/60';
                 valueColor = 'text-red-400';
                 badgeClass = 'bg-red-500/20 text-red-300 border-red-500/40';
-                statusColor = 'text-red-400';
               } else if (Number(acwr) >= 1.3) {
                 cardBorder = 'border-amber-500/35 bg-gradient-to-b from-amber-950/20 to-slate-900/80 hover:border-amber-400/50';
                 valueColor = 'text-amber-400';
                 badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
-                statusColor = 'text-amber-400';
               } else if (Number(acwr) >= 0.8) {
                 cardBorder = 'border-emerald-500/35 bg-gradient-to-b from-emerald-950/20 to-slate-900/80 hover:border-emerald-400/50';
                 valueColor = 'text-emerald-400';
                 badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
-                statusColor = 'text-emerald-400';
               } else {
                 cardBorder = 'border-sky-500/30 bg-gradient-to-b from-sky-950/20 to-slate-900/80 hover:border-sky-400/50';
                 valueColor = 'text-sky-400';
                 badgeClass = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
-                statusColor = 'text-sky-400';
               }
             } else if (isCtl) {
               const ctlVal = banisterSummary?.ctl ?? 0;
@@ -1181,7 +1243,6 @@ export default function PhysiologyDashboard({
               mainNumber = `${ctlVal}`;
               unitLabel = 'pts';
               secondaryDetail = `(${ramp > 0 ? `+${ramp}` : ramp} pts/sem)`;
-              shortFormula = `MME τ=${tauFitness}j`;
 
               const pctVal = rampPct ?? (ramp * 2);
               const clampRamp = Math.max(-10, Math.min(20, pctVal));
@@ -1193,7 +1254,6 @@ export default function PhysiologyDashboard({
               cardBorder = 'border-indigo-500/35 bg-gradient-to-b from-indigo-950/20 to-slate-900/80 hover:border-indigo-400/50';
               valueColor = 'text-indigo-300';
               badgeClass = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
-              statusColor = 'text-indigo-400';
             }
 
             return (
@@ -1410,8 +1470,10 @@ export default function PhysiologyDashboard({
               data={chartData} 
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               onClick={(e) => {
-                if (e && e.activePayload && e.activePayload.length > 0) {
-                  const clickedDay = e.activePayload[0].payload;
+                // recharts 2 fournissait activePayload ; absent des types recharts 3.
+                const activePayload = (e as { activePayload?: Array<{ payload: ChartDay }> } | null)?.activePayload;
+                if (activePayload && activePayload.length > 0) {
+                  const clickedDay = activePayload[0].payload;
                   setSelectedBanisterDay(clickedDay);
                   setIsDayPinned(true);
                 }

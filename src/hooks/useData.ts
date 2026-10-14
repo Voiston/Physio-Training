@@ -27,7 +27,7 @@ import { computeAllWeeksStats, WeekStats } from '../utils/weekHelpers';
 
 import { CURRENT_SCHEMA_VERSION, migrateData, migrateLocalStorage } from '../utils/migration';
 import { isCardioQuality } from '../utils/qualities';
-import { SessionExercise, getSavedCustomExercises } from '../utils/muscleHelpers';
+import { getSavedCustomExercises } from '../utils/muscleHelpers';
 import { 
   isSafeId, 
   isSafeDate, 
@@ -43,139 +43,24 @@ import {
   mergeDailyMetricsNonDestructive
 } from '../utils/security';
 
-export interface QualityImpact {
-  id: string;
-  ratio: number;
-}
-
-export interface Quality {
-  id: string;
-  name: string;
-  g?: number;
-  o?: number;
-  retentionDays?: number;
-  category?: 'cardio' | 'force' | 'mixte' | string;
-  impacts?: QualityImpact[];
-  [key: string]: any;
-}
-
-export interface TrainingRecommendation {
-  quality: Quality;
-  rank: number;
-  isBlockFocus: boolean;
-  cellState: any;
-  daysSinceLastSession: number | null;
-  lastSessionData: any;
-  urgencyScore: number;
-  urgencyLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'OPTIMAL' | 'REST' | string;
-  urgencyBadge: string;
-  urgencyColor: string;
-  reason: string;
-  actionTip: string;
-}
-
-
-export interface SecondaryContribution {
-  load: number;
-  loadCardio?: number;
-  loadMusc?: number;
-  ratio: number;
-  parentName?: string;
-}
-
-export interface SubSession {
-  id: string;
-  name?: string;
-  duration: number;
-  rpeMusc?: number;
-  rpeMusculaire?: number;
-  rpeCardio?: number;
-  fatigue?: number;
-  load: number;
-  loadCardio?: number;
-  loadMusc?: number;
-  sport?: string;
-  isEccentric?: boolean;
-  exercises?: SessionExercise[];
-  notes?: string;
-}
-
-export interface SessionData {
-  rpeMusc?: number;
-  rpeMusculaire?: number;
-  rpeCardio?: number;
-  fatigue?: number;
-  duration?: number;
-  load: number;
-  loadCardio?: number;
-  loadMusc?: number;
-  sport?: 'run' | 'bike' | 'muscu' | string;
-  isEccentric?: boolean;
-  isSecondary?: boolean;
-  exercises?: SessionExercise[];
-  subSessions?: SubSession[];
-  parentQId?: string;
-  parentContributions?: Record<string, SecondaryContribution>;
-  originalLoad?: number;
-  isSimulated?: boolean;
-  updatedAt?: number;
-}
-
-export interface QualityEMASeriesPoint {
-  dateStr: string;
-  day: number;
-  offset: number;
-  load: number;
-  ema3: number;
-  ema7: number;
-  ema21: number;
-}
-
-export interface QualityEMAData {
-  qualityId: string;
-  series: QualityEMASeriesPoint[];
-  current: {
-    load: number;
-    ema3: number;
-    ema7: number;
-    ema21: number;
-    prevEma3?: number;
-    prevEma7?: number;
-    prevEma21?: number;
-    prevPeriodEma3?: number;
-    prevPeriodEma7?: number;
-    prevPeriodEma21?: number;
-    prevWeekEma3?: number;
-    prevWeekEma7?: number;
-    prevWeekEma21?: number;
-    delta3?: number;
-    delta7?: number;
-    delta21?: number;
-    periodDelta3?: number;
-    periodDelta7?: number;
-    periodDelta21?: number;
-    weekDelta3?: number;
-    weekDelta7?: number;
-    weekDelta21?: number;
-    percent3?: number;
-    percent7?: number;
-    percent21?: number;
-    periodPercent3?: number;
-    periodPercent7?: number;
-    periodPercent21?: number;
-    weekPercent3?: number;
-    weekPercent7?: number;
-    weekPercent21?: number;
-    trend3?: 'up' | 'down' | 'flat' | string;
-    trend7?: 'up' | 'down' | 'flat' | string;
-    trend21?: 'up' | 'down' | 'flat' | string;
-    acwr: number;
-    trend: 'up' | 'down' | 'flat' | string;
-  };
-  sparkline: QualityEMASeriesPoint[];
-}
-
-export type QualitiesEMAMap = Record<string, QualityEMAData>;
+import type {
+  Quality,
+  TrainingRecommendation,
+  SessionData,
+  QualityEMAData,
+  QualitiesEMAMap
+} from '../types';
+export type {
+  QualityImpact,
+  Quality,
+  TrainingRecommendation,
+  SecondaryContribution,
+  SubSession,
+  SessionData,
+  QualityEMASeriesPoint,
+  QualityEMAData,
+  QualitiesEMAMap
+} from '../types';
 
 
 

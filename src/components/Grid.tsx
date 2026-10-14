@@ -10,6 +10,88 @@ import {
   BarChart3, Zap, Clock
 } from 'lucide-react';
 import { haptics } from '../utils/haptics';
+import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
+import type {
+  Quality, SessionData, QualityEvents, EventsByQuality, QualitiesEMAMap, QualityEMAData,
+  GridDay, MetricClickHandler
+} from '../types';
+import type { CellState } from '../utils/physiology';
+import type { WeekStats } from '../utils/weekHelpers';
+import type { VfcAnalysisResult, HrRestAnalysisResult } from '../utils/vfcHelpers';
+import type { DailyMetrics } from '../hooks/useMetricsState';
+import type { TrainingBlock } from '../hooks/useBlocksState';
+
+type DropPosition = 'before' | 'after';
+type EmaCurrent = QualityEMAData['current'];
+type CellClickHandler = (quality: Quality, dateStr: string, sessionData: SessionData | undefined) => void;
+
+interface GridQualityCellProps {
+  quality: Quality;
+  day: GridDay;
+  cellState: CellState | undefined;
+  sessionData: SessionData | undefined;
+  onCellClick: CellClickHandler;
+}
+
+interface GridReadinessCellProps {
+  day: GridDay;
+  score: number | '-';
+  onMetricClick: MetricClickHandler;
+}
+
+interface GridVfcCellProps {
+  day: GridDay;
+  vfc: string;
+  vfcAnalysis: VfcAnalysisResult | undefined;
+  onMetricClick: MetricClickHandler;
+}
+
+interface GridHrRestCellProps {
+  day: GridDay;
+  hrRest: string;
+  hrAnalysis: HrRestAnalysisResult | undefined;
+  onMetricClick: MetricClickHandler;
+}
+
+interface GridQualityRowProps {
+  q: Quality;
+  index: number;
+  timeline: GridDay[];
+  emaInfo: QualityEMAData | undefined;
+  isExpanded: boolean;
+  isDragging: boolean;
+  isOver: boolean;
+  dropPosition: DropPosition | null;
+  isFocusInActiveBlock: boolean;
+  activeBlockToday: TrainingBlock | null;
+  cellStates: Record<string, CellState> | undefined;
+  qEvents: QualityEvents | undefined;
+  onQualityClick: (quality: Quality) => void;
+  onCellClick: CellClickHandler;
+  onToggleExpand: (qId: string) => void;
+  onDragStart: (e: DragEvent<HTMLElement>, qId: string, index: number) => void;
+  onDragOver: (e: DragEvent<HTMLElement>, targetQId: string) => void;
+  onDragLeave: (e: DragEvent<HTMLElement>) => void;
+  onDrop: (e: DragEvent<HTMLElement>, targetQId: string) => void;
+  onDragEnd: () => void;
+  moveQuality?: (qId: string, direction: 'up' | 'down') => void;
+}
+
+export interface GridProps {
+  timeline: GridDay[];
+  events: EventsByQuality;
+  qualities: Quality[];
+  dailyMetrics: Record<string, DailyMetrics>;
+  qualitiesEMA: QualitiesEMAMap;
+  trainingBlocks?: TrainingBlock[];
+  currentWeekStats?: WeekStats | null;
+  moveQuality?: (qId: string, direction: 'up' | 'down') => void;
+  reorderQualities?: (sourceId: string, targetId: string, position?: DropPosition) => void;
+  onCellClick: CellClickHandler;
+  onMetricClick: MetricClickHandler;
+  onQualityClick: (quality: Quality) => void;
+  onOpenWeeklyView?: () => void;
+}
 
 /**
  * Cellule mémoïsée pour une qualité physique donnée et un jour de timeline.
@@ -21,13 +103,13 @@ const GridQualityCell = memo(function GridQualityCell({
   cellState,
   sessionData,
   onCellClick,
-}) {
+}: GridQualityCellProps) {
   const handleClick = useCallback(() => {
     haptics.tap();
     onCellClick(quality, day.dateStr, sessionData);
   }, [onCellClick, quality, day.dateStr, sessionData]);
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       haptics.tap();
@@ -59,15 +141,16 @@ const GridQualityCell = memo(function GridQualityCell({
   }
 
   const dateLabel = day.display?.date || day.dateStr;
-  const isMultiSession = Array.isArray(sessionData?.subSessions) && sessionData.subSessions.length > 1;
+  const subSessions = Array.isArray(sessionData?.subSessions) ? sessionData.subSessions : [];
+  const isMultiSession = subSessions.length > 1;
   const cellTitle = sessionData
     ? isMultiSession
-      ? `${sessionData.subSessions.length} séances réalisées ce jour : ${sessionData.subSessions.map((s, i) => `#${i + 1} (${s.duration || 0}min / ${s.load || 0} UA)`).join(', ')} · Total cumulé : ${sessionData.load} UA (${sessionData.duration} min)`
+      ? `${subSessions.length} séances réalisées ce jour : ${subSessions.map((s, i) => `#${i + 1} (${s.duration || 0}min / ${s.load || 0} UA)`).join(', ')} · Total cumulé : ${sessionData.load} UA (${sessionData.duration} min)`
       : `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${sessionData.load} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Fatigue ${sessionData.fatigue !== undefined && sessionData.fatigue !== null ? `${sessionData.fatigue}/10` : '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
     : (cellState?.tooltip || '');
 
   const accessibleLabel = sessionData 
-    ? `${quality.name}, ${dateLabel} : ${isMultiSession ? `${sessionData.subSessions.length} séances cumulées, ` : ''}charge totale ${sessionData.load} unités.${sessionData.sport === 'bike' ? ' Vélo.' : sessionData.sport === 'run' ? ' Course.' : ''}${cellState?.isBurnout ? ' Alerte surmenage.' : ''} Cliquer ou taper Entrée pour ouvrir le détail.`
+    ? `${quality.name}, ${dateLabel} : ${isMultiSession ? `${subSessions.length} séances cumulées, ` : ''}charge totale ${sessionData.load} unités.${sessionData.sport === 'bike' ? ' Vélo.' : sessionData.sport === 'run' ? ' Course.' : ''}${cellState?.isBurnout ? ' Alerte surmenage.' : ''} Cliquer ou taper Entrée pour ouvrir le détail.`
     : `${quality.name}, ${dateLabel} : aucune séance enregistrée. ${cellState?.status === 'green' ? 'Fenêtre de surcompensation optimale.' : cellState?.status === 'orange' ? 'Récupération en cours.' : ''} Cliquer ou taper Entrée pour planifier.`;
 
   return (
@@ -92,8 +175,8 @@ const GridQualityCell = memo(function GridQualityCell({
           <span className="font-mono text-xs font-bold leading-none tracking-tight flex items-center justify-center">
             {sessionData.load}
             {isMultiSession && (
-              <span className="text-[9px] ml-0.5 px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-sans font-extrabold" title={`${sessionData.subSessions.length} séances ce jour`}>
-                ×{sessionData.subSessions.length}
+              <span className="text-[9px] ml-0.5 px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-sans font-extrabold" title={`${subSessions.length} séances ce jour`}>
+                ×{subSessions.length}
               </span>
             )}
             {sessionData.sport === 'bike' && !sessionData.isSecondary && !isMultiSession && <span className="text-[9px] ml-0.5" title="Séance Vélo">🚴</span>}
@@ -113,12 +196,12 @@ const GridQualityCell = memo(function GridQualityCell({
 /**
  * Cellule mémoïsée pour le score Readiness d'un jour donné.
  */
-const GridReadinessCell = memo(function GridReadinessCell({ day, score, onMetricClick }) {
+const GridReadinessCell = memo(function GridReadinessCell({ day, score, onMetricClick }: GridReadinessCellProps) {
   const handleClick = useCallback(() => {
     onMetricClick(day.dateStr, 'readiness', score);
   }, [onMetricClick, day.dateStr, score]);
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onMetricClick(day.dateStr, 'readiness', score);
@@ -158,12 +241,12 @@ const GridReadinessCell = memo(function GridReadinessCell({ day, score, onMetric
 /**
  * Cellule mémoïsée pour la métrique VFC (ms) d'un jour donné.
  */
-const GridVfcCell = memo(function GridVfcCell({ day, vfc, vfcAnalysis, onMetricClick }) {
+const GridVfcCell = memo(function GridVfcCell({ day, vfc, vfcAnalysis, onMetricClick }: GridVfcCellProps) {
   const handleClick = useCallback(() => {
     onMetricClick(day.dateStr, 'vfc', vfc);
   }, [onMetricClick, day.dateStr, vfc]);
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onMetricClick(day.dateStr, 'vfc', vfc);
@@ -212,12 +295,12 @@ const GridVfcCell = memo(function GridVfcCell({ day, vfc, vfcAnalysis, onMetricC
 /**
  * Cellule mémoïsée pour la métrique FC de Repos (bpm) d'un jour donné.
  */
-const GridHrRestCell = memo(function GridHrRestCell({ day, hrRest, hrAnalysis, onMetricClick }) {
+const GridHrRestCell = memo(function GridHrRestCell({ day, hrRest, hrAnalysis, onMetricClick }: GridHrRestCellProps) {
   const handleClick = useCallback(() => {
     onMetricClick(day.dateStr, 'hrRest', hrRest);
   }, [onMetricClick, day.dateStr, hrRest]);
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onMetricClick(day.dateStr, 'hrRest', hrRest);
@@ -287,8 +370,9 @@ const GridQualityRow = memo(function GridQualityRow({
   onDrop,
   onDragEnd,
   moveQuality,
-}) {
-  const current = emaInfo?.current || { ema3: 0, ema7: 0, ema21: 0, acwr: 1 };
+}: GridQualityRowProps) {
+  const current: Pick<EmaCurrent, 'ema3' | 'ema7' | 'ema21' | 'acwr'> & Partial<EmaCurrent> =
+    emaInfo?.current || { ema3: 0, ema7: 0, ema21: 0, acwr: 1 };
 
   const acwrBadge = current.acwr === null
     ? 'bg-white/5 text-slate-500 border-white/10 font-normal'
@@ -300,11 +384,11 @@ const GridQualityRow = memo(function GridQualityRow({
     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-semibold'
     : 'bg-blue-500/20 text-blue-400 border-blue-500/30 font-semibold';
 
-  const handleRowDragOver = useCallback((e) => {
+  const handleRowDragOver = useCallback((e: DragEvent<HTMLElement>) => {
     onDragOver(e, q.id);
   }, [onDragOver, q.id]);
 
-  const handleRowDrop = useCallback((e) => {
+  const handleRowDrop = useCallback((e: DragEvent<HTMLElement>) => {
     onDrop(e, q.id);
   }, [onDrop, q.id]);
 
@@ -312,12 +396,12 @@ const GridQualityRow = memo(function GridQualityRow({
     onQualityClick(q);
   }, [onQualityClick, q]);
 
-  const handleGripDragStart = useCallback((e) => {
+  const handleGripDragStart = useCallback((e: DragEvent<HTMLElement>) => {
     e.stopPropagation();
     onDragStart(e, q.id, index);
   }, [onDragStart, q.id, index]);
 
-  const handleGripKeyDown = useCallback((e) => {
+  const handleGripKeyDown = useCallback((e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopPropagation();
@@ -329,11 +413,11 @@ const GridQualityRow = memo(function GridQualityRow({
     }
   }, [moveQuality, q.id]);
 
-  const handleGripClick = useCallback((e) => {
+  const handleGripClick = useCallback((e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
   }, []);
 
-  const handleToggleExpandClick = useCallback((e) => {
+  const handleToggleExpandClick = useCallback((e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     onToggleExpand(q.id);
   }, [onToggleExpand, q.id]);
@@ -521,14 +605,14 @@ export default function Grid({
   onMetricClick, 
   onQualityClick,
   onOpenWeeklyView
-}) {
-  const [expandedQualityId, setExpandedQualityId] = useState(null);
-  const [draggedQualityId, setDraggedQualityId] = useState(null);
-  const [dragOverQualityId, setDragOverQualityId] = useState(null);
-  const [dropPosition, setDropPosition] = useState(null); // 'before' | 'after'
+}: GridProps) {
+  const [expandedQualityId, setExpandedQualityId] = useState<string | null>(null);
+  const [draggedQualityId, setDraggedQualityId] = useState<string | null>(null);
+  const [dragOverQualityId, setDragOverQualityId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<DropPosition | null>(null); // 'before' | 'after'
 
   // Ref pour le conteneur de défilement horizontal
-  const scrollContainerRef = useRef(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // État pour le glisser-déposer horizontal à la souris (Mouse Pan)
   const [isPanning, setIsPanning] = useState(false);
@@ -544,7 +628,7 @@ export default function Grid({
 
   // Totaux quotidiens pour chaque colonne jour de la timeline
   const dailyTotals = useMemo(() => {
-    const map = {};
+    const map: Record<string, { load: number; duration: number; sessionCount: number }> = {};
     timeline.forEach(day => {
       let load = 0;
       let duration = 0;
@@ -564,10 +648,10 @@ export default function Grid({
 
   // 1. Mémoïsation globale de l'état physiologique des cellules (14 qualités × 36 jours = ~500 calculs)
   const cellStatesMap = useMemo(() => {
-    const map = {};
+    const map: Record<string, Record<string, CellState>> = {};
     for (let i = 0; i < qualities.length; i++) {
       const q = qualities[i];
-      const qMap = {};
+      const qMap: Record<string, CellState> = {};
       const qEvents = events[q.id] || {};
       for (let j = 0; j < timeline.length; j++) {
         const day = timeline[j];
@@ -580,7 +664,7 @@ export default function Grid({
 
   // 2. Mémoïsation des analyses VFC (36 jours) évitant de re-parcourir dailyMetrics à chaque render
   const vfcAnalysisMap = useMemo(() => {
-    const map = {};
+    const map: Record<string, VfcAnalysisResult> = {};
     for (let i = 0; i < timeline.length; i++) {
       const day = timeline[i];
       map[day.dateStr] = computeVfcAnalysis(dailyMetrics, day.dateStr);
@@ -590,7 +674,7 @@ export default function Grid({
 
   // 3. Mémoïsation des analyses FC Repos (36 jours) évitant de re-parcourir dailyMetrics à chaque render
   const hrRestAnalysisMap = useMemo(() => {
-    const map = {};
+    const map: Record<string, HrRestAnalysisResult> = {};
     for (let i = 0; i < timeline.length; i++) {
       const day = timeline[i];
       map[day.dateStr] = computeHrRestAnalysis(dailyMetrics, day.dateStr);
@@ -598,20 +682,20 @@ export default function Grid({
     return map;
   }, [dailyMetrics, timeline]);
 
-  const handleDragStart = useCallback((e, qId, index) => {
+  const handleDragStart = useCallback((e: DragEvent<HTMLElement>, qId: string, _index: number) => {
     setDraggedQualityId(qId);
     e.dataTransfer.setData('text/plain', qId);
     e.dataTransfer.effectAllowed = 'move';
   }, []);
 
-  const handleDragOver = useCallback((e, targetQId) => {
+  const handleDragOver = useCallback((e: DragEvent<HTMLElement>, targetQId: string) => {
     if (!draggedQualityId || draggedQualityId === targetQId) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
     const rect = e.currentTarget.getBoundingClientRect();
     const relY = e.clientY - rect.top;
-    const position = relY < rect.height / 2 ? 'before' : 'after';
+    const position: DropPosition = relY < rect.height / 2 ? 'before' : 'after';
 
     if (dragOverQualityId !== targetQId || dropPosition !== position) {
       setDragOverQualityId(targetQId);
@@ -619,14 +703,14 @@ export default function Grid({
     }
   }, [draggedQualityId, dragOverQualityId, dropPosition]);
 
-  const handleDragLeave = useCallback((e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) {
+  const handleDragLeave = useCallback((e: DragEvent<HTMLElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
       setDragOverQualityId(null);
       setDropPosition(null);
     }
   }, []);
 
-  const handleDrop = useCallback((e, targetQId) => {
+  const handleDrop = useCallback((e: DragEvent<HTMLElement>, targetQId: string) => {
     e.preventDefault();
     if (draggedQualityId && targetQId && draggedQualityId !== targetQId) {
       if (reorderQualities) {
@@ -651,12 +735,12 @@ export default function Grid({
   }, []);
 
   const todayStr = timeline.find(d => d.offset === 0)?.dateStr;
-  const activeBlockToday = getActiveBlockForDate(todayStr, trainingBlocks);
+  const activeBlockToday = getActiveBlockForDate(todayStr ?? '', trainingBlocks);
 
   // Défilement automatique initial vers "Aujourd'hui"
   const scrollToToday = useCallback(() => {
     if (scrollContainerRef.current) {
-      const todayEl = scrollContainerRef.current.querySelector('[data-today="true"]');
+      const todayEl = scrollContainerRef.current.querySelector<HTMLElement>('[data-today="true"]');
       if (todayEl) {
         const container = scrollContainerRef.current;
         const offset = todayEl.offsetLeft - (container.clientWidth / 2) + (todayEl.clientWidth / 2);
@@ -673,15 +757,16 @@ export default function Grid({
   }, [scrollToToday]);
 
   // Déplacement horizontal par boutons
-  const scrollHorizontally = useCallback((amount) => {
+  const scrollHorizontally = useCallback((amount: number) => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
     }
   }, []);
 
   // Gestion du glisser horizontal fluide à la souris (Mouse Drag-to-Scroll)
-  const handleMouseDown = useCallback((e) => {
-    if (e.target.closest('button') || e.target.closest('[draggable="true"]') || e.target.closest('.cell-interactive') || e.target.closest('input')) {
+  const handleMouseDown = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    const target = e.target as Element;
+    if (target.closest('button') || target.closest('[draggable="true"]') || target.closest('.cell-interactive') || target.closest('input')) {
       return;
     }
     if (e.button !== 0) return;
@@ -690,7 +775,7 @@ export default function Grid({
     setPanScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
   }, []);
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
     if (!isPanning || !scrollContainerRef.current) return;
     e.preventDefault();
     const x = e.pageX - (scrollContainerRef.current.offsetLeft || 0);
@@ -702,7 +787,7 @@ export default function Grid({
     setIsPanning(false);
   }, []);
 
-  const toggleExpand = useCallback((qId) => {
+  const toggleExpand = useCallback((qId: string) => {
     setExpandedQualityId(prev => prev === qId ? null : qId);
   }, []);
 
