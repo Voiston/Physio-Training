@@ -1,0 +1,39 @@
+name: Exit Gate
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+jobs:
+  exit-gate:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run Exit Gate
+        shell: bash
+        run: |
+          set -o pipefail
+          status=0
+          python scripts/gate.py | tee gate.txt || status=$?
+          {
+            echo '## Exit Gate'
+            echo '```'
+            sed -E 's/\x1b\[[0-9;]*m//g' gate.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
