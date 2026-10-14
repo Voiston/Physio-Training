@@ -1070,7 +1070,7 @@ export default function Grid({
                 isDragging={draggedQualityId === q.id}
                 isOver={dragOverQualityId === q.id}
                 dropPosition={dropPosition}
-                isFocusInActiveBlock={activeBlockToday?.focusQualities?.includes(q.id)}
+                isFocusInActiveBlock={Boolean(activeBlockToday?.focusQualities?.includes(q.id))}
                 activeBlockToday={activeBlockToday}
                 cellStates={cellStatesMap[q.id]}
                 qEvents={events[q.id]}

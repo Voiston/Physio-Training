@@ -3,6 +3,7 @@ import {
   Calendar, Trophy, FileText, Sliders, Zap, Shield, Plus, 
   Sparkles, ArrowRight, Activity, Clock 
 } from 'lucide-react';
+import type { Quality, TaperingAnalysis, FosterMetrics, BanisterPerformance, CardioMuscularBalanceResult, PhysiologicalSettings } from '../types';
 import { TrainingBlock, BlockTemplate, TargetCompetition } from '../hooks/useData';
 import { getBlockProgress } from '../utils/physiology';
 
@@ -10,13 +11,13 @@ interface PeriodizationViewProps {
   activeBlock: TrainingBlock | null;
   blocks: TrainingBlock[];
   templates: BlockTemplate[];
-  qualities: any[];
+  qualities: Quality[];
   targetCompetition: TargetCompetition | null;
-  taperingAnalysis: any;
-  fosterMetrics?: any;
-  banisterPerformance?: any;
-  cardioMuscularBalance?: any;
-  physioSettings: any;
+  taperingAnalysis: TaperingAnalysis;
+  fosterMetrics?: FosterMetrics;
+  banisterPerformance?: BanisterPerformance;
+  cardioMuscularBalance?: CardioMuscularBalanceResult;
+  physioSettings: PhysiologicalSettings;
   onOpenBlocksModal: () => void;
   onOpenCompetitionModal: () => void;
   onOpenReportModal: () => void;
@@ -332,7 +333,7 @@ export const PeriodizationView: React.FC<PeriodizationViewProps> = ({
 
               {targetCompetition && (
                 <span className="px-3 py-1 rounded-full text-xs font-bold font-mono bg-amber-500/20 text-amber-200 border border-amber-500/40 shadow-sm">
-                  {taperingAnalysis?.daysRemaining >= 0 ? `J-${taperingAnalysis.daysRemaining}` : 'Terminé'}
+                  {taperingAnalysis && taperingAnalysis.daysRemaining >= 0 ? `J-${taperingAnalysis.daysRemaining}` : 'Terminé'}
                 </span>
               )}
             </div>

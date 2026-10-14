@@ -5,12 +5,13 @@ import {
   Trophy, Calendar, AlertTriangle, 
   X, Check, Gauge, Sparkles 
 } from 'lucide-react';
+import type { TaperingAnalysis, FosterMetrics } from '../types';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 
 interface CompetitionModalProps {
   competition: TargetCompetition | null;
-  taperingAnalysis: any;
-  fosterMetrics: any;
+  taperingAnalysis: TaperingAnalysis;
+  fosterMetrics: FosterMetrics;
   onSave: (comp: TargetCompetition | null) => void;
   onClose: () => void;
 }

@@ -81,3 +81,39 @@ describe('dateHelpers & dynamic today handling', () => {
   });
 });
 
+describe('dateHelpers - invalid input', () => {
+  it('parseLocalDate falls back to today at noon for unparseable strings', () => {
+    const today = getLocalYYYYMMDD(new Date());
+    const parsed = parseLocalDate('pas-une-date');
+    expect(getLocalYYYYMMDD(parsed)).toBe(today);
+    expect(parsed.getHours()).toBe(12);
+  });
+
+  it('parseLocalDate treats null and empty string as today', () => {
+    const today = getLocalYYYYMMDD(new Date());
+    expect(getLocalYYYYMMDD(parseLocalDate(null))).toBe(today);
+    expect(getLocalYYYYMMDD(parseLocalDate(''))).toBe(today);
+  });
+
+  it('parseLocalDate normalises out-of-range components like the Date constructor', () => {
+    expect(getLocalYYYYMMDD(parseLocalDate('2026-02-30'))).toBe('2026-03-02');
+    expect(getLocalYYYYMMDD(parseLocalDate('2026-13-01'))).toBe('2027-01-01');
+  });
+
+  it('getLocalYYYYMMDD returns NaN parts for an invalid Date (callers must validate)', () => {
+    expect(getLocalYYYYMMDD(new Date('invalid'))).toBe('NaN-NaN-NaN');
+  });
+
+  it('addDays handles zero, negative and year-crossing offsets', () => {
+    expect(getLocalYYYYMMDD(addDays('2026-12-31', 1))).toBe('2027-01-01');
+    expect(getLocalYYYYMMDD(addDays('2026-03-01', -1))).toBe('2026-02-28');
+    expect(getLocalYYYYMMDD(addDays('2026-05-05', 0))).toBe('2026-05-05');
+  });
+
+  it('generateTimeline with zero past/future days yields only J0', () => {
+    const timeline = generateTimeline(0, 0, '2026-10-14');
+    expect(timeline).toHaveLength(1);
+    expect(Math.abs(timeline[0].offset)).toBe(0);
+    expect(timeline[0].dateStr).toBe('2026-10-14');
+  });
+});

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import type { TooltipContentProps } from 'recharts';
 import { Quality, SessionData } from '../hooks/useData';
 import { 
   computeAllWeeksStats, 
@@ -29,13 +30,22 @@ interface WeeklyAnalysisViewProps {
   events: Record<string, Record<string, SessionData>>;
   qualities: Quality[];
   allWeeksStats?: WeekStats[];
-  onOpenScoreModal?: (q: Quality, dateStr: string, sessionData?: any) => void;
+  onOpenScoreModal?: (q: Quality, dateStr: string, sessionData?: SessionData) => void;
   showToast?: (toast: { type: 'success' | 'info' | 'warning' | 'error'; title: string; message: string }) => void;
 }
 
-const WeeklyChartTooltip = React.memo(function WeeklyChartTooltip({ active, payload }: any) {
+interface WeeklyChartDatum {
+  fullLabel: string;
+  relative: string;
+  totalLoad: number;
+  durationHours: number;
+  sessions: number;
+  acwr: number;
+}
+
+const WeeklyChartTooltip = React.memo(function WeeklyChartTooltip({ active, payload }: TooltipContentProps) {
   if (active && payload && payload.length) {
-    const data = payload[0].payload;
+    const data = payload[0].payload as WeeklyChartDatum;
     return (
       <div className="bg-slate-950/95 backdrop-blur-md p-3 border border-white/15 rounded-xl shadow-2xl text-xs min-w-[200px]">
         <div className="font-bold text-white border-b border-white/10 pb-1 mb-1.5 flex justify-between">
