@@ -255,6 +255,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   // --- NAVIGATION PAR ONGLETS (PARAMÈTRES vs EXERCICES) & DUPLICATION ---
   const [activeModalTab, setActiveModalTab] = useState<string>(isIsolation ? 'exercises' : 'parameters');
   const [duplicateSuccess, setDuplicateSuccess] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // --- MODULE MUSCULATION & EXERCICES PAR GROUPE MUSCULAIRE (OPTION A) ---
   const [exercises, setExercises] = useState<SessionExercise[]>(Array.isArray(activeSub?.exercises) ? activeSub.exercises : []);
@@ -671,6 +672,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const numCardio = Number(rpeCardio) || 0;
   const numMusc = Number(rpeMusc) || 0;
   const numFatigue = Number(fatigue) || 5;
+  const eccentricMultiplier = isEccentric ? 1.15 : 1.0;
 
   const currentDetailedLoad = useMemo(() => {
     return computeDetailedSessionLoad(info.qId, numDur, numCardio, numMusc, Boolean(isEccentric));
@@ -679,6 +681,11 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
   const loadCardio = currentDetailedLoad.loadCardio;
   const loadMusc = currentDetailedLoad.loadMusc;
   const load = currentDetailedLoad.load;
+
+  // Dominance métabolique
+  const totalFactor = (loadCardio + loadMusc) || 1;
+  const cardioPercent = Math.round((loadCardio / totalFactor) * 100);
+  const muscPercent = 100 - cardioPercent;
 
   // Cumul multi-séances pour la journée
   const totalDayStats = useMemo(() => {
@@ -782,6 +789,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
     const computedSubs = updatedSubs.map((sub, sIdx) => {
       const d = Number(sub.duration) || 0;
       const rM = Number(sub.rpeMusc) || 5;
+      const rC = Number(sub.rpeCardio) || 5;
       const { load: subLoad, loadCardio: subCardio, loadMusc: subMusc } = computeDetailedSessionLoad(
         info.qId,
         d,
@@ -1652,7 +1660,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                   </div>
                 )}
                 
-                {existing?.isSecondary && (
+                {currentSessionData?.isSecondary && (
                   <div className="text-[11px] text-amber-400 flex items-center gap-1">
                     <ShieldAlert size={12} /> Séance calculée automatiquement comme impact secondaire.
                   </div>
