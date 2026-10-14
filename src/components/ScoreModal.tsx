@@ -30,7 +30,7 @@ import {
 import { MuscleBodyMap } from './MuscleBodyMap';
 import { haptics } from '../utils/haptics';
 import type { SessionExercise } from '../utils/muscleHelpers';
-import type { Quality, SessionData, SubSession, EventsByQuality } from '../types';
+import type { Quality, SessionData, SubSession, EventsByQuality, ExerciseCategory } from '../types';
 
 /** Valeur de formulaire : nombre saisi ou chaîne vide. */
 type FormNumber = number | string;
@@ -421,7 +421,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
 
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
   const [newExName, setNewExName] = useState('');
-  const [newExCategory, setNewExCategory] = useState('lower');
+  const [newExCategory, setNewExCategory] = useState<ExerciseCategory>('lower');
   const [newExPrimaryMuscle, setNewExPrimaryMuscle] = useState('quadriceps');
   const [newExSecondaryMuscle, setNewExSecondaryMuscle] = useState('');
   const [showBodyMapInModal, setShowBodyMapInModal] = useState(false);
@@ -2074,7 +2074,7 @@ export default function ScoreModal({ info, qualities = [], events = {}, onClose,
                         <select
                           id="custom-new-ex-category"
                           value={newExCategory}
-                          onChange={(e) => setNewExCategory(e.target.value)}
+                          onChange={(e) => setNewExCategory(e.target.value as ExerciseCategory)}
                           className="w-full bg-slate-900 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-400 cursor-pointer"
                         >
                           <option value="lower">Bas du corps (Lower)</option>

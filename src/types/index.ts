@@ -160,3 +160,19 @@ export type MetricClickHandler = (
   type: 'readiness' | 'vfc' | 'hrRest',
   currentValue: number | string
 ) => void;
+
+/** Famille d'un exercice de musculation (alignée sur MuscleGroup.category). */
+export type ExerciseCategory = 'lower' | 'upper_push' | 'upper_pull' | 'core';
+
+/** Exercice du catalogue (ou exercice personnalisé). */
+export interface ExerciseDefinition {
+  id: string;
+  name: string;
+  category: ExerciseCategory;
+  /** Polyarticulaire (true) ou isolation (false). */
+  isCompound: boolean;
+  /** Répétitions par défaut pour estimer le volume. */
+  defaultReps: number;
+  /** Ratio d'activation par id de MUSCLE_GROUPS, dans ]0, 1]. */
+  muscleRatios: Record<string, number>;
+}
