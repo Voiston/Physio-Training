@@ -89,3 +89,32 @@ describe('zones - edge cases', () => {
     expect(getTsbZone(100, 150, 0, 42, true).zoneId).toBe('CRITICAL_FATIGUE');
   });
 });
+
+describe('zones - missing or corrupt data', () => {
+  it('calculateTsbPercent returns null for NaN / Infinity inputs', () => {
+    expect(calculateTsbPercent(Number.NaN, 10)).toBeNull();
+    expect(calculateTsbPercent(100, Number.NaN)).toBeNull();
+    expect(calculateTsbPercent(Number.POSITIVE_INFINITY, 10)).toBeNull();
+  });
+
+  it.each([
+    [Number.NaN, Number.NaN],
+    [Number.NaN, 50],
+    [100, Number.NaN],
+    [Number.POSITIVE_INFINITY, 10]
+  ])('getTsbZone(%s, %s) falls back to an unreliable INITIALIZING zone with finite numbers', (ctl, atl) => {
+    const zone = getTsbZone(ctl, atl, 200, 28, true);
+    expect(zone.zoneId).toBe('INITIALIZING');
+    expect(zone.isReliable).toBe(false);
+    expect(zone.tsbPercent).toBeNull();
+    expect([zone.ctl, zone.atl, zone.tsb]).toEqual([0, 0, 0]);
+    expect(zone.summary).not.toContain('NaN');
+  });
+
+  it('treats a NaN history length as no history', () => {
+    const zone = getTsbZone(100, 150, Number.NaN);
+    expect(zone.zoneId).toBe('INITIALIZING');
+    expect(zone.badge).not.toContain('NaN');
+  });
+});
+

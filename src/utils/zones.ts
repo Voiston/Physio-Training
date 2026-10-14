@@ -27,7 +27,7 @@ export interface TsbZoneInfo {
  * @returns Pourcentage (ex: -18.5 pour -18.5%), ou null si CTL négligeable
  */
 export function calculateTsbPercent(ctl: number, atl: number): number | null {
-  if (ctl <= 3) return null;
+  if (!Number.isFinite(ctl) || !Number.isFinite(atl) || ctl <= 3) return null;
   const tsb = ctl - atl;
   return Math.round((tsb / ctl) * 1000) / 10;
 }
@@ -49,6 +49,12 @@ export function getTsbZone(
   tauFitness: number = 28,
   hasInitialCtl: boolean = false
 ): TsbZoneInfo {
+  // Données absentes ou corrompues (NaN / Infinity) : traitées comme « aucune charge » → phase d'initialisation.
+  if (!Number.isFinite(ctl) || !Number.isFinite(atl)) {
+    ctl = 0;
+    atl = 0;
+  }
+  if (!Number.isFinite(historyDays)) historyDays = 0;
   const tsb = Math.round((ctl - atl) * 10) / 10;
   const tsbPercent = calculateTsbPercent(ctl, atl);
 
