@@ -3,6 +3,7 @@ const GridQualityChart = lazy(() => import('./GridQualityChart'));
 import { computeCellState, getActiveBlockForDate } from '../utils/physiology';
 import { computeAllWeeksStats, formatMinutes } from '../utils/weekHelpers';
 import { computeHrRestAnalysis, computeVfcAnalysis } from '../utils/vfcHelpers';
+import { isPrimary, extractSessionLoad, getNormalizedSessionDuration } from '../utils/loadHelpers';
 import QualitySparkline from './QualitySparkline';
 import { 
   ChevronDown, ChevronUp, BarChart2, GripVertical, 
@@ -120,7 +121,7 @@ const GridQualityCell = memo(function GridQualityCell({
   let cellHeatmapStyle = 'bg-slate-900/30 border-white/[0.03] text-slate-600 hover:bg-white/[0.04] hover:border-white/10';
   
   if (sessionData) {
-    const loadVal = Number(sessionData.load) || (typeof sessionData === 'number' ? sessionData * 45 : 0);
+    const loadVal = extractSessionLoad(sessionData);
     const rM = Number(sessionData.rpeMusc ?? sessionData.rpeMusculaire ?? sessionData);
     const rC = Number(sessionData.rpeCardio ?? sessionData);
     const maxRpe = Math.max(isNaN(rM) ? 0 : rM, isNaN(rC) ? 0 : rC);
@@ -635,9 +636,9 @@ export default function Grid({
       let sessionCount = 0;
       qualities.forEach(q => {
         const s = events[q.id]?.[day.dateStr];
-        if (s && !s.isSecondary) {
-          load += (Number(s.load) || 0);
-          duration += (Number(s.duration) || 0);
+        if (s && isPrimary(s)) {
+          load += extractSessionLoad(s);
+          duration += getNormalizedSessionDuration(s);
           sessionCount += 1;
         }
       });

@@ -16,7 +16,7 @@ import {
   computeIntensityDistribution,
   computePerceivedFatigueAnalysis
 } from '../utils/physiology';
-import { isPrimary } from '../utils/loadHelpers';
+import { isPrimary, extractSessionLoad, getNormalizedSessionDuration } from '../utils/loadHelpers';
 import { getTsbZone, calculateTsbPercent } from '../utils/zones';
 import { computeVfcAnalysis, computeHrRestAnalysis } from '../utils/vfcHelpers';
 import type { TooltipContentProps } from 'recharts';
@@ -280,15 +280,18 @@ export default function PhysiologyDashboard({
             let sessionType = '';
 
             if (typeof item === 'object' && item !== null) {
-              sLoad = Number(item.load) || 0;
-              duration = Number(item.duration) || 0;
+              sLoad = extractSessionLoad(item);
+              duration = getNormalizedSessionDuration(item);
               rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
               rpeC = item.rpeCardio ?? 5;
               fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
               notes = item.notes || '';
               sessionType = item.type || '';
             } else if (typeof item === 'number') {
-              sLoad = item * 5;
+              sLoad = extractSessionLoad(item);
+              duration = getNormalizedSessionDuration(item);
+              rpeM = item <= 10 ? item : 5;
+              rpeC = item <= 10 ? item : 5;
             }
 
             const isPrimarySession = isPrimary(item);
@@ -354,15 +357,18 @@ export default function PhysiologyDashboard({
           let sessionType = '';
 
           if (typeof item === 'object' && item !== null) {
-            sLoad = Number(item.load) || 0;
-            duration = Number(item.duration) || 0;
+            sLoad = extractSessionLoad(item);
+            duration = getNormalizedSessionDuration(item);
             rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
             rpeC = item.rpeCardio ?? 5;
             fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
             notes = item.notes || '';
             sessionType = item.type || '';
           } else if (typeof item === 'number') {
-            sLoad = item * 5;
+            sLoad = extractSessionLoad(item);
+            duration = getNormalizedSessionDuration(item);
+            rpeM = item <= 10 ? item : 5;
+            rpeC = item <= 10 ? item : 5;
           }
 
           const isPrimarySession = isPrimary(item);

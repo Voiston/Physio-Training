@@ -36,6 +36,23 @@ export function extractSessionLoad(data: unknown): number {
 }
 
 /**
+ * Normalise et extrait la charge d'une séance (alias standardisé de extractSessionLoad).
+ */
+export const getNormalizedSessionLoad = extractSessionLoad;
+
+/**
+ * Extrait la durée effective d'une séance en minutes (45 min forfaitaires pour les entrées numériques historiques).
+ */
+export function getNormalizedSessionDuration(data: unknown): number {
+  if (data === null || data === undefined) return 0;
+  if (typeof data === 'number') return 45;
+  if (typeof data === 'object') {
+    return Number((data as { duration?: unknown }).duration) || 0;
+  }
+  return 0;
+}
+
+/**
  * SOURCE UNIQUE DE CHARGE ATHLÈTE (Single Source of Truth) :
  * Calcule la charge réelle cumulée subie par l'athlète sur une journée donnée.
  * EXCLUT STRICTEMENT les impacts secondaires pour éviter tout double-comptage.
@@ -73,7 +90,7 @@ export function getDailyAthleteDuration(
     if (!qualityEvents) return;
     const session = qualityEvents[dateStr];
     if (session && isPrimary(session)) {
-      totalDuration += Number(session.duration) || 0;
+      totalDuration += getNormalizedSessionDuration(session);
     }
   });
 

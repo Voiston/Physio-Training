@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import type { SessionData } from '../../hooks/useData';
 import { 
   getDailyAthleteLoad, 
   getDailyAthleteDuration, 
   isPrimary, 
   extractSessionLoad,
+  getNormalizedSessionLoad,
+  getNormalizedSessionDuration,
   computeSessionLoad,
   getAthleteBaselineDailyLoad,
   getDailyAthleteSessionCount
@@ -158,5 +161,104 @@ describe('loadHelpers - Single Source of Truth for Athlete Load', () => {
     expect(extractSessionLoad(450)).toBe(450);
   });
 });
+
+describe('P1-03 : Cohérence des multiplicateurs de charge et totaux quotidiens (Grid vs PhysiologyDashboard)', () => {
+  it('normalise de manière identique la charge et la durée via getNormalizedSessionLoad et getNormalizedSessionDuration', () => {
+    // Événement numérique 6 (échelle RPE <= 10 -> forfait 45 min = 6 * 45 = 270 UA)
+    expect(getNormalizedSessionLoad(6)).toBe(270);
+    expect(getNormalizedSessionDuration(6)).toBe(45);
+
+    // Événement numérique déjà consolidé en UA (> 10)
+    expect(getNormalizedSessionLoad(180)).toBe(180);
+    expect(getNormalizedSessionDuration(180)).toBe(45);
+
+    // Objet SessionData
+    const sessionObj = { load: 210, duration: 35, isSecondary: false };
+    expect(getNormalizedSessionLoad(sessionObj)).toBe(210);
+    expect(getNormalizedSessionDuration(sessionObj)).toBe(35);
+
+    // Données invalides ou nulles
+    expect(getNormalizedSessionLoad(null)).toBe(0);
+    expect(getNormalizedSessionLoad(undefined)).toBe(0);
+    expect(getNormalizedSessionDuration(null)).toBe(0);
+    expect(getNormalizedSessionDuration(undefined)).toBe(0);
+  });
+
+  it('garantit une égalité stricte entre le total de Grid.tsx, PhysiologyDashboard.tsx et getDailyAthleteLoad sur un jeu mixte', () => {
+    const testDate = '2026-10-15';
+
+    // Jeu mixte d'événements :
+    // 1. Séance objet standard : 150 UA, 30 min (principale)
+    // 2. Séance numérique historique 6 : 6 * 45 = 270 UA, 45 min (principale)
+    // 3. Impact secondaire généré : 80 UA, 0 min (isSecondary = true -> doit être exclu)
+    const mixedEvents: Record<string, Record<string, unknown>> = {
+      force: {
+        [testDate]: { load: 150, duration: 30, isSecondary: false }
+      },
+      vo2max: {
+        [testDate]: 6 // Valeur numérique RPE
+      },
+      recup: {
+        [testDate]: { load: 80, duration: 0, isSecondary: true }
+      }
+    };
+
+    // 1. Calcul canonique du moteur athlète
+    const athleteLoad = getDailyAthleteLoad(mixedEvents as unknown as Record<string, Record<string, SessionData>>, testDate);
+    const athleteDuration = getDailyAthleteDuration(mixedEvents as unknown as Record<string, Record<string, SessionData>>, testDate);
+
+    // 150 + 270 = 420 UA (l'impact secondaire de 80 est exclu)
+    expect(athleteLoad).toBe(420);
+    expect(athleteDuration).toBe(75); // 30 min + 45 min
+
+    // 2. Simulation de la logique dailyTotals dans Grid.tsx
+    let gridDailyLoad = 0;
+    let gridDailyDuration = 0;
+    let gridSessionCount = 0;
+
+    Object.keys(mixedEvents).forEach(qId => {
+      const s = mixedEvents[qId]?.[testDate];
+      if (s && isPrimary(s)) {
+        gridDailyLoad += extractSessionLoad(s);
+        gridDailyDuration += getNormalizedSessionDuration(s);
+        gridSessionCount += 1;
+      }
+    });
+
+    expect(gridDailyLoad).toBe(420);
+    expect(gridDailyDuration).toBe(75);
+    expect(gridSessionCount).toBe(2);
+
+    // 3. Simulation de la logique chartData dans PhysiologyDashboard.tsx
+    let dashboardDailyLoad = 0;
+    const dashboardSessions: Array<{ load: number; duration: number }> = [];
+
+    Object.keys(mixedEvents).forEach(qId => {
+      const item = mixedEvents[qId]?.[testDate];
+      if (item) {
+        const sLoad = extractSessionLoad(item);
+        const duration = getNormalizedSessionDuration(item);
+        const isPrimarySession = isPrimary(item);
+
+        if (isPrimarySession) {
+          dashboardDailyLoad += sLoad;
+        }
+
+        if ((sLoad > 0 || duration > 0) && isPrimarySession) {
+          dashboardSessions.push({ load: sLoad, duration });
+        }
+      }
+    });
+
+    expect(dashboardDailyLoad).toBe(420);
+    expect(dashboardSessions).toHaveLength(2);
+
+    // 4. Vérification de la stricte égalité inter-composants
+    expect(gridDailyLoad).toBe(dashboardDailyLoad);
+    expect(gridDailyLoad).toBe(athleteLoad);
+    expect(gridDailyDuration).toBe(athleteDuration);
+  });
+});
+
 
 
