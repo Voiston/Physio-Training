@@ -167,4 +167,54 @@ describe('Live Gym - Touche Escape et cycle de vie du modal (P1-02)', () => {
   });
 });
 
+describe('GymActiveExercise - Accessibilité des sélecteurs RIR et repos sur smartphone (P2-01)', () => {
+  it('ne masque pas les sélecteurs de RIR et de temps de repos sous la classe hidden sm:flex', async () => {
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { GymActiveExercise } = await import('../GymActiveExercise');
+
+    const sampleExercise = {
+      id: 'ex_1',
+      exerciseCatalogId: 'bench_press',
+      name: 'Développé couché',
+      category: 'chest',
+      sets: [
+        {
+          id: 's_1',
+          setNumber: 1,
+          weightKg: 60,
+          reps: 10,
+          rir: 2,
+          restSeconds: 90,
+          completed: false
+        }
+      ]
+    };
+
+    const html = renderToStaticMarkup(
+      <GymActiveExercise
+        exercise={sampleExercise}
+        exerciseIndex={0}
+        onUpdateSetValue={() => {}}
+        onQuickAdjustWeight={() => {}}
+        onQuickAdjustReps={() => {}}
+        onValidateSet={() => {}}
+        onRemoveSet={() => {}}
+        onAddSet={() => {}}
+        onRemoveExercise={() => {}}
+        onApplyAdaptiveSuggestion={() => {}}
+      />
+    );
+
+    // Les sélecteurs de RIR et de repos ne doivent plus porter "hidden sm:flex"
+    expect(html).not.toContain('hidden sm:flex');
+
+    // Les sélecteurs doivent être présents et dotés de leurs labels / conteneurs responsives
+    expect(html).toContain('Répétitions en réserve RIR pour la série 1');
+    expect(html).toContain('Temps de repos prévu après la série 1');
+    expect(html).toContain('order-5 sm:order-4');
+    expect(html).toContain('order-6 sm:order-5');
+  });
+});
+
+
 

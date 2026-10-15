@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Trash2, Sparkles, Check, Plus, X } from 'lucide-react';
+import { Trash2, Sparkles, Check, Plus, X, Clock } from 'lucide-react';
 import type { LiveExercise, LiveSet } from '../LiveGymModal';
 import type { computeAdaptiveProgression } from '../../utils/muscleHelpers';
 
@@ -115,7 +115,7 @@ export const GymActiveExercise = memo(function GymActiveExercise({
               }`}
             >
               {/* Numéro de série */}
-              <div className="col-span-1 flex flex-col items-center justify-center">
+              <div className="col-span-1 sm:col-span-1 order-1 flex flex-col items-center justify-center">
                 <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
                   isSetDone ? 'bg-emerald-500/30 text-emerald-300 font-black' : 'bg-slate-800 text-slate-300'
                 }`}>
@@ -124,7 +124,7 @@ export const GymActiveExercise = memo(function GymActiveExercise({
               </div>
 
               {/* Charge (kg) avec boutons tactiles +/- agrandis à 44px de hauteur */}
-              <div className="col-span-5 sm:col-span-3 flex items-center justify-center gap-1">
+              <div className="col-span-5 sm:col-span-3 order-2 flex items-center justify-center gap-1">
                 <button
                   type="button"
                   disabled={isSetDone}
@@ -159,7 +159,7 @@ export const GymActiveExercise = memo(function GymActiveExercise({
               </div>
 
               {/* Répétitions avec boutons tactiles +/- agrandis à 44px de hauteur */}
-              <div className="col-span-4 sm:col-span-2 flex items-center justify-center gap-1">
+              <div className="col-span-4 sm:col-span-2 order-3 flex items-center justify-center gap-1">
                 <button
                   type="button"
                   disabled={isSetDone}
@@ -192,14 +192,15 @@ export const GymActiveExercise = memo(function GymActiveExercise({
                 </button>
               </div>
 
-              {/* RIR (Répétitions en réserve) */}
-              <div className="hidden sm:flex sm:col-span-2 items-center justify-center">
+              {/* RIR (Répétitions en réserve) - Accessible et interactif sur mobile */}
+              <div className="col-span-6 sm:col-span-2 order-5 sm:order-4 flex items-center justify-center gap-1.5 pt-1.5 sm:pt-0 border-t border-slate-800/80 sm:border-t-0">
+                <span className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">RIR</span>
                 <select
                   disabled={isSetDone}
                   value={set.rir}
                   onChange={(e) => onUpdateSetValue(exerciseIndex, sIdx, 'rir', Number(e.target.value))}
                   aria-label={`Répétitions en réserve RIR pour la série ${set.setNumber} de ${exercise.name}`}
-                  className="min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full sm:w-auto min-h-[38px] sm:min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="0">0 (Échec)</option>
                   <option value="1">1 (Trés dur)</option>
@@ -209,14 +210,15 @@ export const GymActiveExercise = memo(function GymActiveExercise({
                 </select>
               </div>
 
-              {/* Temps de repos par défaut pour ce set */}
-              <div className="hidden sm:flex sm:col-span-2 items-center justify-center">
+              {/* Temps de repos par défaut pour ce set - Accessible et interactif sur mobile */}
+              <div className="col-span-6 sm:col-span-2 order-6 sm:order-5 flex items-center justify-center gap-1.5 pt-1.5 sm:pt-0 border-t border-slate-800/80 sm:border-t-0">
+                <Clock size={13} className="sm:hidden text-slate-400 shrink-0" />
                 <select
                   disabled={isSetDone}
                   value={set.restSeconds}
                   onChange={(e) => onUpdateSetValue(exerciseIndex, sIdx, 'restSeconds', Number(e.target.value))}
                   aria-label={`Temps de repos prévu après la série ${set.setNumber} de ${exercise.name}`}
-                  className="min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full sm:w-auto min-h-[38px] sm:min-h-[40px] px-2 bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-xs font-bold text-slate-200 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="45">45s</option>
                   <option value="60">60s</option>
@@ -227,7 +229,7 @@ export const GymActiveExercise = memo(function GymActiveExercise({
               </div>
 
               {/* BOUTON TACTILE DE VALIDATION (MIN-H 44PX WCAG 2.2) */}
-              <div className="col-span-2 sm:col-span-2 flex items-center justify-center gap-1">
+              <div className="col-span-2 sm:col-span-2 order-4 sm:order-6 flex items-center justify-center gap-1">
                 <button
                   type="button"
                   onClick={() => onValidateSet(exerciseIndex, sIdx)}
