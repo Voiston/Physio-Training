@@ -95,7 +95,7 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
       0, 
       tauFatigue, 
       tauFitness, 
-      initialCtl !== '' ? Number(initialCtl) : null
+      initialCtl !== '' ? Math.max(0, Math.min(250, Number(initialCtl))) : null
     );
   }, [events, dailyMetrics, tauFatigue, tauFitness, initialCtl]);
 
@@ -130,7 +130,7 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
       tauFatigue: Number(tauFatigue),
       tauFitness: Number(tauFitness),
       profileName,
-      initialCtl: initialCtl !== '' ? Number(initialCtl) : undefined
+      initialCtl: initialCtl !== '' ? Math.max(0, Math.min(250, Number(initialCtl))) : undefined
     });
     onClose();
   };

@@ -36,7 +36,19 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   private handleResetData = () => {
     if (window.confirm('Voulez-vous réinitialiser les données locales du navigateur en cas de corruption ? (Pensez à sauvegarder un export si possible)')) {
-      localStorage.clear();
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+          if (/^\d{4}-\d{2}-\d{2}_/.test(key) || key.startsWith('physio_') || key.startsWith('training_')) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch (e) {
+        console.warn('Erreur lors de la purge ciblée de localStorage:', e);
+      }
       window.location.reload();
     }
   };
