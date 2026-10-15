@@ -699,8 +699,13 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       const targetEx = { ...clone[exerciseIndex] };
       const targetSets = [...targetEx.sets];
 
+      const currentReps = newCompleted
+        ? Math.max(1, targetSets[setIndex].reps || 1)
+        : targetSets[setIndex].reps;
+
       targetSets[setIndex] = {
         ...targetSets[setIndex],
+        reps: currentReps,
         completed: newCompleted,
         completedAt: newCompleted ? new Date().toISOString() : undefined
       };
@@ -711,7 +716,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         targetSets[setIndex + 1] = {
           ...targetSets[setIndex + 1],
           weightKg: targetSets[setIndex].weightKg,
-          reps: targetSets[setIndex].reps,
+          reps: currentReps,
           rir: targetSets[setIndex].rir
         };
       }

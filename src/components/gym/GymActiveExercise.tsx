@@ -174,8 +174,13 @@ export const GymActiveExercise = memo(function GymActiveExercise({
                   type="number"
                   inputMode="numeric"
                   disabled={isSetDone}
-                  value={set.reps || ''}
-                  onChange={(e) => onUpdateSetValue(exerciseIndex, sIdx, 'reps', Math.max(1, Number(e.target.value) || 1))}
+                  value={set.reps === 0 ? '' : (set.reps || '')}
+                  onChange={(e) => onUpdateSetValue(exerciseIndex, sIdx, 'reps', Number(e.target.value) || 0)}
+                  onBlur={() => {
+                    if (!set.reps || set.reps < 1) {
+                      onUpdateSetValue(exerciseIndex, sIdx, 'reps', Math.max(1, set.reps || 1));
+                    }
+                  }}
                   placeholder="10"
                   aria-label={`Nombre de répétitions pour la série ${set.setNumber} de ${exercise.name}`}
                   className="w-10 sm:w-12 min-h-[44px] sm:min-h-[40px] text-center font-mono font-bold text-sm bg-black/40 border border-slate-700 disabled:border-transparent rounded-lg text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"

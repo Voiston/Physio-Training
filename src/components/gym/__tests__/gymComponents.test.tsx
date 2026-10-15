@@ -216,5 +216,116 @@ describe('GymActiveExercise - Accessibilité des sélecteurs RIR et repos sur sm
   });
 });
 
+describe('GymActiveExercise - Saisie fluide des répétitions et effacement clavier (P2-02)', () => {
+  it('autorise la valeur vide (0) lors de l effacement clavier puis enregistre correctement la nouvelle frappe sans la préfixer par 1', async () => {
+    const { GymActiveExercise } = await import('../GymActiveExercise');
+    const updateSpy = vi.fn();
 
+    const sampleExercise = {
+      id: 'ex_reps_test',
+      exerciseCatalogId: 'bench_press',
+      name: 'Développé couché',
+      category: 'chest',
+      sets: [
+        {
+          id: 's_reps_1',
+          setNumber: 1,
+          weightKg: 60,
+          reps: 10,
+          rir: 2,
+          restSeconds: 90,
+          completed: false
+        }
+      ]
+    };
 
+    type ComponentRenderer = { type: (props: unknown) => { props: { children: Array<{ props: { children: Array<unknown> } }> } } };
+    const renderFn = (GymActiveExercise as unknown as ComponentRenderer).type;
+
+    const component = renderFn({
+      exercise: sampleExercise,
+      exerciseIndex: 0,
+      onUpdateSetValue: updateSpy,
+      onQuickAdjustWeight: () => {},
+      onQuickAdjustReps: () => {},
+      onValidateSet: () => {},
+      onRemoveSet: () => {},
+      onAddSet: () => {},
+      onRemoveExercise: () => {},
+      onApplyAdaptiveSuggestion: () => {}
+    });
+
+    // Recherche de l'input reps dans l'arbre d'éléments
+    const setsContainer = component.props.children[1];
+    const setsList = setsContainer.props.children[1] as Array<{ props: { children: Array<{ props: { children: Array<{ props: Record<string, unknown> }> } }> } }>;
+    const firstSetRow = setsList[0];
+    const repsGroup = firstSetRow.props.children[2];
+    const repsInput = repsGroup.props.children[1];
+
+    expect(repsInput.props.type).toBe('number');
+    expect(repsInput.props.value).toBe(10);
+
+    // 1. L'utilisateur efface le champ (ex: Retour arrière sur '10' -> '')
+    const onChange = repsInput.props.onChange as (e: { target: { value: string } }) => void;
+    onChange({ target: { value: '' } });
+    expect(updateSpy).toHaveBeenCalledWith(0, 0, 'reps', 0);
+
+    // 2. L'utilisateur tape ensuite '8'
+    onChange({ target: { value: '8' } });
+    expect(updateSpy).toHaveBeenCalledWith(0, 0, 'reps', 8);
+    expect(updateSpy).not.toHaveBeenCalledWith(0, 0, 'reps', 18);
+  });
+
+  it('restaure automatiquement 1 répétition minimum au défocus (onBlur) si le champ a été laissé vide ou à 0', async () => {
+    const { GymActiveExercise } = await import('../GymActiveExercise');
+    const updateSpy = vi.fn();
+
+    const sampleExerciseWithEmptyReps = {
+      id: 'ex_reps_blur',
+      exerciseCatalogId: 'squat',
+      name: 'Squat barre',
+      category: 'legs',
+      sets: [
+        {
+          id: 's_blur_1',
+          setNumber: 1,
+          weightKg: 80,
+          reps: 0, // valeur transitoire vide
+          rir: 2,
+          restSeconds: 90,
+          completed: false
+        }
+      ]
+    };
+
+    type ComponentRenderer = { type: (props: unknown) => { props: { children: Array<{ props: { children: Array<unknown> } }> } } };
+    const renderFn = (GymActiveExercise as unknown as ComponentRenderer).type;
+
+    const component = renderFn({
+      exercise: sampleExerciseWithEmptyReps,
+      exerciseIndex: 0,
+      onUpdateSetValue: updateSpy,
+      onQuickAdjustWeight: () => {},
+      onQuickAdjustReps: () => {},
+      onValidateSet: () => {},
+      onRemoveSet: () => {},
+      onAddSet: () => {},
+      onRemoveExercise: () => {},
+      onApplyAdaptiveSuggestion: () => {}
+    });
+
+    const setsContainer = component.props.children[1];
+    const setsList = setsContainer.props.children[1] as Array<{ props: { children: Array<{ props: { children: Array<{ props: Record<string, unknown> }> } }> } }>;
+    const firstSetRow = setsList[0];
+    const repsGroup = firstSetRow.props.children[2];
+    const repsInput = repsGroup.props.children[1];
+
+    // Quand reps est 0, la valeur affichée doit être '' pour laisser le placeholder visible
+    expect(repsInput.props.value).toBe('');
+
+    // Défocus du champ vide
+    const onBlur = repsInput.props.onBlur as () => void;
+    onBlur();
+    expect(updateSpy).toHaveBeenCalledWith(0, 0, 'reps', 1);
+  });
+});
