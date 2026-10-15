@@ -129,6 +129,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
 
   // Calcul du total de muscles actifs
   const totalWorkedMuscles = Object.values(muscleLoads).filter(m => (m?.effectiveSets || 0) > 0).length;
+  const totalMuscleCount = Object.keys(MUSCLE_GROUPS).length;
 
   // Données de l'antagoniste pour le diagnostic biomécanique
   const antagonistInfo = useMemo(() => {
@@ -226,11 +227,11 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
               Cartographie Musculaire Haute Définition
             </h4>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30">
-              {totalWorkedMuscles}/12 ciblés
+              {totalWorkedMuscles}/{totalMuscleCount} ciblés
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1 m-0">
-            Modélisation biomécanique des 12 filières musculaires, équilibre articulaire et volume effectif.
+            Modélisation biomécanique des {totalMuscleCount} filières musculaires, équilibre articulaire et volume effectif.
           </p>
         </div>
 
@@ -1005,6 +1006,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
 
               {/* BADGES NUMÉRIQUES FLOTTANTS DE SÉRIES SUR LE MANNEQUIN DOS */}
               {renderBadge('trapezes', 100, 78)}
+              {renderBadge('deltoides_post', 52, 84)}
               {renderBadge('triceps', 44, 116)}
               {renderBadge('dorsaux', 68, 132)}
               {renderBadge('lombaires', 100, 166)}
@@ -1180,7 +1182,7 @@ export const MuscleBodyMap: React.FC<MuscleBodyMapProps> = ({
               Touchez ou survolez un muscle pour afficher son stimulus, jauge MAV et balance articulaire.
             </span>
             <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
-              12 groupes musculaires • Sciences du sport (Schoenfeld / Israetel)
+              {totalMuscleCount} groupes musculaires • Sciences du sport (Schoenfeld / Israetel)
             </span>
           </div>
         )}

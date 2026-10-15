@@ -83,3 +83,46 @@ describe('MuscleRegion', () => {
     expect(() => root.onBlur?.({} as React.FocusEvent<SVGGElement>)).not.toThrow();
   });
 });
+
+describe('MuscleBodyMap - Décompte des muscles et badge deltoïdes postérieurs (P2-05)', () => {
+  it('affiche le décompte exact 13/13 ciblés et le badge deltoides_post quand les 13 groupes sont travaillés', async () => {
+    const { MuscleBodyMap } = await import('../MuscleBodyMap');
+    const { MUSCLE_GROUPS } = await import('../../utils/muscleHelpers');
+
+    const all13Loads: Record<string, { effectiveSets: number }> = {};
+    Object.keys(MUSCLE_GROUPS).forEach(id => {
+      all13Loads[id] = { effectiveSets: 5 };
+    });
+
+    const element = React.createElement(MuscleBodyMap, {
+      muscleLoads: all13Loads
+    });
+
+    const html = renderToStaticMarkup(element);
+
+    // 1. Décompte d'en-tête dynamique
+    expect(html).toContain('13/13 ciblés');
+    expect(html).not.toContain('13/12 ciblés');
+    expect(html).toContain('Modélisation biomécanique des 13 filières musculaires');
+
+    // 2. Badge de deltoides_post sur la vue dos et région anatomique
+    expect(html).toContain('aria-label="Deltoïdes postérieurs : 5 séries effectives"');
+    expect(html).toContain('transform="translate(52, 84)"');
+    expect(html).toContain('5s');
+
+    // 3. Mention de bas de page
+    expect(html).toContain('13 groupes musculaires');
+  });
+
+  it('affiche 0/13 ciblés lorsque aucune série n est enregistrée', async () => {
+    const { MuscleBodyMap } = await import('../MuscleBodyMap');
+
+    const element = React.createElement(MuscleBodyMap, {
+      muscleLoads: {}
+    });
+
+    const html = renderToStaticMarkup(element);
+    expect(html).toContain('0/13 ciblés');
+  });
+});
+
