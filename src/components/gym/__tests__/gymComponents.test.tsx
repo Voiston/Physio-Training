@@ -329,3 +329,113 @@ describe('GymActiveExercise - Saisie fluide des répétitions et effacement clav
     expect(updateSpy).toHaveBeenCalledWith(0, 0, 'reps', 1);
   });
 });
+
+describe('Live Gym - Gel du chronomètre sur l écran de récapitulatif summary (P2-03)', () => {
+  it('fige le chronomètre lors du passage au résumé et ne comptabilise pas les 5 minutes passées sur l écran récapitulatif', async () => {
+    const { 
+      computeSummaryChronoPause, 
+      calculateElapsedSeconds 
+    } = await import('../../LiveGymModal');
+
+    const startedAt = 1000;
+    // La séance a duré 45 minutes (2700 secondes = 2 700 000 ms)
+    const workoutEndTimestamp = startedAt + 2_700_000;
+
+    // Durée active avant clic sur "Terminer"
+    const elapsedBeforeSummary = calculateElapsedSeconds(startedAt, null, 0, workoutEndTimestamp);
+    expect(elapsedBeforeSummary).toBe(2700); // 45 minutes
+
+    // L'athlète clique sur "Terminer" -> passage en stage 'summary'
+    const pauseTransition = computeSummaryChronoPause({
+      startedAt,
+      pausedAt: null,
+      pausedTotalMs: 0,
+      now: workoutEndTimestamp
+    });
+
+    expect(pauseTransition.pausedAt).toBe(workoutEndTimestamp);
+
+    // L'athlète passe 5 minutes (300 000 ms) à lire ses notes et ajuster ses jauges RPE/Fatigue
+    const fiveMinutesLater = workoutEndTimestamp + 300_000;
+
+    // Calcul de la durée écoulée au moment du clic final sur "Enregistrer" 5 minutes plus tard
+    const elapsedAtSave = calculateElapsedSeconds(
+      startedAt,
+      pauseTransition.pausedAt,
+      pauseTransition.pausedTotalMs,
+      fiveMinutesLater
+    );
+
+    // La durée doit être strictement égale à 2700s (45 min) et ne doit PAS inclure les 5 minutes du résumé
+    expect(elapsedAtSave).toBe(2700);
+    expect(Math.round(elapsedAtSave / 60)).toBe(45);
+  });
+
+  it('décompte fidèlement la durée du résumé dans pausedTotalMs si l athlète clique sur Retour à la séance', async () => {
+    const { 
+      computeSummaryChronoPause, 
+      computeSummaryChronoResume, 
+      calculateElapsedSeconds 
+    } = await import('../../LiveGymModal');
+
+    const startedAt = 1000;
+    const workoutEndTimestamp = startedAt + 2_700_000; // 45 min
+
+    // 1. Passage en summary
+    const pauseTransition = computeSummaryChronoPause({
+      startedAt,
+      pausedAt: null,
+      pausedTotalMs: 0,
+      now: workoutEndTimestamp
+    });
+
+    // 2. 5 minutes s'écoulent dans l'écran summary
+    const resumeTimestamp = workoutEndTimestamp + 300_000;
+
+    // 3. Clic sur "← Retour à la séance"
+    const resumeTransition = computeSummaryChronoResume({
+      startedAt,
+      pausedAt: pauseTransition.pausedAt,
+      pausedTotalMs: pauseTransition.pausedTotalMs,
+      now: resumeTimestamp
+    });
+
+    expect(resumeTransition.pausedAt).toBeNull();
+    expect(resumeTransition.pausedTotalMs).toBe(300_000);
+
+    // 4. L'athlète s'entraîne encore 2 minutes (120 000 ms) supplémentaires
+    const finalTimestamp = resumeTimestamp + 120_000;
+    const finalElapsed = calculateElapsedSeconds(
+      startedAt,
+      resumeTransition.pausedAt,
+      resumeTransition.pausedTotalMs,
+      finalTimestamp
+    );
+
+    // Durée totale = 45 min (2700s) + 2 min (120s) = 47 min (2820s)
+    // Les 5 minutes passées dans l'écran summary ont bien été exclues
+    expect(finalElapsed).toBe(2820);
+    expect(Math.round(finalElapsed / 60)).toBe(47);
+  });
+
+  it('préserve un état de pause antérieur si la séance était déjà en pause lors du clic sur Terminer', async () => {
+    const { 
+      computeSummaryChronoPause 
+    } = await import('../../LiveGymModal');
+
+    const startedAt = 1000;
+    const previouslyPausedAt = startedAt + 1_000_000;
+
+    const pauseTransition = computeSummaryChronoPause({
+      startedAt,
+      pausedAt: previouslyPausedAt, // déjà en pause manuelle
+      pausedTotalMs: 50_000,
+      now: startedAt + 1_500_000
+    });
+
+    // Le pausedAt d'origine doit être conservé
+    expect(pauseTransition.pausedAt).toBe(previouslyPausedAt);
+    expect(pauseTransition.pausedTotalMs).toBe(50_000);
+  });
+});
+

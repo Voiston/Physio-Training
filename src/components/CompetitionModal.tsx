@@ -3,10 +3,33 @@ import { useModalA11y } from '../hooks/useModalA11y';
 import { TargetCompetition } from '../hooks/useData';
 import { 
   Trophy, Calendar, AlertTriangle, 
-  X, Check, Gauge, Sparkles 
+  X, Check, Gauge, Sparkles, Clock 
 } from 'lucide-react';
 import type { TaperingAnalysis, FosterMetrics } from '../types';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
+
+export function buildTargetCompetitionPayload(
+  currentComp: TargetCompetition | null,
+  formData: {
+    name: string;
+    date: string;
+    type: string;
+    targetTsb: number;
+    targetTime?: string;
+    notes?: string;
+  }
+): TargetCompetition {
+  return {
+    ...(currentComp || {}),
+    name: formData.name.trim() || 'Objectif Compétition',
+    date: formData.date,
+    type: formData.type,
+    targetTsb: Number(formData.targetTsb),
+    targetTsbUnit: currentComp?.targetTsbUnit || 'percent',
+    targetTime: formData.targetTime?.trim() ? formData.targetTime.trim() : undefined,
+    notes: formData.notes
+  };
+}
 
 interface CompetitionModalProps {
   competition: TargetCompetition | null;
@@ -29,6 +52,7 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
   const [date, setDate] = useState(competition?.date || '');
   const [type, setType] = useState(competition?.type || 'course');
   const [targetTsb, setTargetTsb] = useState(competition?.targetTsb ?? 18);
+  const [targetTime, setTargetTime] = useState(competition?.targetTime || '');
   const [notes, setNotes] = useState(competition?.notes || '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -45,14 +69,14 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
       return;
     }
     setErrorMsg(null);
-    onSave({
-      name: name.trim() || 'Objectif Compétition',
+    onSave(buildTargetCompetitionPayload(competition, {
+      name,
       date,
       type,
-      targetTsb: Number(targetTsb),
-      targetTsbUnit: 'percent',
+      targetTsb,
+      targetTime,
       notes
-    });
+    }));
     onClose();
   };
 
@@ -238,6 +262,20 @@ export const CompetitionModal: React.FC<CompetitionModalProps> = ({
                 <option value="autre">Autre défi sportif</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="comp-target-time" className="block text-xs font-bold uppercase tracking-wider text-slate-200 mb-1.5 flex items-center gap-1.5">
+              <Clock size={15} className="text-amber-400" aria-hidden="true" /> Chrono visé (optionnel)
+            </label>
+            <input
+              id="comp-target-time"
+              type="text"
+              value={targetTime}
+              onChange={(e) => setTargetTime(e.target.value)}
+              placeholder="Ex: 3h15, 42 min, 1h28..."
+              className="w-full min-h-[44px] px-3.5 py-2.5 bg-black/40 border border-white/15 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-400 font-mono transition-colors"
+            />
           </div>
 
           <div>

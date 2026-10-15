@@ -199,6 +199,50 @@ export function resolveLiveGymEscapeAction(input: EscapeActionInput): EscapeActi
   return 'close_modal';
 }
 
+export interface SummaryChronoTransitionInput {
+  startedAt: number;
+  pausedAt: number | null;
+  pausedTotalMs: number;
+  now: number;
+}
+
+export function computeSummaryChronoPause(input: SummaryChronoTransitionInput): {
+  pausedAt: number;
+  pausedTotalMs: number;
+} {
+  return {
+    pausedAt: input.pausedAt !== null ? input.pausedAt : input.now,
+    pausedTotalMs: input.pausedTotalMs,
+  };
+}
+
+export function computeSummaryChronoResume(input: SummaryChronoTransitionInput): {
+  pausedAt: number | null;
+  pausedTotalMs: number;
+} {
+  if (input.pausedAt !== null) {
+    const pauseDuration = Math.max(0, input.now - input.pausedAt);
+    return {
+      pausedAt: null,
+      pausedTotalMs: input.pausedTotalMs + pauseDuration,
+    };
+  }
+  return {
+    pausedAt: null,
+    pausedTotalMs: input.pausedTotalMs,
+  };
+}
+
+export function calculateElapsedSeconds(
+  startedAt: number,
+  pausedAt: number | null,
+  pausedTotalMs: number,
+  now: number = Date.now()
+): number {
+  const effectiveNow = pausedAt !== null ? pausedAt : now;
+  return Math.max(0, Math.floor((effectiveNow - startedAt - pausedTotalMs) / 1000));
+}
+
 const STORAGE_DRAFT_KEY = 'training_live_session_draft_v1';
 
 export const LiveGymModal: React.FC<LiveGymModalProps> = ({
@@ -264,8 +308,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   }, [pausedAt]);
 
   const getElapsedSeconds = useCallback(() => {
-    const effectiveNow = pausedAt !== null ? pausedAt : Date.now();
-    return Math.max(0, Math.floor((effectiveNow - startedAt - pausedTotalMs) / 1000));
+    return calculateElapsedSeconds(startedAt, pausedAt, pausedTotalMs);
   }, [startedAt, pausedAt, pausedTotalMs]);
 
   // Exercices actifs
@@ -892,8 +935,24 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       suggestedRpe = Math.round(10 - avgRir);
     }
     setSessionRpeMusc(Math.min(10, Math.max(1, suggestedRpe)));
+
+    // [P2-03] Figer le chronomètre dès l'entrée dans le récapitulatif et couper le minuteur de repos
+    if (pausedAt === null) {
+      setPausedAt(Date.now());
+    }
+    setRestTimerState(null);
     setStage('summary');
   };
+
+  const handleResumeActiveWorkout = useCallback(() => {
+    // [P2-03] Reprise propre : décompter le temps passé dans le résumé pour ne pas fausser la durée réelle
+    if (pausedAt !== null) {
+      const pauseDuration = Math.max(0, Date.now() - pausedAt);
+      setPausedTotalMs(prev => prev + pauseDuration);
+      setPausedAt(null);
+    }
+    setStage('active');
+  }, [pausedAt]);
 
   const handleConfirmSaveSession = () => {
     // Vibration physique de succès et célébration
@@ -1380,7 +1439,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                 </div>
               </div>
               <button 
-                onClick={() => setStage('active')}
+                onClick={handleResumeActiveWorkout}
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors"
               >
                 ← Retour à la séance
