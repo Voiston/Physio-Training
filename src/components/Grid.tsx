@@ -615,10 +615,10 @@ export default function Grid({
   // Ref pour le conteneur de défilement horizontal
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // État pour le glisser-déposer horizontal à la souris (Mouse Pan)
+  // État et références pour le glisser-déposer horizontal à la souris (Mouse Pan)
   const [isPanning, setIsPanning] = useState(false);
-  const [panStartX, setPanStartX] = useState(0);
-  const [panScrollLeft, setPanScrollLeft] = useState(0);
+  const panStartXRef = useRef(0);
+  const panScrollLeftRef = useRef(0);
 
   // Statistiques de la semaine en cours (injectées depuis useData ou calculées en fallback)
   const currentWeekStats = useMemo(() => {
@@ -771,18 +771,18 @@ export default function Grid({
       return;
     }
     if (e.button !== 0) return;
+    panStartXRef.current = e.pageX - (scrollContainerRef.current?.offsetLeft || 0);
+    panScrollLeftRef.current = scrollContainerRef.current?.scrollLeft || 0;
     setIsPanning(true);
-    setPanStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0));
-    setPanScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
   }, []);
 
   const handleMouseMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
     if (!isPanning || !scrollContainerRef.current) return;
     e.preventDefault();
     const x = e.pageX - (scrollContainerRef.current.offsetLeft || 0);
-    const walk = (x - panStartX) * 1.4;
-    scrollContainerRef.current.scrollLeft = panScrollLeft - walk;
-  }, [isPanning, panStartX, panScrollLeft]);
+    const walk = (x - panStartXRef.current) * 1.4;
+    scrollContainerRef.current.scrollLeft = panScrollLeftRef.current - walk;
+  }, [isPanning]);
 
   const handleMouseUpOrLeave = useCallback(() => {
     setIsPanning(false);
@@ -909,7 +909,7 @@ export default function Grid({
         className={`w-full overflow-x-auto custom-scrollbar select-none transition-colors ${
           isPanning ? 'cursor-grabbing' : 'cursor-default'
         }`}
-        style={{ scrollBehavior: 'smooth' }}
+        style={{ scrollBehavior: isPanning ? 'auto' : 'smooth' }}
       >
         <table className="w-full text-left border-collapse table-fixed min-w-[700px] sm:min-w-[1300px]">
           <thead>

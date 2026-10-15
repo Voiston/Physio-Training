@@ -68,7 +68,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 
   // Génération dynamique et asynchrone du code QR à la demande uniquement à l'ouverture de la modale
   useEffect(() => {
-    if (!isOpen || !pairingUrl || localQrCodeUrl) return;
+    if (!isOpen || !pairingUrl) return;
 
     let isMounted = true;
     import('qrcode')
@@ -93,7 +93,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, pairingUrl, localQrCodeUrl]);
+  }, [isOpen, pairingUrl]);
 
   // Fermeture accessible sur touche Escape
   useEffect(() => {

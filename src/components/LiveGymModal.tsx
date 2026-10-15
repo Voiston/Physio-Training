@@ -712,35 +712,35 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   };
 
   // --- GESTION DES SÉRIES ET VALIDATION ---
-  const handleValidateSet = (exerciseIndex: number, setIndex: number) => {
-    const ex = activeExercises[exerciseIndex];
-    if (!ex) return;
-    const currentSet = ex.sets[setIndex];
-    if (!currentSet) return;
-
-    const newCompleted = !currentSet.completed;
-
-    if (newCompleted) {
-      // Feedback sonore et tactile
-      if (soundEnabled) {
-        playSetCompletedSound();
-      }
-      triggerVibration(60);
-
-      // Lancement automatique du minuteur de repos basé sur timestamps
-      const restSecs = currentSet.restSeconds || 90;
-      setRestTimerState({
-        endsAt: Date.now() + restSecs * 1000,
-        targetSeconds: restSecs,
-        label: `${ex.name} (Série ${currentSet.setNumber})`,
-        pausedRemainingMs: null
-      });
-    }
-
+  const handleValidateSet = useCallback((exerciseIndex: number, setIndex: number) => {
     setActiveExercises(prev => {
+      const targetEx = prev[exerciseIndex];
+      if (!targetEx) return prev;
+      const currentSet = targetEx.sets[setIndex];
+      if (!currentSet) return prev;
+
+      const newCompleted = !currentSet.completed;
+
+      if (newCompleted) {
+        // Feedback sonore et tactile
+        if (soundEnabled) {
+          playSetCompletedSound();
+        }
+        triggerVibration(60);
+
+        // Lancement automatique du minuteur de repos basé sur timestamps
+        const restSecs = currentSet.restSeconds || 90;
+        setRestTimerState({
+          endsAt: Date.now() + restSecs * 1000,
+          targetSeconds: restSecs,
+          label: `${targetEx.name} (Série ${currentSet.setNumber})`,
+          pausedRemainingMs: null
+        });
+      }
+
       const clone = [...prev];
-      const targetEx = { ...clone[exerciseIndex] };
-      const targetSets = [...targetEx.sets];
+      const nextEx = { ...targetEx };
+      const targetSets = [...nextEx.sets];
 
       const currentReps = newCompleted
         ? Math.max(1, targetSets[setIndex].reps || 1)
@@ -764,55 +764,85 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         };
       }
 
-      targetEx.sets = targetSets;
-      clone[exerciseIndex] = targetEx;
+      nextEx.sets = targetSets;
+      clone[exerciseIndex] = nextEx;
       return clone;
     });
-  };
+  }, [soundEnabled]);
 
-  const handleUpdateSetValue = (exerciseIndex: number, setIndex: number, field: keyof LiveSet, value: LiveSet[keyof LiveSet]) => {
+  const handleUpdateSetValue = useCallback((exerciseIndex: number, setIndex: number, field: keyof LiveSet, value: LiveSet[keyof LiveSet]) => {
     setActiveExercises(prev => {
+      const targetEx = prev[exerciseIndex];
+      if (!targetEx || !targetEx.sets[setIndex]) return prev;
       const clone = [...prev];
-      const targetEx = { ...clone[exerciseIndex] };
-      const targetSets = [...targetEx.sets];
+      const nextEx = { ...targetEx };
+      const targetSets = [...nextEx.sets];
       targetSets[setIndex] = {
         ...targetSets[setIndex],
         [field]: value
       };
-      targetEx.sets = targetSets;
-      clone[exerciseIndex] = targetEx;
+      nextEx.sets = targetSets;
+      clone[exerciseIndex] = nextEx;
       return clone;
     });
-  };
+  }, []);
 
-  const handleQuickAdjustWeight = (exerciseIndex: number, setIndex: number, delta: number) => {
-    const current = activeExercises[exerciseIndex]?.sets[setIndex]?.weightKg || 0;
-    const nextVal = Math.max(0, Math.round((current + delta) * 10) / 10);
-    handleUpdateSetValue(exerciseIndex, setIndex, 'weightKg', nextVal);
-  };
-
-  const handleQuickAdjustReps = (exerciseIndex: number, setIndex: number, delta: number) => {
-    const current = activeExercises[exerciseIndex]?.sets[setIndex]?.reps || 0;
-    const nextVal = Math.max(1, current + delta);
-    handleUpdateSetValue(exerciseIndex, setIndex, 'reps', nextVal);
-  };
-
-  const handleAddSetToExercise = (exerciseIndex: number) => {
-    const ex = activeExercises[exerciseIndex];
-    if (!ex) return;
-    const lastSet = ex.sets[ex.sets.length - 1];
-    const newSetNumber = ex.sets.length + 1;
-    const newSet: LiveSet = {
-      id: `s_${Date.now()}_${newSetNumber}`,
-      setNumber: newSetNumber,
-      weightKg: lastSet ? lastSet.weightKg : 0,
-      reps: lastSet ? lastSet.reps : 10,
-      rir: lastSet ? lastSet.rir : 2,
-      restSeconds: lastSet ? lastSet.restSeconds : 90,
-      completed: false
-    };
-
+  const handleQuickAdjustWeight = useCallback((exerciseIndex: number, setIndex: number, delta: number) => {
     setActiveExercises(prev => {
+      const targetEx = prev[exerciseIndex];
+      if (!targetEx || !targetEx.sets[setIndex]) return prev;
+      const current = targetEx.sets[setIndex].weightKg || 0;
+      const nextVal = Math.max(0, Math.round((current + delta) * 10) / 10);
+
+      const clone = [...prev];
+      const nextEx = { ...targetEx };
+      const targetSets = [...nextEx.sets];
+      targetSets[setIndex] = {
+        ...targetSets[setIndex],
+        weightKg: nextVal
+      };
+      nextEx.sets = targetSets;
+      clone[exerciseIndex] = nextEx;
+      return clone;
+    });
+  }, []);
+
+  const handleQuickAdjustReps = useCallback((exerciseIndex: number, setIndex: number, delta: number) => {
+    setActiveExercises(prev => {
+      const targetEx = prev[exerciseIndex];
+      if (!targetEx || !targetEx.sets[setIndex]) return prev;
+      const current = targetEx.sets[setIndex].reps || 0;
+      const nextVal = Math.max(1, current + delta);
+
+      const clone = [...prev];
+      const nextEx = { ...targetEx };
+      const targetSets = [...nextEx.sets];
+      targetSets[setIndex] = {
+        ...targetSets[setIndex],
+        reps: nextVal
+      };
+      nextEx.sets = targetSets;
+      clone[exerciseIndex] = nextEx;
+      return clone;
+    });
+  }, []);
+
+  const handleAddSetToExercise = useCallback((exerciseIndex: number) => {
+    setActiveExercises(prev => {
+      const ex = prev[exerciseIndex];
+      if (!ex) return prev;
+      const lastSet = ex.sets[ex.sets.length - 1];
+      const newSetNumber = ex.sets.length + 1;
+      const newSet: LiveSet = {
+        id: `s_${Date.now()}_${newSetNumber}`,
+        setNumber: newSetNumber,
+        weightKg: lastSet ? lastSet.weightKg : 0,
+        reps: lastSet ? lastSet.reps : 10,
+        rir: lastSet ? lastSet.rir : 2,
+        restSeconds: lastSet ? lastSet.restSeconds : 90,
+        completed: false
+      };
+
       const clone = [...prev];
       clone[exerciseIndex] = {
         ...clone[exerciseIndex],
@@ -820,36 +850,36 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       };
       return clone;
     });
-  };
+  }, []);
 
-  const handleRemoveSet = (exerciseIndex: number, setIndex: number) => {
+  const handleRemoveSet = useCallback((exerciseIndex: number, setIndex: number) => {
     setActiveExercises(prev => {
+      const targetEx = prev[exerciseIndex];
+      if (!targetEx || targetEx.sets.length <= 1) return prev; // Conserver au moins 1 série
       const clone = [...prev];
-      const targetEx = { ...clone[exerciseIndex] };
-      if (targetEx.sets.length <= 1) return prev; // Conserver au moins 1 série
-      const filtered = targetEx.sets.filter((_, idx) => idx !== setIndex).map((s, idx) => ({
+      const nextEx = { ...targetEx };
+      const filtered = nextEx.sets.filter((_, idx) => idx !== setIndex).map((s, idx) => ({
         ...s,
         setNumber: idx + 1
       }));
-      targetEx.sets = filtered;
-      clone[exerciseIndex] = targetEx;
+      nextEx.sets = filtered;
+      clone[exerciseIndex] = nextEx;
       return clone;
     });
-  };
+  }, []);
 
-  const handleRemoveExercise = (exerciseIndex: number) => {
+  const handleRemoveExercise = useCallback((exerciseIndex: number) => {
     setActiveExercises(prev => prev.filter((_, idx) => idx !== exerciseIndex));
-  };
+  }, []);
 
   const handleApplyAdaptiveSuggestion = useCallback((exerciseIndex: number) => {
-    const ex = activeExercises[exerciseIndex];
-    if (!ex) return;
-    const adaptive = adaptiveProgressionMap.get(ex.exerciseCatalogId);
-    if (!adaptive || !adaptive.hasHistory) return;
-
     setActiveExercises(prev => {
+      const ex = prev[exerciseIndex];
+      if (!ex) return prev;
+      const adaptive = adaptiveProgressionMap.get(ex.exerciseCatalogId);
+      if (!adaptive || !adaptive.hasHistory) return prev;
+
       const clone = [...prev];
-      if (!clone[exerciseIndex]) return prev;
       clone[exerciseIndex] = {
         ...clone[exerciseIndex],
         sets: clone[exerciseIndex].sets.map(s => {
@@ -864,7 +894,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       };
       return clone;
     });
-  }, [activeExercises, adaptiveProgressionMap]);
+  }, [adaptiveProgressionMap]);
 
   const handleAddExerciseFromCatalog = (catalogEx: ExerciseDefinition) => {
     recordExerciseUsage(catalogEx.id);
