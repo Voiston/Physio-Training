@@ -44,6 +44,14 @@ import { EXERCISE_CATALOG, ExerciseDefinition } from '../data/exerciseCatalog';
 import type { PartialEventsByQuality } from '../types';
 
 
+export interface SessionExerciseSet {
+  weightKg?: number;
+  reps?: number;
+  rir?: number;
+  completed?: boolean;
+  restSeconds?: number;
+}
+
 export interface SessionExercise {
   id: string;
   /** Id du catalogue quand l'exercice vient de la séance en direct. */
@@ -55,6 +63,7 @@ export interface SessionExercise {
   rir?: number; // Reps In Reserve (0 à 4+)
   weightKg?: number;
   customRatios?: Record<string, number>;
+  detailSets?: SessionExerciseSet[];
 }
 
 export interface MuscleBreakdownItem {

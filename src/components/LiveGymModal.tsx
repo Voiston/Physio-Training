@@ -83,6 +83,48 @@ function isValidLiveDraft(data: unknown): data is LiveSessionDraft {
   });
 }
 
+// Module-level pure set builder for cloning last workout sessions
+export function buildClonedSets(
+  rawEx: {
+    sets?: number;
+    weightKg?: number;
+    reps?: number;
+    rir?: number;
+    detailSets?: Array<{ weightKg?: number; reps?: number; rir?: number; restSeconds?: number; completed?: boolean }>;
+  },
+  exerciseIdx = 0,
+  defaultReps = 10,
+  defaultRestSeconds = 90
+): LiveSet[] {
+  const setCount = Math.max(1, Number(rawEx.sets) || 3);
+  const defaultWeight = Number(rawEx.weightKg) || 0;
+  const targetReps = Number(rawEx.reps) || defaultReps;
+  const defaultRir = Number(rawEx.rir ?? 2);
+
+  const hasDetailSets = Array.isArray(rawEx.detailSets) && rawEx.detailSets.length > 0;
+  if (hasDetailSets && rawEx.detailSets) {
+    return rawEx.detailSets.map((ds, sIdx) => ({
+      id: `s_${Date.now()}_${exerciseIdx}_${sIdx + 1}`,
+      setNumber: sIdx + 1,
+      weightKg: typeof ds.weightKg === 'number' ? ds.weightKg : defaultWeight,
+      reps: typeof ds.reps === 'number' ? ds.reps : targetReps,
+      rir: typeof ds.rir === 'number' ? ds.rir : defaultRir,
+      restSeconds: typeof ds.restSeconds === 'number' ? ds.restSeconds : defaultRestSeconds,
+      completed: false
+    }));
+  }
+
+  return Array.from({ length: setCount }, (_, sIdx) => ({
+    id: `s_${Date.now()}_${exerciseIdx}_${sIdx + 1}`,
+    setNumber: sIdx + 1,
+    weightKg: defaultWeight,
+    reps: targetReps,
+    rir: defaultRir,
+    restSeconds: defaultRestSeconds,
+    completed: false
+  }));
+}
+
 // Module-level pure time formatter
 function formatTime(secs: number): string {
   const mins = Math.floor(secs / 60);
@@ -132,6 +174,29 @@ interface LiveGymModalProps {
   events: EventsByQuality;
   initialDateStr: string;
   onSaveSession: (qualityId: string, dateStr: string, sessionData: SessionData, applyImpacts: boolean) => void;
+}
+
+export interface EscapeActionInput {
+  showAddExercisePicker: boolean;
+  stage: 'setup' | 'active' | 'summary';
+}
+
+export type EscapeActionResult = 'close_picker' | 'confirm_abandon' | 'close_modal';
+
+/**
+ * Arbitrage hiérarchique de la touche Escape :
+ * 1. Si le sélecteur d'exercices est ouvert -> fermer le picker uniquement sans confirm.
+ * 2. Si la séance est active -> demander confirmation d'abandon.
+ * 3. Sinon (setup / summary) -> fermer le modal avec réinitialisation.
+ */
+export function resolveLiveGymEscapeAction(input: EscapeActionInput): EscapeActionResult {
+  if (input.showAddExercisePicker) {
+    return 'close_picker';
+  }
+  if (input.stage === 'active') {
+    return 'confirm_abandon';
+  }
+  return 'close_modal';
 }
 
 const STORAGE_DRAFT_KEY = 'training_live_session_draft_v1';
@@ -378,21 +443,24 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     }
   }, [isOpen]);
 
-  // Fermeture accessible sur touche Escape
+  // Réinitialisation complète de l'état interne de la séance en direct
+  const resetLiveSessionState = useCallback(() => {
+    setStage('setup');
+    setActiveExercises([]);
+    setRestTimerState(null);
+    setWorkoutNotes('');
+    setShowAddExercisePicker(false);
+    setStartedAt(0);
+    setPausedAt(null);
+    setPausedTotalMs(0);
+  }, []);
+
+  // Réinitialiser automatiquement l'état interne lorsque la modale se ferme
   useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showAddExercisePicker) {
-          setShowAddExercisePicker(false);
-        } else if (stage === 'setup' || stage === 'summary') {
-          onClose();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, showAddExercisePicker, stage, onClose]);
+    if (!isOpen) {
+      resetLiveSessionState();
+    }
+  }, [isOpen, resetLiveSessionState]);
 
   // Sauvegarde automatique du brouillon avec debounce de 1 seconde
   // Ne s'exécute QUE si la structure change (exercices, séries, pause), JAMAIS à chaque seconde du chrono
@@ -519,20 +587,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         muscleRatios: {}
       };
 
-      const setCount = Math.max(1, Number(rawEx.sets) || 3);
-      const defaultWeight = Number(rawEx.weightKg) || 0;
-      const defaultReps = Number(rawEx.reps) || def.defaultReps || 10;
-      const defaultRir = Number(rawEx.rir ?? 2);
-
-      const sets: LiveSet[] = Array.from({ length: setCount }, (_, sIdx) => ({
-        id: `s_${Date.now()}_${idx}_${sIdx + 1}`,
-        setNumber: sIdx + 1,
-        weightKg: defaultWeight,
-        reps: defaultReps,
-        rir: defaultRir,
-        restSeconds: 90,
-        completed: false
-      }));
+      const sets = buildClonedSets(rawEx, idx, def.defaultReps || 10, 90);
 
       return {
         id: `ex_${Date.now()}_${idx}`,
@@ -848,7 +903,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       const completed = ex.sets.filter(s => s.completed);
       const targetSets = completed.length > 0 ? completed : ex.sets;
       const setCount = targetSets.length;
-      const avgWeight = Math.round(targetSets.reduce((acc, s) => acc + (s.weightKg || 0), 0) / setCount);
+      const avgWeight = Math.round((targetSets.reduce((acc, s) => acc + (s.weightKg || 0), 0) / setCount) * 10) / 10;
       const avgReps = Math.round(targetSets.reduce((acc, s) => acc + (s.reps || 10), 0) / setCount);
       const avgRir = Math.round(targetSets.reduce((acc, s) => acc + (s.rir ?? 2), 0) / setCount);
 
@@ -911,10 +966,11 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       // Ignore
     }
 
+    resetLiveSessionState();
     onClose();
   };
 
-  const handleAbandonWorkout = () => {
+  const handleAbandonWorkout = useCallback(() => {
     if (window.confirm('Voulez-vous vraiment abandonner cette séance ? Les données non enregistrées seront effacées.')) {
       haptics.warning();
       try {
@@ -922,19 +978,31 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       } catch (e) {
         // Ignore
       }
+      resetLiveSessionState();
       onClose();
     }
-  };
+  }, [resetLiveSessionState, onClose]);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
   const handleEscape = useCallback(() => {
-    if (stage === 'active') {
+    const action = resolveLiveGymEscapeAction({ showAddExercisePicker, stage });
+    if (action === 'close_picker') {
+      setShowAddExercisePicker(false);
+      return;
+    }
+    if (action === 'confirm_abandon') {
       handleAbandonWorkout();
     } else {
+      resetLiveSessionState();
       onClose();
     }
-  }, [stage, onClose]);
+  }, [showAddExercisePicker, stage, handleAbandonWorkout, resetLiveSessionState, onClose]);
+
+  const handleSafeClose = useCallback(() => {
+    resetLiveSessionState();
+    onClose();
+  }, [resetLiveSessionState, onClose]);
 
   // Focus trap, Escape listener & Focus restoration (WCAG 2.2 SC 2.1.2 & 2.4.3)
   useModalA11y(isOpen, onClose, modalRef, handleEscape);
@@ -986,7 +1054,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                 </div>
               </div>
               <button 
-                onClick={onClose}
+                onClick={handleSafeClose}
                 className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                 title="Fermer"
               >

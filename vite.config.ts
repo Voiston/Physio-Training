@@ -23,59 +23,61 @@ function stripDevOnlyScriptsPlugin(): Plugin {
 }
 
 export default defineConfig({
-  base: './',
+  base: process.env.VITEST ? '/' : './',
   plugins: [
       stripDevOnlyScriptsPlugin(),
       react(),
       tailwindcss(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
-        manifest: {
-          id: './',
-          name: 'PhysioTracker PRO',
-          short_name: 'PhysioPro',
-          description: "Suivi des effets résiduels d'entraînement, courbes EMA et préparation athlétique.",
-          theme_color: '#0a0a0c',
-          background_color: '#0a0a0c',
-          display: 'standalone',
-          start_url: './',
-          scope: './',
-          icons: [
-            {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: 'pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-          ],
-        },
-        workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          globIgnores: ['**/stats.html'],
-        },
-        devOptions: {
-          enabled: false,
-        },
-      }),
-      visualizer({
-        filename: 'dist/stats.html',
-        open: false,
-        gzipSize: true,
-        brotliSize: true,
-      }),
+      ...(!process.env.VITEST ? [
+        VitePWA({
+          registerType: 'autoUpdate',
+          includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+          manifest: {
+            id: './',
+            name: 'PhysioTracker PRO',
+            short_name: 'PhysioPro',
+            description: "Suivi des effets résiduels d'entraînement, courbes EMA et préparation athlétique.",
+            theme_color: '#0a0a0c',
+            background_color: '#0a0a0c',
+            display: 'standalone',
+            start_url: './',
+            scope: './',
+            icons: [
+              {
+                src: 'pwa-192x192.png',
+                sizes: '192x192',
+                type: 'image/png',
+                purpose: 'any',
+              },
+              {
+                src: 'pwa-512x512.png',
+                sizes: '512x512',
+                type: 'image/png',
+                purpose: 'any',
+              },
+              {
+                src: 'pwa-maskable-512x512.png',
+                sizes: '512x512',
+                type: 'image/png',
+                purpose: 'maskable',
+              },
+            ],
+          },
+          workbox: {
+            globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+            globIgnores: ['**/stats.html'],
+          },
+          devOptions: {
+            enabled: false,
+          },
+        }),
+        visualizer({
+          filename: 'dist/stats.html',
+          open: false,
+          gzipSize: true,
+          brotliSize: true,
+        }),
+      ] : []),
     ],
     resolve: {
       alias: {
