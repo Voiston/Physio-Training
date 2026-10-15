@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { GymRestTimer, GymActiveExercise, GymSetHistory } from '../index';
 
 describe('Gym Components (Modular Gym HUD)', () => {
@@ -23,7 +24,7 @@ describe('Gym Components (Modular Gym HUD)', () => {
         onSkip={() => {}}
       />
     );
-    expect(timerElem).toBeTruthy();
+    expect(renderToStaticMarkup(timerElem)).toContain('01:00');
 
     const historyElem = (
       <GymSetHistory
@@ -34,7 +35,38 @@ describe('Gym Components (Modular Gym HUD)', () => {
         elapsedSeconds={1800}
       />
     );
-    expect(historyElem).toBeTruthy();
+    const historyHtml = renderToStaticMarkup(historyElem);
+    expect(historyHtml).toContain('Tonnage total');
+    expect(historyHtml).toContain('Séries validées');
+    expect(historyHtml).toContain('8');
+    expect(historyHtml).toContain('12');
+
+    const exerciseElem = (
+      <GymActiveExercise
+        exercise={{
+          id: 'ex_1',
+          exerciseCatalogId: 'bench_press',
+          name: 'Développé Couché',
+          category: 'upper_push',
+          sets: [
+            { id: 's_1_1', setNumber: 1, weightKg: 80, reps: 10, rir: 2, restSeconds: 90, completed: false }
+          ]
+        }}
+        exerciseIndex={0}
+        onUpdateSetValue={() => {}}
+        onQuickAdjustWeight={() => {}}
+        onQuickAdjustReps={() => {}}
+        onValidateSet={() => {}}
+        onRemoveSet={() => {}}
+        onAddSet={() => {}}
+        onRemoveExercise={() => {}}
+        onApplyAdaptiveSuggestion={() => {}}
+      />
+    );
+    const exerciseHtml = renderToStaticMarkup(exerciseElem);
+    expect(exerciseHtml).toContain('Développé Couché');
+    expect(exerciseHtml).toContain('80');
+    expect(exerciseHtml).toContain('10');
   });
 });
 
