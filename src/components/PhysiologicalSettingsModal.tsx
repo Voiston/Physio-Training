@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { PhysiologicalSettings } from '../hooks/useData';
 import { computeBanisterPerformance } from '../utils/physiology';
 import { 
@@ -75,16 +76,10 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
   const [profileName, setProfileName] = useState<string>(settings.profileName || 'Standard');
   const [initialCtl, setInitialCtl] = useState<number | ''>(settings.initialCtl ?? '');
 
-  // Fermeture accessible sur touche Escape
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap, écouteur Escape et restauration du focus (WCAG 2.2 SC 2.1.2 & SC 2.4.3)
+  useModalA11y(true, onClose, modalRef);
 
   // Calcul live avec les paramètres actuels de l'UI
   const liveBanister = useMemo(() => {
@@ -148,7 +143,9 @@ export const PhysiologicalSettingsModal: React.FC<PhysiologicalSettingsModalProp
       aria-describedby="physio-modal-desc"
     >
       <div 
-        className="w-full max-w-2xl bg-[#0f0f15] border border-white/15 rounded-2xl shadow-2xl p-5 sm:p-6 text-slate-100 my-auto"
+        ref={modalRef}
+        tabIndex={-1}
+        className="w-full max-w-2xl bg-[#0f0f15] border border-white/15 rounded-2xl shadow-2xl p-5 sm:p-6 text-slate-100 my-auto focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         

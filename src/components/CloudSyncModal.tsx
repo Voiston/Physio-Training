@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import {
   Cloud,
   CheckCircle2,
@@ -95,18 +96,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     };
   }, [isOpen, pairingUrl]);
 
-  // Fermeture accessible sur touche Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap, écouteur Escape et restauration du focus (WCAG 2.2 SC 2.1.2 & SC 2.4.3)
+  useModalA11y(isOpen, onClose, modalRef);
 
   if (!isOpen) return null;
 
@@ -132,11 +125,13 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
       onClick={onClose}
     >
       <div 
+        ref={modalRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="cloud-sync-title"
         aria-describedby="cloud-sync-desc"
-        className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-slate-100 p-6 flex flex-col gap-6"
+        className="relative w-full max-w-xl max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-slate-100 p-6 flex flex-col gap-6 focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

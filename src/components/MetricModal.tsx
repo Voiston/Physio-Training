@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { Calendar, CheckCircle2 } from 'lucide-react';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export interface MetricModalInfo {
   type: 'readiness' | 'vfc' | 'hrRest' | string;
@@ -23,6 +24,10 @@ export interface MetricModalProps {
 export default function MetricModal({ info, onClose, onSave }: MetricModalProps) {
   const existing = info.currentValue !== '-' ? info.currentValue : '';
   const [value, setValue] = useState<number | string>(existing);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap, écouteur Escape et restauration du focus (WCAG 2.2 SC 2.1.2 & SC 2.4.3)
+  useModalA11y(true, onClose, modalRef);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,11 +44,22 @@ export default function MetricModal({ info, onClose, onSave }: MetricModalProps)
     : [48, 52, 56, 60, 64, 68];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="metric-modal-title"
+    >
+      <div 
+        ref={modalRef}
+        tabIndex={-1}
+        className="modal-content animate-fadeIn focus:outline-none" 
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between pb-3 border-b border-white/10 mb-4">
           <div>
-            <h3 className="text-xl font-bold text-slate-100 tracking-tight m-0">{info.title}</h3>
+            <h3 id="metric-modal-title" className="text-xl font-bold text-slate-100 tracking-tight m-0">{info.title}</h3>
             <p className="text-xs font-mono text-blue-400 mt-1 mb-0 flex items-center gap-1.5">
               <Calendar size={12} /> {info.dateStr}
             </p>

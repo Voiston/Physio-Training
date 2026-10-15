@@ -150,6 +150,61 @@ function getDynamicBanisterInterpretation(
 }
 
 /**
+ * Extrait les séances primaires enregistrées pour une date donnée à travers toutes les qualités physiques.
+ */
+export function extractDaySessionsForDate(
+  events: EventsByQuality,
+  qualities: Quality[],
+  dateStr: string
+): DaySession[] {
+  const daySessions: DaySession[] = [];
+  Object.entries(events).forEach(([qualityId, qualityDates]) => {
+    if (qualityDates && qualityDates[dateStr]) {
+      const item = qualityDates[dateStr];
+      const qDef = qualities.find(q => q.id === qualityId);
+      let sLoad = 0;
+      let duration = 0;
+      let rpeM = 5;
+      let rpeC = 5;
+      let fatigue: number | null = null;
+      let notes = '';
+      let sessionType = '';
+
+      if (typeof item === 'object' && item !== null) {
+        sLoad = extractSessionLoad(item);
+        duration = getNormalizedSessionDuration(item);
+        rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
+        rpeC = item.rpeCardio ?? 5;
+        fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
+        notes = item.notes || '';
+        sessionType = item.type || '';
+      } else if (typeof item === 'number') {
+        sLoad = extractSessionLoad(item);
+        duration = getNormalizedSessionDuration(item);
+        rpeM = item <= 10 ? item : 5;
+        rpeC = item <= 10 ? item : 5;
+      }
+
+      const isPrimarySession = isPrimary(item);
+      if ((sLoad > 0 || duration > 0) && isPrimarySession) {
+        daySessions.push({
+          qualityId,
+          qualityName: qDef?.name || qualityId,
+          load: sLoad,
+          duration,
+          rpeM,
+          rpeC,
+          fatigue,
+          notes,
+          sessionType
+        });
+      }
+    }
+  });
+  return daySessions;
+}
+
+/**
  * Tooltip hautement optimisé à l'échelle du module
  */
 const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: TooltipContentProps) {
@@ -265,51 +320,7 @@ export default function PhysiologyDashboard({
         const vfc = dailyMetrics[dateStr]?.vfc || null;
         const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
         const readiness = dailyMetrics[dateStr]?.readiness || null;
-        
-        const daySessions: DaySession[] = [];
-        Object.entries(events).forEach(([qualityId, qualityDates]) => {
-          if (qualityDates && qualityDates[dateStr]) {
-            const item = qualityDates[dateStr];
-            const qDef = qualities.find(q => q.id === qualityId);
-            let sLoad = 0;
-            let duration = 0;
-            let rpeM = 5;
-            let rpeC = 5;
-            let fatigue = null;
-            let notes = '';
-            let sessionType = '';
-
-            if (typeof item === 'object' && item !== null) {
-              sLoad = extractSessionLoad(item);
-              duration = getNormalizedSessionDuration(item);
-              rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
-              rpeC = item.rpeCardio ?? 5;
-              fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
-              notes = item.notes || '';
-              sessionType = item.type || '';
-            } else if (typeof item === 'number') {
-              sLoad = extractSessionLoad(item);
-              duration = getNormalizedSessionDuration(item);
-              rpeM = item <= 10 ? item : 5;
-              rpeC = item <= 10 ? item : 5;
-            }
-
-            const isPrimarySession = isPrimary(item);
-            if ((sLoad > 0 || duration > 0) && isPrimarySession) {
-              daySessions.push({
-                qualityId,
-                qualityName: qDef?.name || qualityId,
-                load: sLoad,
-                duration,
-                rpeM,
-                rpeC,
-                fatigue,
-                notes,
-                sessionType
-              });
-            }
-          }
-        });
+        const daySessions = extractDaySessionsForDate(events, qualities, dateStr);
 
         return {
           ...point,
@@ -341,56 +352,8 @@ export default function PhysiologyDashboard({
       const vfc = dailyMetrics[dateStr]?.vfc || null;
       const hrRest = dailyMetrics[dateStr]?.hrRest ?? dailyMetrics[dateStr]?.rhr ?? null;
       const readiness = dailyMetrics[dateStr]?.readiness || null;
-      let totalLoad = 0;
-      const daySessions: DaySession[] = [];
-      
-      Object.entries(events).forEach(([qualityId, qualityDates]) => {
-        if (qualityDates && qualityDates[dateStr]) {
-          const item = qualityDates[dateStr];
-          const qDef = qualities.find(q => q.id === qualityId);
-          let sLoad = 0;
-          let duration = 0;
-          let rpeM = 5;
-          let rpeC = 5;
-          let fatigue = null;
-          let notes = '';
-          let sessionType = '';
-
-          if (typeof item === 'object' && item !== null) {
-            sLoad = extractSessionLoad(item);
-            duration = getNormalizedSessionDuration(item);
-            rpeM = item.rpeMusculaire ?? item.rpeMusc ?? 5;
-            rpeC = item.rpeCardio ?? 5;
-            fatigue = item.fatigue !== undefined && item.fatigue !== null ? Number(item.fatigue) : null;
-            notes = item.notes || '';
-            sessionType = item.type || '';
-          } else if (typeof item === 'number') {
-            sLoad = extractSessionLoad(item);
-            duration = getNormalizedSessionDuration(item);
-            rpeM = item <= 10 ? item : 5;
-            rpeC = item <= 10 ? item : 5;
-          }
-
-          const isPrimarySession = isPrimary(item);
-          if (isPrimarySession) {
-            totalLoad += sLoad;
-          }
-
-          if ((sLoad > 0 || duration > 0) && isPrimarySession) {
-            daySessions.push({
-              qualityId,
-              qualityName: qDef?.name || qualityId,
-              load: sLoad,
-              duration,
-              rpeM,
-              rpeC,
-              fatigue,
-              notes,
-              sessionType
-            });
-          }
-        }
-      });
+      const daySessions = extractDaySessionsForDate(events, qualities, dateStr);
+      const totalLoad = daySessions.reduce((acc, s) => acc + s.load, 0);
 
       rawData.push({ 
         dateStr, 
