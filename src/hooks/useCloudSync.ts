@@ -113,6 +113,23 @@ function withTimeout<T>(promise: Promise<T>, ms = 12000, errorMsg = 'Délai d\'a
   });
 }
 
+/**
+ * Rafraîchit de façon transparente et sécurisée le token d'authentification Google ID.
+ * Prévient les déconnexions inopinées après 45-60 min d'utilisation ou mise en veille.
+ */
+async function refreshAuthToken(force = false): Promise<boolean> {
+  try {
+    const fb = await getFirebase();
+    const user = fb.auth.currentUser;
+    if (!user) return false;
+    await user.getIdToken(force);
+    return true;
+  } catch (err) {
+    console.warn('[cloudSync] Renouvellement du token Google ID échoué:', err);
+    return false;
+  }
+}
+
 export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearLocalHealthData }: CloudSyncOptions) {
   // 1. Device identity (distinguish PC vs Mobile to avoid self-echo)
   const [deviceId] = useState<string>(() => {
@@ -198,9 +215,12 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       const user = fb.auth.currentUser;
       const path = `sync_records/${user.uid}`;
 
+      let stringified = '';
+      let compressed = '';
       try {
+        await refreshAuthToken(false);
         const dataToSend = overrideData || getExportableDataRef.current();
-        const stringified = typeof dataToSend === 'string' ? dataToSend : JSON.stringify(dataToSend);
+        stringified = typeof dataToSend === 'string' ? dataToSend : JSON.stringify(dataToSend);
 
         // Dirty-check : éviter de repousser vers Firestore si le document est rigoureusement identique
         if (!overrideData && lastPushedDataRef.current === stringified) {
@@ -212,7 +232,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         setSyncStatus('syncing');
 
         // Compression Gzip standard (réduction drastique de 85% à 95% du volume réseau et stockage)
-        const compressed = await compressString(stringified);
+        compressed = await compressString(stringified);
         const quota = computeQuotaUsage(compressed.length);
         setQuotaUsage(quota);
 
@@ -254,6 +274,43 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         setLastSyncedAt(new Date());
         setConfirmFirstPush(false);
       } catch (err: unknown) {
+        // En cas de permission-denied, le token Google ID a pu expirer après 45-60 min d'inactivité.
+        // Tentative automatique et transparente de renouvellement forcé du token + seconde tentative immédiate.
+        if (errorCode(err) === 'permission-denied' && fb.auth.currentUser && compressed) {
+          console.log('[cloudSync] Token potentiellement expiré, renouvellement forcé en cours...');
+          const renewed = await refreshAuthToken(true);
+          if (renewed) {
+            try {
+              const docRef = fb.doc(fb.db, 'sync_records', user.uid);
+              await withTimeout(
+                fb.setDoc(
+                  docRef,
+                  {
+                    userId: user.uid,
+                    userEmail: user.email || '',
+                    key: user.uid,
+                    data: compressed,
+                    version: 1,
+                    lastDeviceId: deviceId,
+                    updatedAt: new Date().toISOString(),
+                  },
+                  { merge: true }
+                ),
+                12000,
+                'Délai de téléversement Cloud dépassé (12s).'
+              );
+              lastPushedDataRef.current = stringified;
+              setSyncStatus('synced');
+              setSyncErrorDetail(null);
+              setLastSyncedAt(new Date());
+              setConfirmFirstPush(false);
+              return;
+            } catch (retryErr) {
+              console.warn('[cloudSync] Échec persistant après renouvellement forcé du token:', retryErr);
+            }
+          }
+        }
+
         console.warn('Firestore push error:', err);
         setSyncStatus(navigator.onLine ? 'error' : 'offline');
         const desc = errorCode(err) === 'permission-denied'
@@ -304,12 +361,32 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     const path = `sync_records/${user.uid}`;
 
     try {
+      await refreshAuthToken(false);
       const docRef = fb.doc(fb.db, 'sync_records', user.uid);
-      const docSnap = await withTimeout(
-        fb.getDoc(docRef),
-        10000,
-        'Délai de récupération Cloud dépassé (10s).'
-      );
+      let docSnap;
+      try {
+        docSnap = await withTimeout(
+          fb.getDoc(docRef),
+          10000,
+          'Délai de récupération Cloud dépassé (10s).'
+        );
+      } catch (firstErr: unknown) {
+        if (errorCode(firstErr) === 'permission-denied' && fb.auth.currentUser) {
+          console.log('[cloudSync] Token expiré lors du pull, renouvellement forcé...');
+          const renewed = await refreshAuthToken(true);
+          if (renewed) {
+            docSnap = await withTimeout(
+              fb.getDoc(docRef),
+              10000,
+              'Délai de récupération Cloud dépassé (10s).'
+            );
+          } else {
+            throw firstErr;
+          }
+        } else {
+          throw firstErr;
+        }
+      }
 
       if (docSnap.exists()) {
         const record = docSnap.data();
@@ -494,6 +571,13 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
           }
 
           if (!user) {
+            // Si le compte local est configuré, Firebase peut être en train de rafraîchir le token en arrière-plan
+            // ou de recharger la persistance depuis IndexedDB/localStorage. Ne pas déconnecter inopinément !
+            const savedAccount = localStorage.getItem('physio_user_account');
+            if (savedAccount) {
+              console.log('[cloudSync] Session en cours de rétablissement (non-nullification préventive)');
+              return;
+            }
             setCurrentUser(null);
             setUserAccount(null);
             setSyncStatus('unpaired');
@@ -570,12 +654,16 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
             },
             (error) => {
               console.warn('Firestore onSnapshot notice:', error.message);
+              if (errorCode(error) === 'permission-denied' && fb.auth.currentUser) {
+                console.log('[cloudSync] onSnapshot: permission-denied, tentative de renouvellement forcé du token...');
+                refreshAuthToken(true);
+              }
               setSyncStatus('error');
             }
           );
         };
 
-        unsubAuth = fb.onAuthStateChanged(fb.auth, (user) => {
+        unsubAuth = fb.onIdTokenChanged(fb.auth, (user) => {
           if (!isCancelled) {
             setupListenerForUser(user);
           }
@@ -594,6 +682,36 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       if (unsubAuth) unsubAuth();
     };
   }, [deviceId]);
+
+  // Rafraîchissement proactif du token d'authentification Google toutes les 25 minutes
+  // (un token Google ID expire après 60min, ce renouvellement prévient les déconnexions inopinées)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (navigator.onLine && localStorage.getItem('physio_user_account')) {
+        console.log('[cloudSync] Rafraîchissement préventif (intervalle 25 min) du token Google ID...');
+        refreshAuthToken(true);
+      }
+    }, 25 * 60 * 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Rafraîchissement automatique au réveil de l'onglet ou retour au premier plan (focus)
+  useEffect(() => {
+    const handleWakeup = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine && localStorage.getItem('physio_user_account')) {
+        console.log('[cloudSync] Réveil de l\'application détecté, vérification du token Google ID...');
+        refreshAuthToken(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleWakeup);
+    window.addEventListener('focus', handleWakeup);
+    return () => {
+      document.removeEventListener('visibilitychange', handleWakeup);
+      window.removeEventListener('focus', handleWakeup);
+    };
+  }, []);
 
   // Handle online/offline network events
   useEffect(() => {

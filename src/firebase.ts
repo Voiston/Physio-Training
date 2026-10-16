@@ -1,13 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
-  setPersistence,
+  initializeAuth,
+  getAuth,
+  indexedDBLocalPersistence,
   browserLocalPersistence,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut, 
-  onAuthStateChanged, 
-  type User 
+  onAuthStateChanged,
+  onIdTokenChanged,
+  type User,
+  type Auth
 } from 'firebase/auth';
 import { 
   getFirestore 
@@ -16,16 +19,25 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
 
-// Verrouille la persistance locale permanente (survie aux rechargements, fermeture d'onglets et redémarrages)
-if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence).catch(err => {
-    console.warn('Firebase Auth persistence notice:', err);
+// Initialisation robuste de Firebase Auth avec double persistance (IndexedDB + fallback localStorage)
+// Garantit la rétention de la session et des refresh tokens en PWA, contextes iframes et réveils mobiles
+let authInstance: Auth;
+try {
+  authInstance = initializeAuth(app, {
+    persistence: typeof window !== 'undefined'
+      ? [indexedDBLocalPersistence, browserLocalPersistence]
+      : []
   });
+} catch {
+  authInstance = getAuth(app);
 }
 
+export const auth = authInstance;
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export enum OperationType {
   CREATE = 'create',
@@ -83,5 +95,5 @@ export {
   onSnapshot 
 } from 'firebase/firestore';
 
-export { signInWithPopup, signOut, onAuthStateChanged };
+export { signInWithPopup, signOut, onAuthStateChanged, onIdTokenChanged };
 export type { User };
