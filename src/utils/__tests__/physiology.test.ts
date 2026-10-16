@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { 
   computeFosterMetrics, 
   computeBanisterPerformance, 
@@ -10,6 +10,10 @@ import { getDailyAthleteLoad } from '../loadHelpers';
 
 describe('Phase 1 Physiology Verifications', () => {
   const testDate = '2026-10-01';
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   // Cas type de l'audit :
   // Une séance sprint de 100 donne 100 en charge globale dans tous les onglets (pas 320 ou 410 !)
@@ -35,6 +39,10 @@ describe('Phase 1 Physiology Verifications', () => {
   };
 
   it('A1 Criterion: a 100 load session yields exactly 100 athlete load globally', () => {
+    // Horloge figée sur testDate : la fenêtre Banister (relative à aujourd'hui) couvre toujours testDate
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(`${testDate}T12:00:00`));
+
     // 1. Single source of truth load
     const athleteLoad = getDailyAthleteLoad(eventsWithSecondaries, testDate);
     expect(athleteLoad).toBe(100);
