@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { isMemo } from 'react-is';
 
 // Hook state persistant pour simuler le cycle de vie et les re-rendus de LiveGymModal
-const hookStateMap = new Map<number, any>();
+const hookStateMap = new Map<number, unknown>();
 let currentHookIdx = 0;
 
 function resetHookRunner() {
@@ -20,32 +20,32 @@ vi.mock('react', async (importOriginal) => {
       if (!hookStateMap.has(idx)) {
         hookStateMap.set(idx, typeof init === 'function' ? (init as () => T)() : init);
       }
-      const setState = (val: any) => {
-        const prev = hookStateMap.get(idx);
-        hookStateMap.set(idx, typeof val === 'function' ? val(prev) : val);
+      const setState = (val: T | ((prev: T) => T)) => {
+        const prev = hookStateMap.get(idx) as T;
+        hookStateMap.set(idx, typeof val === 'function' ? (val as (prev: T) => T)(prev) : val);
       };
-      return [hookStateMap.get(idx), setState];
+      return [hookStateMap.get(idx) as T, setState];
     },
     useRef: <T,>(init: T) => {
       const idx = currentHookIdx++;
       if (!hookStateMap.has(idx)) {
         hookStateMap.set(idx, { current: init });
       }
-      return hookStateMap.get(idx);
+      return hookStateMap.get(idx) as { current: T };
     },
-    useCallback: <T extends Function>(fn: T, deps: any[]): T => {
+    useCallback: <T extends Function>(fn: T, deps: readonly unknown[]): T => {
       const idx = currentHookIdx++;
-      const prev = hookStateMap.get(idx);
-      if (prev && deps && prev.deps.every((d: any, i: number) => Object.is(d, deps[i]))) {
+      const prev = hookStateMap.get(idx) as { fn: T; deps: readonly unknown[] } | undefined;
+      if (prev && deps && prev.deps.every((d: unknown, i: number) => Object.is(d, deps[i]))) {
         return prev.fn;
       }
       hookStateMap.set(idx, { fn, deps });
       return fn;
     },
-    useMemo: <T,>(fn: () => T, deps: any[]): T => {
+    useMemo: <T,>(fn: () => T, deps: readonly unknown[]): T => {
       const idx = currentHookIdx++;
-      const prev = hookStateMap.get(idx);
-      if (prev && deps && prev.deps.every((d: any, i: number) => Object.is(d, deps[i]))) {
+      const prev = hookStateMap.get(idx) as { val: T; deps: readonly unknown[] } | undefined;
+      if (prev && deps && prev.deps.every((d: unknown, i: number) => Object.is(d, deps[i]))) {
         return prev.val;
       }
       const val = fn();
@@ -112,7 +112,7 @@ describe('GymActiveExercise - Efficacité de React.memo (P2-07)', () => {
   it('valide formellement que GymActiveExercise est encapsulé dans React.memo', () => {
     const element = <GymActiveExercise {...dummyProps} />;
     expect(isMemo(element)).toBe(true);
-    expect((GymActiveExercise as any).$$typeof).toBe(Symbol.for('react.memo'));
+    expect((GymActiveExercise as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'));
   });
 
   it('garantit que handleValidateSet reste référentiellement stable entre deux rendus de LiveGymModal', () => {
@@ -159,7 +159,7 @@ describe('GymActiveExercise - Efficacité de React.memo (P2-07)', () => {
       isOpen: true,
       onClose: () => {},
       qualities: dummyQualities,
-      events: { other: {} } as any, // Prop modifiée simulant une réévaluation du parent
+      events: { other: {} } as unknown as EventsByQuality, // Prop modifiée simulant une réévaluation du parent
       initialDateStr: '2026-10-16',
       onSaveSession: () => {}
     }) as unknown as ReactNode;
