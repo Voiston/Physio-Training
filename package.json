@@ -26,7 +26,7 @@
     "react-dom": "19.0.1",
     "react-is": "19.0.1",
     "recharts": "3.8.1",
-    "vite": "6.4.4"
+    "vite": "8.3.4"
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "0.0.2",
