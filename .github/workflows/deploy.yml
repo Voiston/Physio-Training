@@ -28,17 +28,15 @@ jobs:
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
-          cache: 'npm'
 
-      - name: Ensure lockfile exists
+      - name: Install dependencies
         run: |
-          if [ -f package.json ] && [ ! -f package-lock.json ]; then
-            echo "Lockfile missing, generating package-lock.json..."
-            npm i --package-lock-only
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "package-lock.json absent, repli vers npm install..."
+            npm install --no-audit --no-fund
           fi
-
-      - name: Install dependencies (Strict & Deterministic)
-        run: npm ci
 
       - name: Security Audit
         run: npm audit --audit-level=critical
