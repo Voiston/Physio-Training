@@ -22,7 +22,7 @@ async function startServer() {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com",
-    "connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://festive-condition-nzbz0.firebaseapp.com https://apis.google.com https://accounts.google.com",
+    "connect-src 'self' https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://festive-condition-nzbz0.firebaseapp.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://accounts.google.com",
     "frame-src 'self' https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com https://apis.google.com",
     "frame-ancestors 'self' https://*.google.com https://*.run.app https://aistudio.google.com https://*.googleusercontent.com",
     "worker-src 'self' blob:",

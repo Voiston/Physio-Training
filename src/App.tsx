@@ -126,9 +126,10 @@ function AppContent() {
   const [mobileGridTab, setMobileGridTab] = useState<'grid' | 'athlete'>('grid');
 
   // Coupure réseau Firestore pendant la séance live : le modem radio peut dormir, toutes les données sont locales
+  const { setNetworkState } = cloudSync;
   useEffect(() => {
-    cloudSync.setNetworkState(!showLiveGymModal);
-  }, [showLiveGymModal, cloudSync]);
+    setNetworkState(!showLiveGymModal);
+  }, [showLiveGymModal, setNetworkState]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1231,6 +1232,14 @@ function AppContent() {
               type: 'info',
               title: 'Synchronisation Cloud',
               message: 'Données rechargées depuis Firebase Cloud.'
+            });
+          }}
+          onResetSyncState={() => {
+            cloudSync.resetSyncState();
+            showToast({
+              type: 'info',
+              title: 'Synchronisation Débloquée',
+              message: 'L\'état de synchronisation a été débloqué et réinitialisé.'
             });
           }}
         />

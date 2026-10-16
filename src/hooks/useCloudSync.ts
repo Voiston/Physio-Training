@@ -93,6 +93,26 @@ function errorMessage(err: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Enveloppe une promesse avec un délai maximal (timeout) strict pour interdire tout blocage infini.
+ */
+function withTimeout<T>(promise: Promise<T>, ms = 12000, errorMsg = 'Délai d\'attente de synchronisation dépassé (12s)'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(errorMsg));
+    }, ms);
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearLocalHealthData }: CloudSyncOptions) {
   // 1. Device identity (distinguish PC vs Mobile to avoid self-echo)
   const [deviceId] = useState<string>(() => {
@@ -210,18 +230,22 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         }
 
         const docRef = fb.doc(fb.db, 'sync_records', user.uid);
-        await fb.setDoc(
-          docRef,
-          {
-            userId: user.uid,
-            userEmail: user.email || '',
-            key: user.uid,
-            data: compressed,
-            version: 1,
-            lastDeviceId: deviceId,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
+        await withTimeout(
+          fb.setDoc(
+            docRef,
+            {
+              userId: user.uid,
+              userEmail: user.email || '',
+              key: user.uid,
+              data: compressed,
+              version: 1,
+              lastDeviceId: deviceId,
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          ),
+          12000,
+          'Délai de téléversement Cloud dépassé (12s). Vérifiez votre connexion.'
         );
 
         lastPushedDataRef.current = stringified;
@@ -281,7 +305,11 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
 
     try {
       const docRef = fb.doc(fb.db, 'sync_records', user.uid);
-      const docSnap = await fb.getDoc(docRef);
+      const docSnap = await withTimeout(
+        fb.getDoc(docRef),
+        10000,
+        'Délai de récupération Cloud dépassé (10s).'
+      );
 
       if (docSnap.exists()) {
         const record = docSnap.data();
@@ -405,7 +433,10 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   }, []);
 
   // Coupure ou réactivation du réseau Firestore pendant les séances hors-ligne
+  const currentNetworkStateRef = useRef<boolean>(true);
   const setNetworkState = useCallback(async (enabled: boolean) => {
+    if (currentNetworkStateRef.current === enabled) return;
+    currentNetworkStateRef.current = enabled;
     if (firebaseModulePromise) {
       try {
         const fb = await firebaseModulePromise;
@@ -417,6 +448,26 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       } catch (err) { console.warn("[cloudSync] Changement d'état réseau Firestore échoué", err); }
     }
   }, []);
+
+  // Déblocage forcé manuel de l'état de synchronisation
+  const resetSyncState = useCallback(() => {
+    isRemoteUpdatingRef.current = false;
+    setSyncStatus('synced');
+    setSyncErrorDetail(null);
+    setSyncNotification('État de synchronisation débloqué');
+  }, []);
+
+  // Watchdog de sécurité anti-blocage : si un état 'syncing' persiste au-delà de 15s sans résolution
+  useEffect(() => {
+    if (syncStatus === 'syncing') {
+      const watchdog = setTimeout(() => {
+        console.warn('[cloudSync] Watchdog: synchronisation en cours depuis 15s sans retour réseau. Déblocage automatique.');
+        setSyncStatus('synced');
+        setSyncNotification('Synchronisation maintenue en local');
+      }, 15000);
+      return () => clearTimeout(watchdog);
+    }
+  }, [syncStatus]);
 
   // Listen to Auth State and Real-Time Firestore changes UNIQUEMENT si un compte est enregistré
   useEffect(() => {
@@ -594,5 +645,6 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     triggerDebouncedPush,
     pullFromCloud,
     setNetworkState,
+    resetSyncState,
   };
 }

@@ -43,6 +43,7 @@ interface CloudSyncModalProps {
   onLogout: () => void;
   onPushToCloud: () => void;
   onPullFromCloud: () => void;
+  onResetSyncState?: () => void;
 }
 
 export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
@@ -62,6 +63,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   onLogout,
   onPushToCloud,
   onPullFromCloud,
+  onResetSyncState,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -246,14 +248,39 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 
           {userAccount && (
             <div className="flex items-center gap-2">
+              {syncStatus === 'syncing' && onResetSyncState && (
+                <button
+                  type="button"
+                  onClick={onResetSyncState}
+                  aria-label="Débloquer la synchronisation"
+                  title="Interrompre l'attente et débloquer immédiatement l'état local"
+                  className="min-h-[44px] px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-amber-500/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                >
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Débloquer</span>
+                </button>
+              )}
+              {syncStatus === 'error' && (
+                <button
+                  type="button"
+                  onClick={onPullFromCloud}
+                  aria-label="Réessayer la synchronisation"
+                  title="Tenter à nouveau de contacter Google Cloud"
+                  className="min-h-[44px] px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Réessayer</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onPushToCloud}
+                disabled={syncStatus === 'syncing'}
                 aria-label="Forcer la synchronisation immédiate vers Google Cloud"
                 title="Envoyer manuellement les données vers le cloud"
-                className="min-h-[44px] px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="min-h-[44px] px-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               >
-                <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                <RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} aria-hidden="true" />
                 <span className="hidden sm:inline">Forcer sync</span>
               </button>
             </div>

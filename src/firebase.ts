@@ -10,18 +10,12 @@ import {
   type User 
 } from 'firebase/auth';
 import { 
-  initializeFirestore 
+  getFirestore 
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 export const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(
-  app,
-  {
-    experimentalAutoDetectLongPolling: true,
-  },
-  firebaseConfig.firestoreDatabaseId
-);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 // Verrouille la persistance locale permanente (survie aux rechargements, fermeture d'onglets et redémarrages)
