@@ -63,12 +63,13 @@ describe('Grid - Fluidité du Mouse Pan (P2-06)', () => {
     expect(markup).not.toContain('Force Maximale');
   });
 
-  it('tolère des séances corrompues : filière null, séance numérique historique, date inconnue', () => {
+  it('tolère des séances corrompues et affiche la charge calculée (ex: 315 UA pour RPE 7)', () => {
     const corrupt = {
       force_max: { '2026-10-15': 7, '1999-01-01': { load: Number.NaN } },
       endurance: null
     } as unknown as EventsByQuality;
-    expect(() => renderGrid({ events: corrupt })).not.toThrow();
+    const markup = renderGrid({ events: corrupt });
+    expect(markup).toContain('315');
   });
 
   it('affiche la readiness absente (ou à 0) en badge neutre, et une valeur valide en couleur', () => {

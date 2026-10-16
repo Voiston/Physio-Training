@@ -11,6 +11,28 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
+/**
+ * Purge hermétique des données applicatives locales de PhysioTracker PRO.
+ * Supprime uniquement les séances/métriques (YYYY-MM-DD_*), les données physio_*
+ * et les brouillons training_*, en préservant strictement les jetons d'authentification
+ * Firebase et les clés tierces du domaine.
+ */
+export function purgeAppLocalStorage(storage: Storage = localStorage): void {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key) continue;
+      if (/^\d{4}-\d{2}-\d{2}_/.test(key) || key.startsWith('physio_') || key.startsWith('training_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => storage.removeItem(k));
+  } catch (e) {
+    console.warn('Erreur lors de la purge ciblée de localStorage:', e);
+  }
+}
+
 export class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -36,19 +58,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   private handleResetData = () => {
     if (window.confirm('Voulez-vous réinitialiser les données locales du navigateur en cas de corruption ? (Pensez à sauvegarder un export si possible)')) {
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (!key) continue;
-          if (/^\d{4}-\d{2}-\d{2}_/.test(key) || key.startsWith('physio_') || key.startsWith('training_')) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-      } catch (e) {
-        console.warn('Erreur lors de la purge ciblée de localStorage:', e);
-      }
+      purgeAppLocalStorage();
       window.location.reload();
     }
   };

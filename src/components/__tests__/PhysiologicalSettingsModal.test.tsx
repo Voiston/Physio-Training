@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PhysiologicalSettingsModal } from '../PhysiologicalSettingsModal';
+import { purgeAppLocalStorage } from '../ErrorBoundary';
 import type { EventsByQuality } from '../../types';
 import type { PhysiologicalSettings, DailyMetrics } from '../../hooks/useData';
 
@@ -103,7 +104,7 @@ describe('PhysiologicalSettingsModal - Bornage de initialCtl (P2-09)', () => {
 });
 
 describe('ErrorBoundary - Nettoyage ciblé de localStorage (P2-09)', () => {
-  it('ne supprime que les clés de PhysioTracker PRO et préserve les clés Firebase / externes', () => {
+  it('ne supprime que les clés de PhysioTracker PRO et préserve les clés Firebase / externes via purgeAppLocalStorage', () => {
     const store: Record<string, string> = {
       '2026-10-15_force_max': '{"load": 100}',
       '2026-10-15_readiness': '8',
@@ -114,17 +115,19 @@ describe('ErrorBoundary - Nettoyage ciblé de localStorage (P2-09)', () => {
       'other_app_key': 'preserve_me'
     };
 
-    const keys = Object.keys(store);
-    const keysToRemove: string[] = [];
-
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      if (/^\d{4}-\d{2}-\d{2}_/.test(key) || key.startsWith('physio_') || key.startsWith('training_')) {
-        keysToRemove.push(key);
+    const mockStorage = {
+      get length() { return Object.keys(store).length; },
+      key(idx: number) { return Object.keys(store)[idx] ?? null; },
+      getItem(k: string) { return store[k] ?? null; },
+      setItem(k: string, v: string) { store[k] = v; },
+      removeItem(k: string) { delete store[k]; },
+      clear() {
+        for (const k of Object.keys(store)) delete store[k];
       }
-    }
+    } as Storage;
 
-    keysToRemove.forEach(k => delete store[k]);
+    // Appel direct de la fonction de production
+    purgeAppLocalStorage(mockStorage);
 
     // Clés applicatives supprimées
     expect(store['2026-10-15_force_max']).toBeUndefined();

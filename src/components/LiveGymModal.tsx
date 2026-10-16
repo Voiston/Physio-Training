@@ -243,7 +243,7 @@ export function calculateElapsedSeconds(
   return Math.max(0, Math.floor((effectiveNow - startedAt - pausedTotalMs) / 1000));
 }
 
-const STORAGE_DRAFT_KEY = 'training_live_session_draft_v1';
+export const STORAGE_DRAFT_KEY = 'training_live_session_draft_v1';
 
 export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   isOpen,
@@ -277,7 +277,18 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   const isPullSession = targetSessionCategory === 'upper_pull';
 
   // Draft en cours
-  const [draftExists, setDraftExists] = useState(false);
+  const [draftExists, setDraftExists] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return isValidLiveDraft(parsed) && parsed.exercises.length > 0;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Chrono général de séance basé sur timestamps absolus (zéro re-rendu du parent chaque seconde)
@@ -313,6 +324,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
   // Exercices actifs
   const [activeExercises, setActiveExercises] = useState<LiveExercise[]>([]);
+  const activeExercisesRef = useRef(activeExercises);
+  activeExercisesRef.current = activeExercises;
 
   // Modale d'ajout d'exercice
   const [showAddExercisePicker, setShowAddExercisePicker] = useState(false);
@@ -478,11 +491,15 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
           setDraftExists(true);
         } else {
           localStorage.removeItem(STORAGE_DRAFT_KEY);
+          setDraftExists(false);
         }
+      } else {
+        setDraftExists(false);
       }
     } catch (e) {
       // Nettoyer si corrompu
       try { localStorage.removeItem(STORAGE_DRAFT_KEY); } catch (err) { console.warn('[LiveGym] Impossible de supprimer le brouillon corrompu', err); }
+      setDraftExists(false);
     }
   }, [isOpen]);
 
@@ -496,6 +513,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     setStartedAt(0);
     setPausedAt(null);
     setPausedTotalMs(0);
+    setDraftExists(false);
   }, []);
 
   // Réinitialiser automatiquement l'état interne lorsque la modale se ferme
@@ -713,33 +731,36 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
   // --- GESTION DES SÉRIES ET VALIDATION ---
   const handleValidateSet = useCallback((exerciseIndex: number, setIndex: number) => {
-    setActiveExercises(prev => {
-      const targetEx = prev[exerciseIndex];
-      if (!targetEx) return prev;
-      const currentSet = targetEx.sets[setIndex];
-      if (!currentSet) return prev;
+    const currentExercises = activeExercisesRef.current;
+    const targetEx = currentExercises[exerciseIndex];
+    if (!targetEx) return;
+    const currentSet = targetEx.sets[setIndex];
+    if (!currentSet) return;
 
-      const newCompleted = !currentSet.completed;
+    const newCompleted = !currentSet.completed;
 
-      if (newCompleted) {
-        // Feedback sonore et tactile
-        if (soundEnabled) {
-          playSetCompletedSound();
-        }
-        triggerVibration(60);
-
-        // Lancement automatique du minuteur de repos basé sur timestamps
-        const restSecs = currentSet.restSeconds || 90;
-        setRestTimerState({
-          endsAt: Date.now() + restSecs * 1000,
-          targetSeconds: restSecs,
-          label: `${targetEx.name} (Série ${currentSet.setNumber})`,
-          pausedRemainingMs: null
-        });
+    if (newCompleted) {
+      // Feedback sonore et tactile
+      if (soundEnabled) {
+        playSetCompletedSound();
       }
+      triggerVibration(60);
 
+      // Lancement automatique du minuteur de repos basé sur timestamps
+      const restSecs = currentSet.restSeconds || 90;
+      setRestTimerState({
+        endsAt: Date.now() + restSecs * 1000,
+        targetSeconds: restSecs,
+        label: `${targetEx.name} (Série ${currentSet.setNumber})`,
+        pausedRemainingMs: null
+      });
+    }
+
+    setActiveExercises(prev => {
       const clone = [...prev];
-      const nextEx = { ...targetEx };
+      const ex = clone[exerciseIndex];
+      if (!ex) return prev;
+      const nextEx = { ...ex };
       const targetSets = [...nextEx.sets];
 
       const currentReps = newCompleted
@@ -967,22 +988,30 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     setSessionRpeMusc(Math.min(10, Math.max(1, suggestedRpe)));
 
     // [P2-03] Figer le chronomètre dès l'entrée dans le récapitulatif et couper le minuteur de repos
-    if (pausedAt === null) {
-      setPausedAt(Date.now());
-    }
+    const nextChrono = computeSummaryChronoPause({
+      startedAt,
+      pausedAt,
+      pausedTotalMs,
+      now: Date.now()
+    });
+    setPausedAt(nextChrono.pausedAt);
+    setPausedTotalMs(nextChrono.pausedTotalMs);
     setRestTimerState(null);
     setStage('summary');
   };
 
   const handleResumeActiveWorkout = useCallback(() => {
     // [P2-03] Reprise propre : décompter le temps passé dans le résumé pour ne pas fausser la durée réelle
-    if (pausedAt !== null) {
-      const pauseDuration = Math.max(0, Date.now() - pausedAt);
-      setPausedTotalMs(prev => prev + pauseDuration);
-      setPausedAt(null);
-    }
+    const nextChrono = computeSummaryChronoResume({
+      startedAt,
+      pausedAt,
+      pausedTotalMs,
+      now: Date.now()
+    });
+    setPausedAt(nextChrono.pausedAt);
+    setPausedTotalMs(nextChrono.pausedTotalMs);
     setStage('active');
-  }, [pausedAt]);
+  }, [startedAt, pausedAt, pausedTotalMs]);
 
   const handleConfirmSaveSession = () => {
     // Vibration physique de succès et célébration
@@ -1010,11 +1039,12 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
         rir: avgRir,
         rpe: 10 - avgRir,
         customRatios: ex.muscleRatios && Object.keys(ex.muscleRatios).length > 0 ? { ...ex.muscleRatios } : undefined,
-        detailSets: ex.sets.map(s => ({
+        detailSets: targetSets.map(s => ({
           weightKg: s.weightKg,
           reps: s.reps,
           rir: s.rir,
-          completed: s.completed
+          completed: s.completed,
+          restSeconds: s.restSeconds
         }))
       };
     });
@@ -1059,6 +1089,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     } catch (e) {
       // Ignore
     }
+    setDraftExists(false);
 
     resetLiveSessionState();
     onClose();
@@ -1072,6 +1103,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       } catch (e) {
         // Ignore
       }
+      setDraftExists(false);
       resetLiveSessionState();
       onClose();
     }

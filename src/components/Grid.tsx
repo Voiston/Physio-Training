@@ -119,9 +119,9 @@ const GridQualityCell = memo(function GridQualityCell({
   }, [onCellClick, quality, day.dateStr, sessionData]);
 
   let cellHeatmapStyle = 'bg-slate-900/30 border-white/[0.03] text-slate-600 hover:bg-white/[0.04] hover:border-white/10';
+  const loadVal = sessionData ? extractSessionLoad(sessionData) : 0;
   
   if (sessionData) {
-    const loadVal = extractSessionLoad(sessionData);
     const rM = Number(sessionData.rpeMusc ?? sessionData.rpeMusculaire ?? sessionData);
     const rC = Number(sessionData.rpeCardio ?? sessionData);
     const maxRpe = Math.max(isNaN(rM) ? 0 : rM, isNaN(rC) ? 0 : rC);
@@ -146,12 +146,12 @@ const GridQualityCell = memo(function GridQualityCell({
   const isMultiSession = subSessions.length > 1;
   const cellTitle = sessionData
     ? isMultiSession
-      ? `${subSessions.length} séances réalisées ce jour : ${subSessions.map((s, i) => `#${i + 1} (${s.duration || 0}min / ${s.load || 0} UA)`).join(', ')} · Total cumulé : ${sessionData.load} UA (${sessionData.duration} min)`
-      : `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${sessionData.load} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Fatigue ${sessionData.fatigue !== undefined && sessionData.fatigue !== null ? `${sessionData.fatigue}/10` : '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
+      ? `${subSessions.length} séances réalisées ce jour : ${subSessions.map((s, i) => `#${i + 1} (${s.duration || 0}min / ${s.load || 0} UA)`).join(', ')} · Total cumulé : ${loadVal} UA (${sessionData.duration} min)`
+      : `Séance ${sessionData.sport === 'bike' ? '🚴 Vélo / HT' : sessionData.sport === 'run' ? '🏃 Course à pied' : ''} : Charge ${loadVal} (RPE Musc ${sessionData.rpeMusc || '-'}, Cardio ${sessionData.rpeCardio || '-'}, Fatigue ${sessionData.fatigue !== undefined && sessionData.fatigue !== null ? `${sessionData.fatigue}/10` : '-'}, Durée ${sessionData.duration || '-'}min)${sessionData.isSecondary ? ' • [Impact secondaire]' : ''}`
     : (cellState?.tooltip || '');
 
   const accessibleLabel = sessionData 
-    ? `${quality.name}, ${dateLabel} : ${isMultiSession ? `${subSessions.length} séances cumulées, ` : ''}charge totale ${sessionData.load} unités.${sessionData.sport === 'bike' ? ' Vélo.' : sessionData.sport === 'run' ? ' Course.' : ''}${cellState?.isBurnout ? ' Alerte surmenage.' : ''} Cliquer ou taper Entrée pour ouvrir le détail.`
+    ? `${quality.name}, ${dateLabel} : ${isMultiSession ? `${subSessions.length} séances cumulées, ` : ''}charge totale ${loadVal} unités.${sessionData.sport === 'bike' ? ' Vélo.' : sessionData.sport === 'run' ? ' Course.' : ''}${cellState?.isBurnout ? ' Alerte surmenage.' : ''} Cliquer ou taper Entrée pour ouvrir le détail.`
     : `${quality.name}, ${dateLabel} : aucune séance enregistrée. ${cellState?.status === 'green' ? 'Fenêtre de surcompensation optimale.' : cellState?.status === 'orange' ? 'Récupération en cours.' : ''} Cliquer ou taper Entrée pour planifier.`;
 
   return (
@@ -174,7 +174,7 @@ const GridQualityCell = memo(function GridQualityCell({
         )}
         {sessionData ? (
           <span className="font-mono text-xs font-bold leading-none tracking-tight flex items-center justify-center">
-            {sessionData.load}
+            {loadVal}
             {isMultiSession && (
               <span className="text-[9px] ml-0.5 px-1 py-0.2 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-sans font-extrabold" title={`${subSessions.length} séances ce jour`}>
                 ×{subSessions.length}
