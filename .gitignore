@@ -9,3 +9,7 @@ coverage/
 /data/
 .aistudio/
 dev-dist/
+
+# Python
+__pycache__/
+*.pyc
