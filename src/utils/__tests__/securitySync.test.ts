@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   sanitizeSessionData,
   sanitizeEventsPayload,
@@ -8,6 +8,7 @@ import {
   sanitizeDailyMetricsPayload,
   validateAndStageImportPayload
 } from '../security';
+import { purgeLocalHealthStorage, hasLocalHealthData } from '../../hooks/useCloudSync';
 
 describe('Synchronisation & Tombstones - Résolution de Conflits & Suppressions', () => {
   it('préserve le champ updatedAt dans sanitizeSessionData', () => {
@@ -309,4 +310,57 @@ describe('Import & fusion - échecs dégradés', () => {
     expect(hasNewLocalData).toBe(true);
   });
 });
+
+describe('Cloud Sync - Résilience de session, jetons et isolation du stockage', () => {
+  const mockStorage: Record<string, string> = {};
+
+  beforeEach(() => {
+    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => mockStorage[key] ?? null,
+      setItem: (key: string, val: string) => { mockStorage[key] = String(val); },
+      removeItem: (key: string) => { delete mockStorage[key]; },
+      clear: () => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]); },
+      key: (i: number) => Object.keys(mockStorage)[i] ?? null,
+      get length() { return Object.keys(mockStorage).length; }
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('détecte fidèlement la présence de données de santé sans faux-positif sur les identifiants', () => {
+    expect(hasLocalHealthData()).toBe(false);
+
+    // Seulement l'identifiant matériel d'appareil : pas de données de santé
+    localStorage.setItem('physio_device_id', 'pc_test123');
+    localStorage.setItem('physio_user_account', JSON.stringify({ email: 'test@example.com' }));
+    expect(hasLocalHealthData()).toBe(false);
+
+    // Présence d'une entrée de santé temporelle
+    localStorage.setItem('2026-10-26_events', JSON.stringify({ force: { load: 100 } }));
+    expect(hasLocalHealthData()).toBe(true);
+  });
+
+  it('purge hermétiquement les données de santé tout en préservant physio_device_id', () => {
+    localStorage.setItem('physio_device_id', 'mobile_unique_uuid');
+    localStorage.setItem('2026-10-25_events', '{"load": 120}');
+    localStorage.setItem('2026-10-26_metrics', '{"vfc": 65}');
+    localStorage.setItem('physio_training_blocks', '[]');
+    localStorage.setItem('training_live_session_draft_v1', '{"stage":"active"}');
+
+    purgeLocalHealthStorage();
+
+    // L'identifiant matériel doit être strictement préservé
+    expect(localStorage.getItem('physio_device_id')).toBe('mobile_unique_uuid');
+
+    // Les données de santé et le brouillon doivent être effacés
+    expect(localStorage.getItem('2026-10-25_events')).toBeNull();
+    expect(localStorage.getItem('2026-10-26_metrics')).toBeNull();
+    expect(localStorage.getItem('physio_training_blocks')).toBeNull();
+    expect(localStorage.getItem('training_live_session_draft_v1')).toBeNull();
+  });
+});
+
 

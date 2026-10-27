@@ -114,13 +114,33 @@ function withTimeout<T>(promise: Promise<T>, ms = 12000, errorMsg = 'Délai d\'a
 }
 
 /**
+ * Rétablit ou attend la disponibilité de l'utilisateur authentifié.
+ * Évite les déconnexions fantômes ('unpaired') au démarrage ou réveil si la session est en cours de restauration.
+ */
+async function ensureAuthenticatedUser(): Promise<{ fb: typeof import('../firebase'); user: User | null }> {
+  const fb = await getFirebase();
+  if (fb.auth.currentUser) {
+    return { fb, user: fb.auth.currentUser };
+  }
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('physio_user_account')) {
+    try {
+      if (typeof fb.auth.authStateReady === 'function') {
+        await withTimeout(fb.auth.authStateReady(), 3000, 'authStateReady timeout');
+      }
+    } catch {
+      // Ignorer timeout transitoire
+    }
+  }
+  return { fb, user: fb.auth.currentUser };
+}
+
+/**
  * Rafraîchit de façon transparente et sécurisée le token d'authentification Google ID.
  * Prévient les déconnexions inopinées après 45-60 min d'utilisation ou mise en veille.
  */
 async function refreshAuthToken(force = false): Promise<boolean> {
   try {
-    const fb = await getFirebase();
-    const user = fb.auth.currentUser;
+    const { user } = await ensureAuthenticatedUser();
     if (!user) return false;
     await user.getIdToken(force);
     return true;
@@ -190,6 +210,9 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     onClearLocalHealthDataRef.current = onClearLocalHealthData;
   }, [onClearLocalHealthData]);
 
+  // Référence d'auto-guérison et resynchronisation globale (utilisée lors des réveils, retours en ligne et heartbeats)
+  const ensureSyncRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
   // QR Code pairing URL to open the app directly on smartphone
   const pairingUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${typeof window !== 'undefined' ? window.location.pathname : ''}`;
 
@@ -206,13 +229,14 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         return;
       }
       
-      const fb = await getFirebase();
-      if (!fb.auth.currentUser) {
-        setSyncStatus('unpaired');
+      const { fb, user } = await ensureAuthenticatedUser();
+      if (!user) {
+        if (!localStorage.getItem('physio_user_account')) {
+          setSyncStatus('unpaired');
+        }
         return;
       }
 
-      const user = fb.auth.currentUser;
       const path = `sync_records/${user.uid}`;
 
       let stringified = '';
@@ -350,14 +374,15 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       setSyncStatus('offline');
       return;
     }
-    const fb = await getFirebase();
-    if (!fb.auth.currentUser) {
-      setSyncStatus('unpaired');
+    const { fb, user } = await ensureAuthenticatedUser();
+    if (!user) {
+      if (!localStorage.getItem('physio_user_account')) {
+        setSyncStatus('unpaired');
+      }
       return;
     }
 
     setSyncStatus('syncing');
-    const user = fb.auth.currentUser;
     const path = `sync_records/${user.uid}`;
 
     try {
@@ -532,6 +557,9 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     setSyncStatus('synced');
     setSyncErrorDetail(null);
     setSyncNotification('État de synchronisation débloqué');
+    ensureSyncRef.current().catch((err) => {
+      console.warn('[cloudSync] Échec du rétablissement forcé:', err);
+    });
   }, []);
 
   // Watchdog de sécurité anti-blocage : si un état 'syncing' persiste au-delà de 15s sans résolution
@@ -551,9 +579,149 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     let unsubscribeSnapshot: (() => void) | null = null;
     let unsubAuth: (() => void) | null = null;
     let isCancelled = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let activeUserId: string | null = null;
+
+    let fbInstance: typeof import('../firebase') | null = null;
+
+    const scheduleReconnect = (delayMs = 1500) => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(async () => {
+        if (isCancelled) return;
+        const savedAccount = localStorage.getItem('physio_user_account');
+        if (!savedAccount) return;
+        console.log('[cloudSync] Auto-guérison : tentative de renouvellement de session et réattachement Firestore...');
+        const renewed = await refreshAuthToken(true);
+        const { fb, user } = await ensureAuthenticatedUser();
+        fbInstance = fb;
+        if (renewed && user && !isCancelled) {
+          setupListenerForUser(user);
+          pullFromCloudRef.current();
+        } else if (user && !isCancelled) {
+          scheduleReconnect(Math.min(delayMs * 1.5, 20000));
+        }
+      }, delayMs);
+    };
+
+    const setupListenerForUser = (user: User | null) => {
+      if (!user) {
+        // Si le compte local est configuré, Firebase peut être en train de rafraîchir le token en arrière-plan
+        // ou de recharger la persistance depuis IndexedDB/localStorage. Ne pas déconnecter inopinément ni détruire l'écouteur !
+        const savedAccount = localStorage.getItem('physio_user_account');
+        if (savedAccount) {
+          console.log('[cloudSync] Session en cours de rétablissement (non-nullification préventive)');
+          return;
+        }
+        if (unsubscribeSnapshot) {
+          unsubscribeSnapshot();
+          unsubscribeSnapshot = null;
+        }
+        activeUserId = null;
+        setCurrentUser(null);
+        setUserAccount(null);
+        setSyncStatus('unpaired');
+        setConfirmFirstPush(false);
+        return;
+      }
+
+      // Si un écouteur est déjà sain et actif pour cet utilisateur, éviter les redémarrages inutiles
+      if (unsubscribeSnapshot && activeUserId === user.uid) {
+        return;
+      }
+
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+
+      if (!fbInstance) return;
+      const fb = fbInstance;
+
+      activeUserId = user.uid;
+      setCurrentUser(user);
+      const email = (user.email || '').toLowerCase();
+      const account: UserAccount = {
+        email,
+        name: user.displayName || email.split('@')[0],
+        avatar: user.photoURL || undefined,
+        provider: 'google',
+      };
+      setUserAccount(account);
+      localStorage.setItem('physio_user_account', JSON.stringify(account));
+
+      if (!navigator.onLine) {
+        setSyncStatus('offline');
+        return;
+      }
+
+      // Attach Firestore onSnapshot listener
+      const docRef = fb.doc(fb.db, 'sync_records', user.uid);
+      unsubscribeSnapshot = fb.onSnapshot(
+        docRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            setConfirmFirstPush(false);
+            const record = snapshot.data();
+            if (record && record.data) {
+              // Ignore self-echo
+              if (record.lastDeviceId === deviceId) {
+                setSyncStatus('synced');
+                setSyncErrorDetail(null);
+                setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+                return;
+              }
+
+              (async () => {
+                try {
+                  const decompressed = typeof record.data === 'string' ? await decompressString(record.data) : record.data;
+                  const parsed = typeof decompressed === 'string' ? JSON.parse(decompressed) : decompressed;
+                  isRemoteUpdatingRef.current = true;
+                  onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
+                  setTimeout(() => {
+                    isRemoteUpdatingRef.current = false;
+                  }, 600);
+
+                  setSyncStatus('synced');
+                  setSyncErrorDetail(null);
+                  setLastSyncedAt(new Date(record.updatedAt || Date.now()));
+
+                  const senderDevice = record.lastDeviceId?.startsWith('mobile')
+                    ? 'Smartphone'
+                    : record.lastDeviceId?.startsWith('pc')
+                    ? 'PC'
+                    : 'Appareil distant';
+                  setSyncNotification(`⚡ Synchronisation en direct depuis votre ${senderDevice}`);
+                } catch (err) {
+                  console.error('Error parsing Firestore remote payload:', err);
+                }
+              })();
+            }
+          } else {
+            // First time user (document cloud vierge)
+            if (hasLocalHealthData()) {
+              setConfirmFirstPush(true);
+              setSyncStatus('synced');
+              setSyncNotification('Nouveau compte détecté : confirmation requise pour la synchronisation');
+            } else {
+              pushToCloudRef.current();
+            }
+          }
+        },
+        (error) => {
+          console.warn('Firestore onSnapshot notice:', error.message);
+          // L'écouteur Firestore a été résilié par le SDK sur erreur
+          unsubscribeSnapshot = null;
+          activeUserId = null;
+          setSyncStatus(navigator.onLine ? 'error' : 'offline');
+          setSyncErrorDetail(`Connexion Cloud interrompue : ${error.message}`);
+          
+          // Auto-guérison : renouvellement forcé du jeton et réattachement immédiat
+          scheduleReconnect(1500);
+        }
+      );
+    };
 
     const initSync = async () => {
-      // Si aucun compte n'est enregistré dans localStorage, ne pas initialiser Firebase
       const raw = localStorage.getItem('physio_user_account');
       if (!raw) {
         setSyncStatus('unpaired');
@@ -561,111 +729,17 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       }
 
       try {
-        const fb = await getFirebase();
+        const { fb, user } = await ensureAuthenticatedUser();
+        fbInstance = fb;
         if (isCancelled) return;
 
-        const setupListenerForUser = (user: User | null) => {
-          if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-            unsubscribeSnapshot = null;
-          }
+        if (user) {
+          setupListenerForUser(user);
+        }
 
-          if (!user) {
-            // Si le compte local est configuré, Firebase peut être en train de rafraîchir le token en arrière-plan
-            // ou de recharger la persistance depuis IndexedDB/localStorage. Ne pas déconnecter inopinément !
-            const savedAccount = localStorage.getItem('physio_user_account');
-            if (savedAccount) {
-              console.log('[cloudSync] Session en cours de rétablissement (non-nullification préventive)');
-              return;
-            }
-            setCurrentUser(null);
-            setUserAccount(null);
-            setSyncStatus('unpaired');
-            setConfirmFirstPush(false);
-            return;
-          }
-
-          setCurrentUser(user);
-          const email = (user.email || '').toLowerCase();
-          const account: UserAccount = {
-            email,
-            name: user.displayName || email.split('@')[0],
-            avatar: user.photoURL || undefined,
-            provider: 'google',
-          };
-          setUserAccount(account);
-          localStorage.setItem('physio_user_account', JSON.stringify(account));
-
-          if (!navigator.onLine) {
-            setSyncStatus('offline');
-            return;
-          }
-
-          // Attach Firestore onSnapshot listener
-          const docRef = fb.doc(fb.db, 'sync_records', user.uid);
-          unsubscribeSnapshot = fb.onSnapshot(
-            docRef,
-            (snapshot) => {
-              if (snapshot.exists()) {
-                setConfirmFirstPush(false);
-                const record = snapshot.data();
-                if (record && record.data) {
-                  // Ignore self-echo
-                  if (record.lastDeviceId === deviceId) {
-                    setSyncStatus('synced');
-                    setLastSyncedAt(new Date(record.updatedAt || Date.now()));
-                    return;
-                  }
-
-                  (async () => {
-                    try {
-                      const decompressed = typeof record.data === 'string' ? await decompressString(record.data) : record.data;
-                      const parsed = typeof decompressed === 'string' ? JSON.parse(decompressed) : decompressed;
-                      isRemoteUpdatingRef.current = true;
-                      onRemoteDataReceivedRef.current(parsed, record.lastDeviceId);
-                      setTimeout(() => {
-                        isRemoteUpdatingRef.current = false;
-                      }, 600);
-
-                      setSyncStatus('synced');
-                      setLastSyncedAt(new Date(record.updatedAt || Date.now()));
-
-                      const senderDevice = record.lastDeviceId?.startsWith('mobile')
-                        ? 'Smartphone'
-                        : record.lastDeviceId?.startsWith('pc')
-                        ? 'PC'
-                        : 'Appareil distant';
-                      setSyncNotification(`⚡ Synchronisation en direct depuis votre ${senderDevice}`);
-                    } catch (err) {
-                      console.error('Error parsing Firestore remote payload:', err);
-                    }
-                  })();
-                }
-              } else {
-                // First time user (document cloud vierge)
-                if (hasLocalHealthData()) {
-                  setConfirmFirstPush(true);
-                  setSyncStatus('synced');
-                  setSyncNotification('Nouveau compte détecté : confirmation requise pour la synchronisation');
-                } else {
-                  pushToCloudRef.current();
-                }
-              }
-            },
-            (error) => {
-              console.warn('Firestore onSnapshot notice:', error.message);
-              if (errorCode(error) === 'permission-denied' && fb.auth.currentUser) {
-                console.log('[cloudSync] onSnapshot: permission-denied, tentative de renouvellement forcé du token...');
-                refreshAuthToken(true);
-              }
-              setSyncStatus('error');
-            }
-          );
-        };
-
-        unsubAuth = fb.onIdTokenChanged(fb.auth, (user) => {
+        unsubAuth = fb.onIdTokenChanged(fb.auth, (authUser) => {
           if (!isCancelled) {
-            setupListenerForUser(user);
+            setupListenerForUser(authUser);
           }
         });
       } catch (err) {
@@ -674,34 +748,55 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       }
     };
 
+    ensureSyncRef.current = async () => {
+      if (isCancelled) return;
+      const savedAccount = localStorage.getItem('physio_user_account');
+      if (!savedAccount) return;
+
+      const { fb, user } = await ensureAuthenticatedUser();
+      fbInstance = fb;
+      if (user && !isCancelled) {
+        await refreshAuthToken(true);
+        if (!unsubscribeSnapshot || activeUserId !== user.uid) {
+          setupListenerForUser(user);
+        }
+        await pullFromCloudRef.current();
+      }
+    };
+
     initSync();
 
     return () => {
       isCancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (unsubscribeSnapshot) unsubscribeSnapshot();
       if (unsubAuth) unsubAuth();
     };
   }, [deviceId]);
 
-  // Rafraîchissement proactif du token d'authentification Google toutes les 25 minutes
-  // (un token Google ID expire après 60min, ce renouvellement prévient les déconnexions inopinées)
+  // Rafraîchissement proactif du token d'authentification Google toutes les 15 minutes
+  // (un token Google ID expire après 60min, ce renouvellement régulier prévient les déconnexions)
   useEffect(() => {
     const timer = setInterval(() => {
       if (navigator.onLine && localStorage.getItem('physio_user_account')) {
-        console.log('[cloudSync] Rafraîchissement préventif (intervalle 25 min) du token Google ID...');
-        refreshAuthToken(true);
+        console.log('[cloudSync] Heartbeat préventif (15 min) : renouvellement du token et maintien du flux...');
+        ensureSyncRef.current().catch((err) => {
+          console.warn('[cloudSync] Échec du heartbeat préventif:', err);
+        });
       }
-    }, 25 * 60 * 1000);
+    }, 15 * 60 * 1000);
 
     return () => clearInterval(timer);
   }, []);
 
-  // Rafraîchissement automatique au réveil de l'onglet ou retour au premier plan (focus)
+  // Rafraîchissement automatique et resynchronisation au réveil de l'onglet ou retour au premier plan (focus)
   useEffect(() => {
     const handleWakeup = () => {
       if (document.visibilityState === 'visible' && navigator.onLine && localStorage.getItem('physio_user_account')) {
-        console.log('[cloudSync] Réveil de l\'application détecté, vérification du token Google ID...');
-        refreshAuthToken(false);
+        console.log('[cloudSync] Réveil de l\'application détecté, vérification du token et resynchronisation Cloud...');
+        ensureSyncRef.current().catch((err) => {
+          console.warn('[cloudSync] Échec de la resynchronisation au réveil:', err);
+        });
       }
     };
 
@@ -717,8 +812,11 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   useEffect(() => {
     const handleOnline = () => {
       if (localStorage.getItem('physio_user_account')) {
+        console.log('[cloudSync] Rétablissement de la connexion réseau, reconnexion Cloud...');
         setSyncStatus('syncing');
-        pullFromCloudRef.current();
+        ensureSyncRef.current().catch(() => {
+          pullFromCloudRef.current();
+        });
       }
     };
     const handleOffline = () => {
