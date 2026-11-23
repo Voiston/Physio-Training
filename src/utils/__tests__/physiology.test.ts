@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import type { SessionData } from '../../types';
 import { 
   computeFosterMetrics, 
   computeBanisterPerformance, 
@@ -116,13 +117,13 @@ describe('Phase 1 Physiology Verifications', () => {
 
   it('Warmup Invariance: computeQualityEMAData produces identical converged current EMA regardless of daysHistory', () => {
     // Generate 30 days of consistent training
-    const historyEvents: Record<string, any> = {};
+    const historyEvents: Record<string, SessionData> = {};
     const ref = new Date();
     for (let i = 1; i <= 30; i++) {
       const d = new Date(ref);
       d.setDate(ref.getDate() - i);
       const str = d.toISOString().split('T')[0];
-      historyEvents[str] = { load: 100, isSecondary: false, isPrimary: true };
+      historyEvents[str] = { load: 100, isSecondary: false };
     }
 
     // Call with 14 days vs 45 days

@@ -98,7 +98,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   // Semaine active inspectée
   const activeWeek = useMemo(() => {
     return allWeeks.find(w => w.weekId === selectedWeekId) || currentWeek;
-  }, [allWeeks, selectedWeekId]);
+  }, [allWeeks, selectedWeekId, currentWeek]);
 
   // Mode Comparateur direct (Semaine A vs Semaine B)
   const [isCompareMode, setIsCompareMode] = useState<boolean>(false);

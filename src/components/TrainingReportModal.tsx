@@ -9,12 +9,13 @@ import {
   Award, Sparkles, Heart,
   Copy, Check 
 } from 'lucide-react';
-import type { QualitiesEMAMap, FosterMetrics, BanisterPerformance, CardioMuscularBalanceResult } from '../types';
+import type { QualitiesEMAMap, FosterMetrics, BanisterPerformance, CardioMuscularBalanceResult, SessionData } from '../types';
+import type { DailyMetrics } from '../hooks/useMetricsState';
 
 interface TrainingReportModalProps {
-  events: Record<string, Record<string, any>>;
+  events: Record<string, Record<string, SessionData>>;
   qualities: Quality[];
-  dailyMetrics: Record<string, any>;
+  dailyMetrics: Record<string, DailyMetrics>;
   qualitiesEMA: QualitiesEMAMap;
   activeBlock: TrainingBlock | null;
   targetCompetition: TargetCompetition | null;

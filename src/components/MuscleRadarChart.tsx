@@ -84,22 +84,22 @@ const CustomRadarTooltip = memo(function CustomRadarTooltip({ active, payload }:
   );
 });
 
+// Ordre anatomique cohérent des axes du radar musculaire
+const ORDERED_MUSCLE_IDS = [
+  'quadriceps', 'glutes', 'ischios', 'mollets',
+  'lombaires', 'abdos',
+  'dorsaux', 'trapezes', 'deltoides_post', 'biceps',
+  'deltoides_ant', 'pectoraux', 'triceps'
+] as const;
+
 export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
   muscles,
   selectedMuscleId = null,
   onSelectMuscle,
   className = ''
 }) => {
-  // Préparation des données du radar dans un ordre anatomique cohérent
-  const orderedMuscleIds = [
-    'quadriceps', 'glutes', 'ischios', 'mollets', 
-    'lombaires', 'abdos',
-    'dorsaux', 'trapezes', 'deltoides_post', 'biceps', 
-    'deltoides_ant', 'pectoraux', 'triceps'
-  ];
-
   const radarData = useMemo(() => {
-    return orderedMuscleIds.map(mId => {
+    return ORDERED_MUSCLE_IDS.map(mId => {
       const item = muscles[mId] || {
         effectiveSets: 0,
         name: MUSCLE_GROUPS[mId]?.name || mId,

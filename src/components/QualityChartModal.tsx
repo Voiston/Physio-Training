@@ -80,7 +80,7 @@ export default function QualityChartModal({ quality, events, onClose }: QualityC
   }, [current.acwr]);
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
+    <div className="modal-overlay z-[1000]" onClick={onClose}>
       <div className="modal-content !w-[860px] !max-w-[95vw] flex flex-col gap-5" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-center pb-3 border-b border-white/10">

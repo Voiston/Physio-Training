@@ -33,6 +33,8 @@ interface GarminSyncModalProps {
   pendingActivities: PendingGarminActivity[];
   processedCount: number;
   userAccount: UserAccount | null;
+  authError?: string | null;
+  isSigningIn?: boolean;
   onLoginWithGoogle: () => void;
   onCheckStatus: () => void;
   onSyncNow: (daysBack: number) => void;
@@ -63,6 +65,8 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
   pendingActivities,
   processedCount,
   userAccount,
+  authError = null,
+  isSigningIn = false,
   onLoginWithGoogle,
   onCheckStatus,
   onSyncNow,
@@ -387,12 +391,22 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
             <p className="text-xs text-slate-300 leading-relaxed m-0">
               Votre passerelle Garmin est configurée sur le serveur. Connectez votre compte Google autorisé en 1 clic pour déverrouiller la synchronisation automatique et éviter les doublons entre smartphone et PC.
             </p>
+            {authError && (
+              <div
+                role="alert"
+                className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-xs text-rose-200 leading-relaxed"
+              >
+                {authError}
+              </div>
+            )}
             <button
               type="button"
               onClick={onLoginWithGoogle}
-              className="w-full min-h-[46px] py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              disabled={isSigningIn}
+              className="w-full min-h-[46px] py-2.5 px-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
-              <span>Se connecter avec Google</span>
+              {isSigningIn && <RefreshCw className="w-4 h-4 animate-spin" aria-hidden="true" />}
+              <span>{isSigningIn ? 'Connexion Google en cours…' : 'Se connecter avec Google'}</span>
             </button>
           </div>
         )}

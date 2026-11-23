@@ -3,31 +3,23 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import {
+  INTERVALS_API_BASE,
+  getAllowedEmails,
+  isAllowedCorsOrigin,
+  validateSyncDateRange,
+  formatUtcDate,
+  sanitizeAthleteId,
+  sanitizeWellnessItem,
+  sanitizeActivityItem,
+} from './shared/intervalsProxyCore.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT) || 3000;
 
-const INTERVALS_API_BASE = 'https://intervals.icu/api/v1';
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
-const SAFE_ISO_DATE_REGEX = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
-const SAFE_ATHLETE_ID_REGEX = /^(?:0|i?\d{1,12})$/;
-
-// Liste d'emails propriétaires autorisés (alignée sur firestore.rules)
-const DEFAULT_ALLOWED_EMAILS = [
-  'poketime.idle@gmail.com',
-  'david.voisard2@gmail.com',
-  'vdcoachsportif@gmail.com',
-];
-
-function getAllowedEmails(): Set<string> {
-  const fromEnv = (process.env.INTERVALS_ALLOWED_EMAILS || '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return new Set([...DEFAULT_ALLOWED_EMAILS, ...fromEnv]);
-}
 
 function getFirebaseProjectId(): string {
   try {
@@ -146,7 +138,7 @@ async function verifyFirebaseBearerToken(authHeader?: string): Promise<
     }
 
     const email = (payload.email || '').toLowerCase();
-    if (!payload.email_verified || !email || !getAllowedEmails().has(email)) {
+    if (!payload.email_verified || !email || !getAllowedEmails(process.env.INTERVALS_ALLOWED_EMAILS).has(email)) {
       return { ok: false, status: 403, error: 'Compte Google non autorisé pour la synchronisation Garmin.' };
     }
 
@@ -154,20 +146,6 @@ async function verifyFirebaseBearerToken(authHeader?: string): Promise<
   } catch {
     return { ok: false, status: 401, error: 'Vérification du jeton Google impossible.' };
   }
-}
-
-function isValidIsoCalendarDate(dateStr: string): boolean {
-  if (!SAFE_ISO_DATE_REGEX.test(dateStr)) return false;
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-}
-
-function formatUtcDate(date: Date): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(date.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }
 
 function readEnvKeyFromDotenvFiles(keys: string[]): string {
@@ -210,58 +188,9 @@ function getIntervalsServerConfig(): { configured: boolean; apiKey: string; athl
     readEnvKeyFromDotenvFiles(['INTERVALS_ICU_ATHLETE_ID', 'INTERVALS_ATHLETE_ID']) ||
     '0'
   ).trim();
-  const athleteId = SAFE_ATHLETE_ID_REGEX.test(rawAthleteId) ? rawAthleteId : '0';
+  const athleteId = sanitizeAthleteId(rawAthleteId);
   const authHeader = apiKey ? `Basic ${Buffer.from(`API_KEY:${apiKey}`).toString('base64')}` : '';
   return { configured: apiKey.length > 0, apiKey, athleteId, authHeader };
-}
-
-function sanitizeWellnessItem(raw: unknown): Record<string, unknown> | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const item = raw as Record<string, unknown>;
-  if (typeof item.id !== 'string' || !isValidIsoCalendarDate(item.id)) return null;
-  return {
-    id: item.id,
-    hrv: typeof item.hrv === 'number' && Number.isFinite(item.hrv) ? item.hrv : null,
-    restingHR: typeof item.restingHR === 'number' && Number.isFinite(item.restingHR) ? item.restingHR : null,
-    readiness: typeof item.readiness === 'number' && Number.isFinite(item.readiness) ? item.readiness : null,
-    sleepScore: typeof item.sleepScore === 'number' && Number.isFinite(item.sleepScore) ? item.sleepScore : null,
-    sleepSecs: typeof item.sleepSecs === 'number' && Number.isFinite(item.sleepSecs) ? item.sleepSecs : null,
-    sleepQuality: typeof item.sleepQuality === 'number' && Number.isFinite(item.sleepQuality) ? item.sleepQuality : null,
-  };
-}
-
-function sanitizeActivityItem(raw: unknown): Record<string, unknown> | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const item = raw as Record<string, unknown>;
-  if ((typeof item.id !== 'string' && typeof item.id !== 'number') || typeof item.start_date_local !== 'string') {
-    return null;
-  }
-  const datePart = item.start_date_local.slice(0, 10);
-  if (!isValidIsoCalendarDate(datePart)) return null;
-
-  const numOrNull = (val: unknown) => (typeof val === 'number' && Number.isFinite(val) ? val : null);
-
-  return {
-    id: String(item.id).slice(0, 64),
-    name: typeof item.name === 'string' ? item.name.slice(0, 120) : null,
-    type: typeof item.type === 'string' ? item.type.slice(0, 40) : null,
-    start_date_local: item.start_date_local.slice(0, 32),
-    moving_time: numOrNull(item.moving_time),
-    elapsed_time: numOrNull(item.elapsed_time),
-    distance: numOrNull(item.distance),
-    total_elevation_gain: numOrNull(item.total_elevation_gain),
-    average_heartrate: numOrNull(item.average_heartrate),
-    max_heartrate: numOrNull(item.max_heartrate),
-    icu_rpe: numOrNull(item.icu_rpe),
-    feel: numOrNull(item.feel),
-    icu_training_load: numOrNull(item.icu_training_load),
-    icu_intensity: numOrNull(item.icu_intensity),
-    icu_hr_zone_times: Array.isArray(item.icu_hr_zone_times)
-      ? item.icu_hr_zone_times.slice(0, 10).map((z) => (typeof z === 'number' && Number.isFinite(z) ? z : 0))
-      : null,
-    source: typeof item.source === 'string' ? item.source.slice(0, 40) : null,
-    trainer: typeof item.trainer === 'boolean' ? item.trainer : null,
-  };
 }
 
 async function startServer() {
@@ -290,6 +219,7 @@ async function startServer() {
 
   app.use((_req, res, next) => {
     res.setHeader('Content-Security-Policy', CSP_POLICY);
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     // Permissions Policy
@@ -311,37 +241,18 @@ async function startServer() {
 
   // 4. Proxy sécurisé Intervals.icu (Garmin Connect -> Intervals.icu -> PhysioTracker PRO)
   // Autorise les appels CORS strictement vérifiés depuis GitHub Pages (*.github.io) ou origines configurées
-  const GITHUB_PAGES_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+\.github\.io$/i;
-  const CLOUD_RUN_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+\.run\.app$/i;
-  const LOCALHOST_ORIGIN_REGEX = /^http:\/\/(?:localhost|127\.0\.0\.1):3000$/;
-
-  const isAllowedCorsOrigin = (origin?: string): boolean => {
-    if (!origin) return false;
-    if (
-      GITHUB_PAGES_ORIGIN_REGEX.test(origin) ||
-      CLOUD_RUN_ORIGIN_REGEX.test(origin) ||
-      LOCALHOST_ORIGIN_REGEX.test(origin)
-    ) {
-      return true;
-    }
-    const extra = (process.env.INTERVALS_ALLOWED_ORIGINS || '')
-      .split(',')
-      .map((o) => o.trim().replace(/\/+$/, ''))
-      .filter(Boolean);
-    return extra.includes(origin);
-  };
-
   app.use('/api/intervals', (req, res, next) => {
     const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+    const allowed = isAllowedCorsOrigin(origin, process.env.INTERVALS_ALLOWED_ORIGINS);
     res.setHeader('Vary', 'Origin');
-    if (origin && isAllowedCorsOrigin(origin)) {
+    if (allowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
       res.setHeader('Access-Control-Max-Age', '600');
     }
     if (req.method === 'OPTIONS') {
-      res.status(origin && isAllowedCorsOrigin(origin) ? 204 : 403).end();
+      res.status(allowed ? 204 : 403).end();
       return;
     }
     next();
@@ -437,14 +348,9 @@ async function startServer() {
     const oldest = typeof req.query.oldest === 'string' ? req.query.oldest.trim() : defaultOldest;
     const newest = typeof req.query.newest === 'string' ? req.query.newest.trim() : defaultNewest;
 
-    if (!isValidIsoCalendarDate(oldest) || !isValidIsoCalendarDate(newest)) {
-      res.status(400).json({ error: 'Format de date invalide (YYYY-MM-DD attendu).' });
-      return;
-    }
-
-    const diffDays = Math.round((Date.parse(`${newest}T00:00:00Z`) - Date.parse(`${oldest}T00:00:00Z`)) / 86400000);
-    if (diffDays < 0 || diffDays > 60) {
-      res.status(400).json({ error: 'La plage de synchronisation doit être comprise entre 0 et 60 jours.' });
+    const rangeCheck = validateSyncDateRange(oldest, newest, 60);
+    if (!rangeCheck.ok) {
+      res.status(400).json({ error: rangeCheck.error });
       return;
     }
 

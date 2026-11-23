@@ -95,7 +95,7 @@ describe('PhysiologicalSettingsModal - Bornage de initialCtl (P2-09)', () => {
 
   it('rend sans planter avec des événements et métriques corrompus', () => {
     const events = { force_max: { 'pas-une-date': { load: Number.NaN }, '2026-10-15': null } } as unknown as EventsByQuality;
-    const dailyMetrics = { 'pas-une-date': { readiness: 'abc' } } as unknown as DailyMetrics;
+    const dailyMetrics = { 'pas-une-date': { readiness: 'abc' } } as unknown as Record<string, DailyMetrics>;
     const html = renderToStaticMarkup(
       <PhysiologicalSettingsModal onClose={() => {}} settings={base} onSave={() => {}} events={events} dailyMetrics={dailyMetrics} />
     );

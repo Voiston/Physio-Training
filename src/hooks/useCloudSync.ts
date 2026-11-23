@@ -19,9 +19,20 @@ export interface CloudSyncOptions {
 
 // Singleton de chargement différé : Firebase n'est importé que si un compte existe ou sur action utilisateur
 let firebaseModulePromise: Promise<typeof import('../firebase')> | null = null;
+let resolvedFirebaseModule: typeof import('../firebase') | null = null;
+
+function debugCloudLog(...args: unknown[]): void {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+    console.log(...args);
+  }
+}
+
 function getFirebase() {
   if (!firebaseModulePromise) {
-    firebaseModulePromise = import('../firebase');
+    firebaseModulePromise = import('../firebase').then((mod) => {
+      resolvedFirebaseModule = mod;
+      return mod;
+    });
   }
   return firebaseModulePromise;
 }
@@ -301,7 +312,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         // En cas de permission-denied, le token Google ID a pu expirer après 45-60 min d'inactivité.
         // Tentative automatique et transparente de renouvellement forcé du token + seconde tentative immédiate.
         if (errorCode(err) === 'permission-denied' && fb.auth.currentUser && compressed) {
-          console.log('[cloudSync] Token potentiellement expiré, renouvellement forcé en cours...');
+          debugCloudLog('[cloudSync] Token potentiellement expiré, renouvellement forcé en cours...');
           const renewed = await refreshAuthToken(true);
           if (renewed) {
             try {
@@ -397,7 +408,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         );
       } catch (firstErr: unknown) {
         if (errorCode(firstErr) === 'permission-denied' && fb.auth.currentUser) {
-          console.log('[cloudSync] Token expiré lors du pull, renouvellement forcé...');
+          debugCloudLog('[cloudSync] Token expiré lors du pull, renouvellement forcé...');
           const renewed = await refreshAuthToken(true);
           if (renewed) {
             docSnap = await withTimeout(
@@ -453,12 +464,27 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     pullFromCloudRef.current = pullFromCloud;
   }, [pullFromCloud]);
 
+  // Préchargement silencieux du SDK Firebase à l'ouverture des modales pour préserver le geste utilisateur du popup
+  const preloadFirebase = useCallback(() => {
+    getFirebase().catch((err) => {
+      console.warn('[cloudSync] Préchargement Firebase différé échoué:', err);
+    });
+  }, []);
+
   // Google Login (1-click popup)
   const loginWithGoogle = useCallback(async () => {
     try {
+      setSyncErrorDetail(null);
       setSyncStatus('syncing');
-      const fb = await getFirebase();
-      const result = await fb.signInWithPopup(fb.auth, fb.googleProvider);
+
+      // Si le module Firebase est déjà préchargé, appeler signInWithPopup de façon synchrone
+      // dans le même tick que le clic afin d'éviter le blocage anti-popup des navigateurs.
+      const fb = resolvedFirebaseModule ?? (await getFirebase());
+      const result = await fb.signInWithPopup(
+        fb.auth,
+        fb.googleProvider,
+        fb.browserPopupRedirectResolver
+      );
       const user = result.user;
       const email = (user.email || '').toLowerCase();
       const account: UserAccount = {
@@ -469,25 +495,46 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
       };
       setCurrentUser(user);
       setUserAccount(account);
+      setSyncErrorDetail(null);
       localStorage.setItem('physio_user_account', JSON.stringify(account));
       setSyncNotification(`Connecté avec ${email} · Synchronisation Cloud active`);
       
-      // Pull remote data or handle snapshot
-      pullFromCloudRef.current();
+      // Pull remote data and attach live Firestore listener immediately
+      ensureSyncRef.current().catch(() => {
+        pullFromCloudRef.current();
+      });
     } catch (err: unknown) {
-      console.warn('Google sign-in exception:', errorMessage(err) || err);
+      const code = errorCode(err);
+      console.warn('Google sign-in exception:', code || '', errorMessage(err) || err);
       try {
-        const fb = await getFirebase();
+        const fb = resolvedFirebaseModule ?? (await getFirebase());
         setSyncStatus(fb.auth.currentUser ? 'synced' : 'unpaired');
       } catch {
         setSyncStatus('unpaired');
       }
-      if (errorCode(err) === 'auth/popup-closed-by-user') {
+
+      if (code === 'auth/popup-closed-by-user') {
         setSyncNotification('Connexion Google annulée');
-      } else if (errorCode(err) === 'auth/cancelled-popup-request') {
-        setSyncNotification('Demande de popup annulée');
+      } else if (code === 'auth/cancelled-popup-request') {
+        setSyncNotification('Une fenêtre de connexion Google est déjà ouverte');
+      } else if (code === 'auth/popup-blocked') {
+        const msg = 'Fenêtre Google bloquée par le navigateur. Autorisez les popups pour ce site puis réessayez.';
+        setSyncErrorDetail(msg);
+        setSyncNotification(msg);
+      } else if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'ce domaine';
+        const msg = `Domaine non autorisé dans Firebase Auth (${host}). Ajoutez « ${host} » dans Firebase Console → Authentication → Settings → Authorized domains.`;
+        setSyncErrorDetail(msg);
+        setSyncNotification(msg);
+      } else if (code === 'auth/network-request-failed') {
+        const msg = 'Connexion réseau interrompue pendant l’authentification Google.';
+        setSyncErrorDetail(msg);
+        setSyncNotification(msg);
       } else {
-        setSyncNotification('Connexion Google impossible (vérifiez le bloqueur de popups)');
+        const detail = code ? ` (${code})` : '';
+        const msg = `Connexion Google impossible${detail}. Vérifiez votre bloqueur de popups et réessayez.`;
+        setSyncErrorDetail(msg);
+        setSyncNotification(msg);
       }
     }
   }, []);
@@ -590,7 +637,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         if (isCancelled) return;
         const savedAccount = localStorage.getItem('physio_user_account');
         if (!savedAccount) return;
-        console.log('[cloudSync] Auto-guérison : tentative de renouvellement de session et réattachement Firestore...');
+        debugCloudLog('[cloudSync] Auto-guérison : tentative de renouvellement de session et réattachement Firestore...');
         const renewed = await refreshAuthToken(true);
         const { fb, user } = await ensureAuthenticatedUser();
         fbInstance = fb;
@@ -609,7 +656,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
         // ou de recharger la persistance depuis IndexedDB/localStorage. Ne pas déconnecter inopinément ni détruire l'écouteur !
         const savedAccount = localStorage.getItem('physio_user_account');
         if (savedAccount) {
-          console.log('[cloudSync] Session en cours de rétablissement (non-nullification préventive)');
+          debugCloudLog('[cloudSync] Session en cours de rétablissement (non-nullification préventive)');
           return;
         }
         if (unsubscribeSnapshot) {
@@ -779,7 +826,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   useEffect(() => {
     const timer = setInterval(() => {
       if (navigator.onLine && localStorage.getItem('physio_user_account')) {
-        console.log('[cloudSync] Heartbeat préventif (15 min) : renouvellement du token et maintien du flux...');
+        debugCloudLog('[cloudSync] Heartbeat préventif (15 min) : renouvellement du token et maintien du flux...');
         ensureSyncRef.current().catch((err) => {
           console.warn('[cloudSync] Échec du heartbeat préventif:', err);
         });
@@ -793,7 +840,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   useEffect(() => {
     const handleWakeup = () => {
       if (document.visibilityState === 'visible' && navigator.onLine && localStorage.getItem('physio_user_account')) {
-        console.log('[cloudSync] Réveil de l\'application détecté, vérification du token et resynchronisation Cloud...');
+        debugCloudLog('[cloudSync] Réveil de l\'application détecté, vérification du token et resynchronisation Cloud...');
         ensureSyncRef.current().catch((err) => {
           console.warn('[cloudSync] Échec de la resynchronisation au réveil:', err);
         });
@@ -812,7 +859,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
   useEffect(() => {
     const handleOnline = () => {
       if (localStorage.getItem('physio_user_account')) {
-        console.log('[cloudSync] Rétablissement de la connexion réseau, reconnexion Cloud...');
+        debugCloudLog('[cloudSync] Rétablissement de la connexion réseau, reconnexion Cloud...');
         setSyncStatus('syncing');
         ensureSyncRef.current().catch(() => {
           pullFromCloudRef.current();
@@ -855,6 +902,7 @@ export function useCloudSync({ onRemoteDataReceived, getExportableData, onClearL
     confirmFirstPush,
     acceptFirstPush,
     rejectFirstPush,
+    preloadFirebase,
     loginWithGoogle,
     logout,
     pushToCloud,

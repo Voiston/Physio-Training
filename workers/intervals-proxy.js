@@ -23,7 +23,7 @@ const GOOGLE_JWKS_URL =
 const SAFE_ISO_DATE_REGEX = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 const SAFE_ATHLETE_ID_REGEX = /^(?:0|i?\d{1,12})$/;
 const GITHUB_PAGES_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+\.github\.io$/i;
-const CLOUD_RUN_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+\.run\.app$/i;
+const CLOUD_RUN_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)?\.run\.app$/i;
 const LOCALHOST_ORIGIN_REGEX = /^http:\/\/(?:localhost|127\.0\.0\.1):3000$/;
 
 const DEFAULT_ALLOWED_EMAILS = [

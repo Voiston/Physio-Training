@@ -46,6 +46,7 @@ export interface UseMetricsStateOptions {
 
 export function getInitialDailyMetrics(): Record<string, DailyMetrics> {
   const loadedMetrics: Record<string, DailyMetrics> = {};
+  if (typeof localStorage === 'undefined') return loadedMetrics;
   const ALLOWED_METRICS = new Set(['readiness', 'vfc', 'hrRest']);
 
   try {

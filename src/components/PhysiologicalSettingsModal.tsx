@@ -7,10 +7,13 @@ import {
   Sparkles, Info, HeartPulse, User, Zap 
 } from 'lucide-react';
 
+import type { SessionData } from '../types';
+import type { DailyMetrics } from '../hooks/useMetricsState';
+
 interface PhysiologicalSettingsModalProps {
   settings: PhysiologicalSettings;
-  events: Record<string, Record<string, any>>;
-  dailyMetrics: Record<string, any>;
+  events: Record<string, Record<string, SessionData>>;
+  dailyMetrics: Record<string, DailyMetrics>;
   onSave: (settings: PhysiologicalSettings) => void;
   onClose: () => void;
 }

@@ -1283,12 +1283,11 @@ export default function PhysiologyDashboard({
                 <div className="pt-2 border-t border-white/5 space-y-1">
                   <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden relative border border-white/10">
                     <div 
-                      className={`h-full rounded-full transition-all duration-500 ${
+                      className={`w-full h-full rounded-full transition-all duration-500 ${
                         isTsb ? 'bg-gradient-to-r from-red-500 via-amber-400 via-emerald-400 to-sky-400' :
                         isAtl ? 'bg-gradient-to-r from-sky-400 via-emerald-400 via-amber-400 to-red-500' :
                         'bg-gradient-to-r from-slate-500 via-sky-400 via-emerald-400 to-amber-500'
                       }`}
-                      style={{ width: '100%' }}
                     />
                     <div 
                       className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] transform -translate-x-1/2"

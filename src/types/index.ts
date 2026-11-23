@@ -62,6 +62,7 @@ export interface SubSession {
 }
 
 export interface SessionData {
+  rpe?: number;
   rpeMusc?: number;
   rpeMusculaire?: number;
   rpeCardio?: number;

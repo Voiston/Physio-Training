@@ -84,6 +84,46 @@ export default defineConfig({
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (
+              id.includes('/node_modules/react/') ||
+              id.includes('/node_modules/react-dom/') ||
+              id.includes('/node_modules/react-is/') ||
+              id.includes('/node_modules/scheduler/')
+            ) {
+              return 'react-vendor';
+            }
+            if (id.includes('/node_modules/firebase/') || id.includes('/node_modules/@firebase/')) {
+              return 'firebase-vendor';
+            }
+            if (
+              id.includes('/node_modules/recharts/') ||
+              id.includes('/node_modules/d3-') ||
+              id.includes('/node_modules/victory-vendor/') ||
+              id.includes('/node_modules/es-toolkit/') ||
+              id.includes('/node_modules/@reduxjs/toolkit/') ||
+              id.includes('/node_modules/immer/') ||
+              id.includes('/node_modules/reselect/') ||
+              id.includes('/node_modules/eventemitter3/') ||
+              id.includes('/node_modules/use-sync-external-store/')
+            ) {
+              return 'recharts-vendor';
+            }
+            if (id.includes('/node_modules/lucide-react/')) {
+              return 'icons-vendor';
+            }
+            if (id.includes('/node_modules/qrcode/')) {
+              return 'qrcode-vendor';
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: 3000,
       host: '0.0.0.0',

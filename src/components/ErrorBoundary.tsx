@@ -9,6 +9,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  confirmingReset: boolean;
 }
 
 /**
@@ -40,11 +41,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      confirmingReset: false,
     };
   }
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, errorInfo: null };
+    return { hasError: true, error, errorInfo: null, confirmingReset: false };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -56,11 +58,17 @@ export class ErrorBoundary extends React.Component<Props, State> {
     window.location.reload();
   };
 
-  private handleResetData = () => {
-    if (window.confirm('Voulez-vous réinitialiser les données locales du navigateur en cas de corruption ? (Pensez à sauvegarder un export si possible)')) {
-      purgeAppLocalStorage();
-      window.location.reload();
-    }
+  private handleRequestReset = () => {
+    this.setState({ confirmingReset: true });
+  };
+
+  private handleCancelReset = () => {
+    this.setState({ confirmingReset: false });
+  };
+
+  private handleConfirmReset = () => {
+    purgeAppLocalStorage();
+    window.location.reload();
   };
 
   public render() {
@@ -89,26 +97,53 @@ export class ErrorBoundary extends React.Component<Props, State> {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={this.handleReload}
-                className="min-h-[44px] flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            {this.state.confirmingReset ? (
+              <div
+                role="alert"
+                className="p-3.5 bg-red-950/50 border border-red-500/40 rounded-xl space-y-3 text-left"
               >
-                <RefreshCw size={15} aria-hidden="true" /> 
-                <span>Recharger la page</span>
-              </button>
+                <p className="text-xs text-red-100 m-0 leading-relaxed">
+                  Confirmer la purge des données locales du navigateur ? Vos données déjà synchronisées sur Google Cloud resteront intactes.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={this.handleCancelReset}
+                    className="min-h-[44px] flex-1 py-2 px-3 bg-white/10 hover:bg-white/15 text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={this.handleConfirmReset}
+                    className="min-h-[44px] flex-1 py-2 px-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Confirmer la purge
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={this.handleReload}
+                  className="min-h-[44px] flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                  <RefreshCw size={15} aria-hidden="true" />
+                  <span>Recharger la page</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={this.handleResetData}
-                className="min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-white/5 hover:bg-red-500/20 text-slate-200 hover:text-red-200 border border-white/10 hover:border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-                title="Vider le stockage local pour réparer une structure corrompue"
-              >
-                <Trash2 size={15} aria-hidden="true" /> 
-                <span>Réinitialiser</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={this.handleRequestReset}
+                  className="min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-4 bg-white/5 hover:bg-red-500/20 text-slate-200 hover:text-red-200 border border-white/10 hover:border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                  title="Vider le stockage local pour réparer une structure corrompue"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  <span>Réinitialiser</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       );

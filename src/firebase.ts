@@ -4,6 +4,7 @@ import {
   getAuth,
   indexedDBLocalPersistence,
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut, 
@@ -27,7 +28,10 @@ try {
   authInstance = initializeAuth(app, {
     persistence: typeof window !== 'undefined'
       ? [indexedDBLocalPersistence, browserLocalPersistence]
-      : []
+      : [],
+    popupRedirectResolver: typeof window !== 'undefined'
+      ? browserPopupRedirectResolver
+      : undefined,
   });
 } catch {
   authInstance = getAuth(app);
@@ -95,5 +99,5 @@ export {
   onSnapshot 
 } from 'firebase/firestore';
 
-export { signInWithPopup, signOut, onAuthStateChanged, onIdTokenChanged };
+export { signInWithPopup, signOut, onAuthStateChanged, onIdTokenChanged, browserPopupRedirectResolver };
 export type { User };

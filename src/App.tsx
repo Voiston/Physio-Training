@@ -149,6 +149,27 @@ function AppContent() {
       });
     },
   });
+
+  // Précharger le SDK Firebase dès l'ouverture des modales Cloud/Garmin pour préserver le geste clic du popup Google
+  const { preloadFirebase } = cloudSync;
+  useEffect(() => {
+    if (showCloudSyncModal || showGarminSyncModal) {
+      preloadFirebase();
+    }
+  }, [showCloudSyncModal, showGarminSyncModal, preloadFirebase]);
+
+  // Relayer les notifications Cloud / Google Auth dans le système de toasts global
+  useEffect(() => {
+    if (!cloudSync.syncNotification) return;
+    const msg = cloudSync.syncNotification;
+    const isErrorMsg = /impossible|bloquée|refusé|non autorisé|dépassé|❌/i.test(msg);
+    const isSuccessMsg = /connecté avec|synchronisées|associées|⚡/i.test(msg);
+    showToast({
+      type: isErrorMsg ? 'error' : isSuccessMsg ? 'success' : 'info',
+      title: isErrorMsg ? 'Connexion Google / Cloud' : 'Cloud Sync',
+      message: msg,
+    });
+  }, [cloudSync.syncNotification, showToast]);
   const [hasGymDraft, setHasGymDraft] = useState<boolean>(() => {
     try {
       return Boolean(localStorage.getItem('training_live_session_draft_v1'));
@@ -1405,6 +1426,8 @@ function AppContent() {
           pendingActivities={intervalsSync.pendingActivities}
           processedCount={intervalsSync.processedCount}
           userAccount={cloudSync.userAccount}
+          authError={cloudSync.syncErrorDetail}
+          isSigningIn={cloudSync.syncStatus === 'syncing'}
           onLoginWithGoogle={cloudSync.loginWithGoogle}
           onCheckStatus={() => {
             intervalsSync.checkStatus().then((res) => {

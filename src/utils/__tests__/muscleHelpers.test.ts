@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { EventsByQuality } from '../../types';
 import { 
   computeSessionMuscularBreakdown, 
   computeWeeklyMuscularSummary,
@@ -157,7 +158,7 @@ describe('Muscle Helpers & Physiological Modeling', () => {
   });
 
   it('aggregates micro-session logged under isolation quality without touching pull back window', () => {
-    const events: Record<string, any> = {
+    const events: EventsByQuality = {
       isolation: {
         '2026-10-09': {
           duration: 10,
@@ -180,9 +181,10 @@ describe('Muscle Helpers & Physiological Modeling', () => {
 
   describe('Adaptive Load Suggestion (RIR & Fatigue)', () => {
     it('finds the last exercise performance chronologically across multiple qualities', () => {
-      const events: Record<string, any> = {
+      const events: EventsByQuality = {
         pull: {
           '2026-10-01': {
+            load: 120,
             exercises: [
               { id: 'biceps_curl', name: 'Curl Biceps', sets: 4, reps: 10, weightKg: 14, rir: 2 }
             ],
@@ -191,6 +193,7 @@ describe('Muscle Helpers & Physiological Modeling', () => {
         },
         isolation: {
           '2026-10-06': {
+            load: 120,
             exercises: [
               { id: 'biceps_curl', name: 'Curl Biceps', sets: 5, reps: 10, weightKg: 15, rir: 3 }
             ],

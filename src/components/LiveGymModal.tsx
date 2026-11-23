@@ -329,6 +329,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
 
   // Modale d'ajout d'exercice
   const [showAddExercisePicker, setShowAddExercisePicker] = useState(false);
+  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [expandedMuscles, setExpandedMuscles] = useState<Record<string, boolean>>({});
@@ -1096,22 +1097,29 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   };
 
   const handleAbandonWorkout = useCallback(() => {
-    if (window.confirm('Voulez-vous vraiment abandonner cette séance ? Les données non enregistrées seront effacées.')) {
-      haptics.warning();
-      try {
-        localStorage.removeItem(STORAGE_DRAFT_KEY);
-      } catch (e) {
-        // Ignore
-      }
-      setDraftExists(false);
-      resetLiveSessionState();
-      onClose();
+    setShowAbandonConfirm(true);
+  }, []);
+
+  const handleConfirmAbandonWorkout = useCallback(() => {
+    setShowAbandonConfirm(false);
+    haptics.warning();
+    try {
+      localStorage.removeItem(STORAGE_DRAFT_KEY);
+    } catch {
+      // Ignore storage errors
     }
+    setDraftExists(false);
+    resetLiveSessionState();
+    onClose();
   }, [resetLiveSessionState, onClose]);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
   const handleEscape = useCallback(() => {
+    if (showAbandonConfirm) {
+      setShowAbandonConfirm(false);
+      return;
+    }
     const action = resolveLiveGymEscapeAction({ showAddExercisePicker, stage });
     if (action === 'close_picker') {
       setShowAddExercisePicker(false);
@@ -1123,7 +1131,7 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
       resetLiveSessionState();
       onClose();
     }
-  }, [showAddExercisePicker, stage, handleAbandonWorkout, resetLiveSessionState, onClose]);
+  }, [showAbandonConfirm, showAddExercisePicker, stage, handleAbandonWorkout, resetLiveSessionState, onClose]);
 
   const handleSafeClose = useCallback(() => {
     resetLiveSessionState();
@@ -1968,6 +1976,44 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                       );
                     })
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dialogue inline de confirmation d'abandon (remplace window.confirm pour PWA & mobile) */}
+        {showAbandonConfirm && (
+          <div
+            className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="live-gym-abandon-title"
+            aria-describedby="live-gym-abandon-desc"
+          >
+            <div className="w-full max-w-sm bg-slate-900 border border-rose-500/40 rounded-2xl p-5 shadow-2xl space-y-4">
+              <div className="space-y-1.5">
+                <h3 id="live-gym-abandon-title" className="text-base font-bold text-white m-0">
+                  Abandonner cette séance ?
+                </h3>
+                <p id="live-gym-abandon-desc" className="text-xs text-slate-300 m-0 leading-relaxed">
+                  Les séries non enregistrées et le brouillon en cours seront effacés.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAbandonConfirm(false)}
+                  className="min-h-[44px] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Continuer la séance
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAbandonWorkout}
+                  className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Confirmer l’abandon
+                </button>
               </div>
             </div>
           </div>

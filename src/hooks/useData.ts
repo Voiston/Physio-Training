@@ -331,7 +331,17 @@ export function useData() {
     setIntervalsProcessedIds([]);
     localStorage.removeItem('physio_intervals_processed_ids');
     localStorage.removeItem('physio_intervals_auto_metrics');
-  }, [setIntervalsProcessedIds]);
+  }, [
+    setDailyMetrics,
+    setTrainingBlocks,
+    setTargetCompetitionState,
+    setQualitiesState,
+    setBlockTemplates,
+    setPhysioSettingsState,
+    setIsSimulationActive,
+    setSimulatedEvents,
+    setIntervalsProcessedIds,
+  ]);
 
   const onRemoteDataReceived = useCallback((remoteData: unknown) => {
     if (!remoteData) return;
@@ -452,7 +462,16 @@ export function useData() {
     } catch (e) {
       console.error('[Cloud Sync] Error applying remote data:', e);
     }
-  }, [triggerSyncPush, setIntervalsProcessedIds]);
+  }, [
+    triggerSyncPush,
+    setDailyMetrics,
+    setTrainingBlocks,
+    setQualitiesState,
+    setBlockTemplates,
+    setTargetCompetitionState,
+    setPhysioSettingsState,
+    setIntervalsProcessedIds,
+  ]);
 
   const getExportableData = useCallback(() => {
     return {
