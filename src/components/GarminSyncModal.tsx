@@ -109,6 +109,12 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
           tone: 'text-amber-300',
           icon: <Lock className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />,
         };
+      case 'static_host':
+        return {
+          label: 'Hébergement statique (GitHub Pages) · passerelle requise',
+          tone: 'text-amber-300',
+          icon: <Watch className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />,
+        };
       case 'unconfigured':
         return {
           label: 'Configuration initiale requise (1 fois)',
@@ -218,8 +224,93 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
           </div>
         )}
 
+        {/* ÉTAT A0 : Hébergement statique (GitHub Pages) sans URL de passerelle configurée */}
+        {connectionState === 'static_host' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-3.5">
+              <div className="text-xs font-semibold text-slate-200">
+                Activer Garmin sur GitHub Pages (passerelle Cloudflare gratuite, 1 fois)
+              </div>
+              <p className="m-0 text-xs text-slate-400 leading-relaxed">
+                GitHub Pages héberge uniquement des fichiers statiques et ne peut pas stocker votre clé API secrète. Le dépôt inclut déjà le fichier{' '}
+                <code className="px-1.5 py-0.5 rounded bg-slate-800 text-blue-300 font-mono">
+                  workers/intervals-proxy.js
+                </code>{' '}
+                prêt à déployer gratuitement :
+              </p>
+
+              <ol className="space-y-3 m-0 p-0 list-none text-xs text-slate-300 leading-relaxed">
+                <li className="flex items-start gap-3">
+                  <span className="font-mono text-blue-400 font-bold shrink-0">01.</span>
+                  <div>
+                    <span className="text-white font-semibold">Créez un Cloudflare Worker gratuit</span>
+                    <p className="m-0 mt-0.5 text-slate-400">
+                      Sur{' '}
+                      <a
+                        href="https://dash.cloudflare.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 underline inline-flex items-center gap-0.5"
+                      >
+                        dash.cloudflare.com
+                        <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                      </a>
+                      {' '}→ <strong className="text-slate-200">Workers &amp; Pages → Create Worker</strong>, collez le contenu de{' '}
+                      <code className="px-1 py-0.5 rounded bg-slate-800 text-slate-200 font-mono">workers/intervals-proxy.js</code>{' '}
+                      et cliquez sur <strong className="text-slate-200">Deploy</strong>.
+                    </p>
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-3">
+                  <span className="font-mono text-blue-400 font-bold shrink-0">02.</span>
+                  <div>
+                    <span className="text-white font-semibold">Ajoutez votre clé Intervals.icu dans Cloudflare</span>
+                    <p className="m-0 mt-0.5 text-slate-400">
+                      Dans le Worker → <strong className="text-slate-200">Settings → Variables and Secrets → Add Secret</strong>, créez{' '}
+                      <code className="px-1.5 py-0.5 rounded bg-slate-800 text-blue-300 font-mono">
+                        INTERVALS_ICU_API_KEY
+                      </code>{' '}
+                      avec votre clé API Intervals.icu.
+                    </p>
+                  </div>
+                </li>
+
+                <li className="flex items-start gap-3">
+                  <span className="font-mono text-blue-400 font-bold shrink-0">03.</span>
+                  <div>
+                    <span className="text-white font-semibold">Renseignez l’URL du Worker dans GitHub</span>
+                    <p className="m-0 mt-0.5 text-slate-400">
+                      Dans votre dépôt GitHub → <strong className="text-slate-200">Settings → Secrets and variables → Actions → Variables</strong>, ajoutez{' '}
+                      <code className="px-1.5 py-0.5 rounded bg-slate-800 text-blue-300 font-mono">
+                        VITE_INTERVALS_PROXY_URL
+                      </code>{' '}
+                      avec l’URL <code className="text-slate-200 font-mono">https://…workers.dev</code> puis relancez le déploiement GitHub Pages.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" aria-hidden="true" />
+                  <span>Clé isolée dans Cloudflare · accès vérifié par votre compte Google</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCheckStatus}
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Revérifier</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ÉTAT A : Clé serveur INTERVALS_ICU_API_KEY non encore configurée */}
-        {!isConfigured && connectionState !== 'checking' && (
+        {!isConfigured && connectionState !== 'checking' && connectionState !== 'static_host' && (
           <div className="space-y-4">
             <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-3.5">
               <div className="text-xs font-semibold text-slate-200">

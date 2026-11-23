@@ -627,3 +627,27 @@ export function buildSessionFromGarminActivity(
     updatedAt: now,
   };
 }
+
+/**
+ * Valide et normalise une URL publique de proxy Intervals.icu (ex. Cloudflare Worker ou Cloud Run)
+ * pour les déploiements statiques comme GitHub Pages. Rejette tout protocole non sécurisé.
+ */
+export function normalizeIntervalsProxyUrl(rawUrl?: string | null): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    const isHttps = parsed.protocol === 'https:';
+    const isLocalHttp =
+      parsed.protocol === 'http:' &&
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
+    if (!isHttps && !isLocalHttp) return '';
+    if (parsed.username || parsed.password) return '';
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    return `${parsed.origin}${cleanPath}`;
+  } catch {
+    return '';
+  }
+}
+

@@ -7,6 +7,7 @@ import {
   normalizeIntervalsWellness,
   classifyIntervalsActivity,
   buildSessionFromGarminActivity,
+  normalizeIntervalsProxyUrl,
   type IntervalsWellnessEntry,
   type IntervalsActivityEntry,
   type PendingGarminActivity,
@@ -47,6 +48,7 @@ export interface UseIntervalsSyncOptions {
 
 export type IntervalsConnectionState =
   | 'checking'
+  | 'static_host'
   | 'unconfigured'
   | 'auth_required'
   | 'ready'
@@ -55,6 +57,18 @@ export type IntervalsConnectionState =
   | 'error';
 
 const AUTO_SYNC_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes entre deux syncs automatiques
+
+function resolveIntervalsEndpoint(path: string): { url: string; proxyBaseUrl: string } {
+  const rawEnvUrl =
+    typeof import.meta !== 'undefined' && import.meta.env
+      ? (import.meta.env.VITE_INTERVALS_PROXY_URL as string | undefined)
+      : undefined;
+  const proxyBaseUrl = normalizeIntervalsProxyUrl(rawEnvUrl);
+  return {
+    url: proxyBaseUrl ? `${proxyBaseUrl}${path}` : path,
+    proxyBaseUrl,
+  };
+}
 
 export function useIntervalsSync({
   currentUser,
@@ -71,6 +85,7 @@ export function useIntervalsSync({
 }: UseIntervalsSyncOptions) {
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isStaticHost, setIsStaticHost] = useState<boolean>(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [athleteName, setAthleteName] = useState<string | null>(null);
@@ -78,6 +93,7 @@ export function useIntervalsSync({
   const [lastMetricsSummary, setLastMetricsSummary] = useState<AutoMetricsImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rawActivities, setRawActivities] = useState<IntervalsActivityEntry[]>([]);
+  const proxyBaseUrl = useMemo(() => resolveIntervalsEndpoint('').proxyBaseUrl, []);
 
   const lastAutoSyncTimestampRef = useRef<number>(0);
   const isSyncingRef = useRef<boolean>(false);
@@ -105,19 +121,39 @@ export function useIntervalsSync({
   const checkStatus = useCallback(async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setIsCheckingStatus(false);
-      return { configured: isConfigured, connected: false };
+      return { configured: isConfigured, connected: false, staticHost: isStaticHost };
     }
 
     setIsCheckingStatus(true);
+    const { url, proxyBaseUrl: configuredProxy } = resolveIntervalsEndpoint('/api/intervals/status');
     try {
       const headers = await getAuthHeaders();
-      const resp = await fetch('/api/intervals/status', {
+      const resp = await fetch(url, {
         headers,
         cache: 'no-store',
       });
-      if (!resp.ok) {
+      const contentType = resp.headers.get('content-type') || '';
+      const isJsonResponse = contentType.toLowerCase().includes('application/json');
+
+      // Sur GitHub Pages sans VITE_INTERVALS_PROXY_URL, /api/intervals/status renvoie 404 ou du HTML
+      if (!configuredProxy && (resp.status === 404 || !isJsonResponse)) {
+        setIsStaticHost(true);
+        setIsConfigured(false);
+        setIsConnected(false);
+        setError(null);
         setIsCheckingStatus(false);
-        return { configured: false, connected: false };
+        return { configured: false, connected: false, staticHost: true };
+      }
+
+      if (!resp.ok || !isJsonResponse) {
+        setIsStaticHost(false);
+        setError(
+          configuredProxy
+            ? `Passerelle distante inaccessible (code ${resp.status}). Vérifiez VITE_INTERVALS_PROXY_URL.`
+            : null
+        );
+        setIsCheckingStatus(false);
+        return { configured: false, connected: false, staticHost: false };
       }
 
       const data = (await resp.json()) as {
@@ -130,17 +166,31 @@ export function useIntervalsSync({
 
       const configured = Boolean(data.configured);
       const connected = Boolean(data.connected);
+      setIsStaticHost(false);
       setIsConfigured(configured);
       setIsConnected(connected);
       setAthleteName(data.athleteName || null);
       setError(data.error || null);
       setIsCheckingStatus(false);
-      return { configured, connected };
+      return { configured, connected, staticHost: false };
     } catch {
+      const isGitHubPages =
+        typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io');
+      if (!configuredProxy && isGitHubPages) {
+        setIsStaticHost(true);
+        setIsConfigured(false);
+        setIsConnected(false);
+        setError(null);
+        setIsCheckingStatus(false);
+        return { configured: false, connected: false, staticHost: true };
+      }
+      if (configuredProxy) {
+        setError('Impossible de joindre votre passerelle Garmin (vérifiez l’URL Cloudflare Worker).');
+      }
       setIsCheckingStatus(false);
-      return { configured: false, connected: false };
+      return { configured: false, connected: false, staticHost: false };
     }
-  }, [getAuthHeaders, isConfigured]);
+  }, [getAuthHeaders, isConfigured, isStaticHost]);
 
   const syncNow = useCallback(
     async (
@@ -177,7 +227,8 @@ export function useIntervalsSync({
         const newest = getLocalYYYYMMDD(now);
         const oldest = getLocalYYYYMMDD(addDays(now, -safeDays));
 
-        const resp = await fetch(`/api/intervals/sync?oldest=${oldest}&newest=${newest}`, {
+        const { url } = resolveIntervalsEndpoint(`/api/intervals/sync?oldest=${oldest}&newest=${newest}`);
+        const resp = await fetch(url, {
           headers,
           cache: 'no-store',
         });
@@ -382,17 +433,20 @@ export function useIntervalsSync({
   const connectionState: IntervalsConnectionState = useMemo(() => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return 'offline';
     if (isCheckingStatus) return 'checking';
+    if (isStaticHost) return 'static_host';
     if (!isConfigured) return 'unconfigured';
     if (!currentUser) return 'auth_required';
     if (isSyncing) return 'syncing';
     if (error && !isConnected) return 'error';
     return 'ready';
-  }, [isCheckingStatus, isConfigured, currentUser, isSyncing, error, isConnected]);
+  }, [isCheckingStatus, isStaticHost, isConfigured, currentUser, isSyncing, error, isConnected]);
 
   return {
     connectionState,
     isConfigured,
     isConnected,
+    isStaticHost,
+    proxyBaseUrl,
     isSyncing,
     athleteName,
     lastSyncedAt,

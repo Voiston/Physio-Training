@@ -1415,6 +1415,12 @@ function AppContent() {
                   message: 'Synchronisation automatique activée.',
                 });
                 intervalsSync.syncNow(14, { silent: false });
+              } else if (res.staticHost) {
+                showToast({
+                  type: 'info',
+                  title: 'Passerelle GitHub Pages à relier',
+                  message: 'Déployez workers/intervals-proxy.js puis ajoutez VITE_INTERVALS_PROXY_URL dans GitHub Actions.',
+                });
               } else if (!res.configured) {
                 showToast({
                   type: 'info',

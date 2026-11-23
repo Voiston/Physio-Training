@@ -170,9 +170,46 @@ function formatUtcDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function readEnvKeyFromDotenvFiles(keys: string[]): string {
+  const candidates = ['.env.local', '.env'];
+  for (const filename of candidates) {
+    const filePath = path.join(__dirname, filename);
+    try {
+      if (!fs.existsSync(filePath)) continue;
+      const content = fs.readFileSync(filePath, 'utf8');
+      for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) continue;
+        const eqIdx = line.indexOf('=');
+        if (eqIdx <= 0) continue;
+        const k = line.slice(0, eqIdx).trim();
+        if (!keys.includes(k)) continue;
+        let v = line.slice(eqIdx + 1).trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+          v = v.slice(1, -1).trim();
+        }
+        if (v) return v;
+      }
+    } catch {
+      // Ignore unreadable env files
+    }
+  }
+  return '';
+}
+
 function getIntervalsServerConfig(): { configured: boolean; apiKey: string; athleteId: string; authHeader: string } {
-  const apiKey = (process.env.INTERVALS_ICU_API_KEY || '').trim();
-  const rawAthleteId = (process.env.INTERVALS_ICU_ATHLETE_ID || '0').trim();
+  const apiKey = (
+    process.env.INTERVALS_ICU_API_KEY ||
+    process.env.INTERVALS_API_KEY ||
+    readEnvKeyFromDotenvFiles(['INTERVALS_ICU_API_KEY', 'INTERVALS_API_KEY']) ||
+    ''
+  ).trim();
+  const rawAthleteId = (
+    process.env.INTERVALS_ICU_ATHLETE_ID ||
+    process.env.INTERVALS_ATHLETE_ID ||
+    readEnvKeyFromDotenvFiles(['INTERVALS_ICU_ATHLETE_ID', 'INTERVALS_ATHLETE_ID']) ||
+    '0'
+  ).trim();
   const athleteId = SAFE_ATHLETE_ID_REGEX.test(rawAthleteId) ? rawAthleteId : '0';
   const authHeader = apiKey ? `Basic ${Buffer.from(`API_KEY:${apiKey}`).toString('base64')}` : '';
   return { configured: apiKey.length > 0, apiKey, athleteId, authHeader };
@@ -241,7 +278,7 @@ async function startServer() {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com",
-    "connect-src 'self' https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://festive-condition-nzbz0.firebaseapp.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://accounts.google.com",
+    "connect-src 'self' https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://festive-condition-nzbz0.firebaseapp.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://apis.google.com https://accounts.google.com https://*.workers.dev https://*.run.app",
     "frame-src 'self' https://festive-condition-nzbz0.firebaseapp.com https://accounts.google.com https://apis.google.com",
     "frame-ancestors 'self' https://*.google.com https://*.run.app https://aistudio.google.com https://*.googleusercontent.com",
     "worker-src 'self' blob:",
@@ -273,6 +310,43 @@ async function startServer() {
   });
 
   // 4. Proxy sécurisé Intervals.icu (Garmin Connect -> Intervals.icu -> PhysioTracker PRO)
+  // Autorise les appels CORS strictement vérifiés depuis GitHub Pages (*.github.io) ou origines configurées
+  const GITHUB_PAGES_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+\.github\.io$/i;
+  const CLOUD_RUN_ORIGIN_REGEX = /^https:\/\/[a-z0-9-]+\.run\.app$/i;
+  const LOCALHOST_ORIGIN_REGEX = /^http:\/\/(?:localhost|127\.0\.0\.1):3000$/;
+
+  const isAllowedCorsOrigin = (origin?: string): boolean => {
+    if (!origin) return false;
+    if (
+      GITHUB_PAGES_ORIGIN_REGEX.test(origin) ||
+      CLOUD_RUN_ORIGIN_REGEX.test(origin) ||
+      LOCALHOST_ORIGIN_REGEX.test(origin)
+    ) {
+      return true;
+    }
+    const extra = (process.env.INTERVALS_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((o) => o.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
+    return extra.includes(origin);
+  };
+
+  app.use('/api/intervals', (req, res, next) => {
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+    res.setHeader('Vary', 'Origin');
+    if (origin && isAllowedCorsOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+      res.setHeader('Access-Control-Max-Age', '600');
+    }
+    if (req.method === 'OPTIONS') {
+      res.status(origin && isAllowedCorsOrigin(origin) ? 204 : 403).end();
+      return;
+    }
+    next();
+  });
+
   app.get('/api/intervals/status', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const cfg = getIntervalsServerConfig();

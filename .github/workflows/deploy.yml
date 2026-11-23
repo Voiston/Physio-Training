@@ -48,6 +48,8 @@ jobs:
         run: npm test
 
       - name: Build production bundle
+        env:
+          VITE_INTERVALS_PROXY_URL: ${{ vars.VITE_INTERVALS_PROXY_URL || secrets.VITE_INTERVALS_PROXY_URL }}
         run: npm run build
 
       - name: Setup Pages

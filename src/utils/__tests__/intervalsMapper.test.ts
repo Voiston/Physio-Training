@@ -5,6 +5,7 @@ import {
   mapIntervalsSport,
   classifyIntervalsActivity,
   buildSessionFromGarminActivity,
+  normalizeIntervalsProxyUrl,
 } from '../intervalsMapper';
 import { DEFAULT_QUALITIES } from '../physiology';
 
@@ -139,5 +140,17 @@ describe('intervalsMapper', () => {
     expect(merged.load).toBe(120 + 200);
     expect(merged.subSessions).toHaveLength(2);
     expect(merged.subSessions?.[1].id).toBe('icu_act-pm');
+  });
+
+  it('validates and normalizes optional proxy URLs while rejecting insecure protocols', () => {
+    expect(normalizeIntervalsProxyUrl('https://physio-garmin.user.workers.dev/')).toBe(
+      'https://physio-garmin.user.workers.dev'
+    );
+    expect(normalizeIntervalsProxyUrl('http://localhost:3000/')).toBe('http://localhost:3000');
+    expect(normalizeIntervalsProxyUrl('http://evil.example.com')).toBe('');
+    expect(normalizeIntervalsProxyUrl('javascript:alert(1)')).toBe('');
+    expect(normalizeIntervalsProxyUrl('https://user:pass@proxy.workers.dev')).toBe('');
+    expect(normalizeIntervalsProxyUrl('not-a-url')).toBe('');
+    expect(normalizeIntervalsProxyUrl(null)).toBe('');
   });
 });
