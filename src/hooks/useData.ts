@@ -293,7 +293,11 @@ export function useData() {
     taperingAnalysis,
     cardioMuscularBalance,
     intensityDistribution,
-    perceivedFatigueAnalysis
+    perceivedFatigueAnalysis,
+    dualBanister,
+    interferenceAnalysis,
+    dailyBriefing,
+    strengthProgression,
   } = useMetricsState(effectiveEvents, qualities, isSimulationActive, { onPushSync: triggerSyncPush });
 
   const markIntervalsIdsProcessed = useCallback((ids: string[]) => {
@@ -799,6 +803,10 @@ export function useData() {
     cardioMuscularBalance,
     intensityDistribution,
     perceivedFatigueAnalysis,
+    dualBanister,
+    interferenceAnalysis,
+    dailyBriefing,
+    strengthProgression,
     // Mode Simulation (What-If)
     isSimulationActive,
     simulatedEvents,

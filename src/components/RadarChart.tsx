@@ -155,7 +155,7 @@ export default function RadarChart({ qualities, events, dailyMetrics, trainingBl
             </table>
           </div>
 
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={270} minWidth={0}>
             <RechartsRadar cx="50%" cy="50%" outerRadius="68%" data={radarData}>
               <PolarGrid stroke="rgba(255, 255, 255, 0.2)" />
               <PolarAngleAxis 

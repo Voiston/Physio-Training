@@ -3,8 +3,9 @@ import { Quality, SessionData } from '../hooks/useData';
 import { getLocalYYYYMMDD } from '../utils/dateHelpers';
 import { computeSessionLoad } from '../utils/loadHelpers';
 import { 
-  Sparkles, Play, CheckCircle2, RotateCcw, X, Plus 
+  Sparkles, Play, CheckCircle2, RotateCcw, X, Plus, AlertTriangle 
 } from 'lucide-react';
+import type { InterferenceAnalysis } from '../utils/hybridIntelligence';
 
 interface SimulationBannerProps {
   isActive: boolean;
@@ -15,6 +16,7 @@ interface SimulationBannerProps {
   onAddSimulatedSession: (qId: string, dateStr: string, sessionData: SessionData) => void;
   onClear: () => void;
   onCommit: () => void;
+  interference?: InterferenceAnalysis;
 }
 
 export const SimulationBanner: React.FC<SimulationBannerProps> = ({
@@ -25,7 +27,8 @@ export const SimulationBanner: React.FC<SimulationBannerProps> = ({
   onApplyScenario,
   onAddSimulatedSession,
   onClear,
-  onCommit
+  onCommit,
+  interference
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState(qualities[0]?.id || 'vo2max');
@@ -165,6 +168,26 @@ export const SimulationBanner: React.FC<SimulationBannerProps> = ({
           <span>🧘 Semaine de Récupération Active (Charge minimale)</span>
         </button>
       </div>
+
+      {/* Alerte d'interférence concurrente déclenchée par les séances simulées */}
+      {(() => {
+        const simConflicts = interference?.conflicts.filter((c) => c.isSimulated) || [];
+        if (simConflicts.length === 0) return null;
+        const top = simConflicts[0];
+        return (
+          <div className="mt-3 pt-2.5 border-t border-amber-500/25 flex items-start gap-2 text-xs text-amber-200">
+            <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="min-w-0">
+              <span className="font-bold text-amber-300">
+                {simConflicts.length} interférence{simConflicts.length > 1 ? 's' : ''} détectée{simConflicts.length > 1 ? 's' : ''} dans cette simulation :
+              </span>{' '}
+              <span className="font-semibold text-white">{top.title}</span>{' '}
+              <span className="text-slate-300 font-mono">({top.dateStr})</span>
+              <span className="text-slate-300"> · {top.recommendation}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Mini-formulaire dépliable pour injecter une séance personnalisée */}
       {showAddForm && (

@@ -191,8 +191,8 @@ export const MuscleRadarChart: React.FC<MuscleRadarChartProps> = ({
       </div>
 
       {/* Zone Graphique Radar */}
-      <div className="w-full h-[320px] sm:h-[350px] relative flex items-center justify-center">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="w-full h-[320px] sm:h-[350px] min-w-0 relative flex items-center justify-center">
+        <ResponsiveContainer width="100%" height={320} minWidth={0}>
           <RechartsRadar 
             cx="50%" 
             cy="50%" 

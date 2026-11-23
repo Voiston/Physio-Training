@@ -226,7 +226,7 @@ export default function QualityChartModal({ quality, events, onClose }: QualityC
 
         {/* Chart */}
         <div className="h-[340px] w-full min-h-[300px] min-w-0 bg-slate-950/70 p-3 rounded-2xl border border-white/10 relative shadow-inner">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={310} minWidth={0}>
             <ComposedChart data={series} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" vertical={false} />
               <XAxis 

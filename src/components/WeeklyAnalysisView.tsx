@@ -25,11 +25,16 @@ import {
 import { MuscleBodyMap } from './MuscleBodyMap';
 import { MuscleRadarChart } from './MuscleRadarChart';
 import { MuscleAlertsBanner } from './MuscleAlertsBanner';
+import { StrengthProgressPanel } from './StrengthProgressPanel';
+import type { DualBanisterResult, StrengthProgressionSummary } from '../utils/hybridIntelligence';
 
 interface WeeklyAnalysisViewProps {
   events: Record<string, Record<string, SessionData>>;
   qualities: Quality[];
   allWeeksStats?: WeekStats[];
+  strengthProgression?: StrengthProgressionSummary;
+  dualBanister?: DualBanisterResult;
+  onOpenLiveGym?: () => void;
   onOpenScoreModal?: (q: Quality, dateStr: string, sessionData?: SessionData) => void;
   showToast?: (toast: { type: 'success' | 'info' | 'warning' | 'error'; title: string; message: string }) => void;
 }
@@ -80,6 +85,9 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   events,
   qualities,
   allWeeksStats,
+  strengthProgression,
+  dualBanister,
+  onOpenLiveGym,
   showToast
 }) => {
   // Statistiques hebdomadaires (injectées depuis useData ou calculées en fallback)
@@ -118,7 +126,7 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
   const [sortDescending, setSortDescending] = useState<boolean>(true);
   const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>('all');
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
-  const [breakdownTab, setBreakdownTab] = useState<'qualities' | 'muscles'>('qualities');
+  const [breakdownTab, setBreakdownTab] = useState<'qualities' | 'muscles' | 'strength'>('qualities');
   const [selectedMuscleId, setSelectedMuscleId] = useState<string | null>(null);
   const [showVolumeGuide, setShowVolumeGuide] = useState<boolean>(false);
 
@@ -335,8 +343,18 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
             <div className="text-xl sm:text-2xl font-mono font-extrabold text-white tracking-tight">
               {activeWeek.totalDurationFormatted}
             </div>
-            <div className="text-xs text-slate-300 mt-1">
-              {activeWeek.totalDurationMinutes} minutes enregistrées
+            <div className="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-x-2">
+              <span>{activeWeek.totalDurationMinutes} min</span>
+              {(activeWeek.totalDistanceKm > 0 || activeWeek.totalElevationGainM > 0) && (
+                <>
+                  <span className="text-slate-600" aria-hidden="true">·</span>
+                  <span className="font-mono tabular-nums text-sky-300 font-semibold">
+                    {activeWeek.totalDistanceKm > 0 ? `${activeWeek.totalDistanceKm} km` : ''}
+                    {activeWeek.totalDistanceKm > 0 && activeWeek.totalElevationGainM > 0 ? ' · ' : ''}
+                    {activeWeek.totalElevationGainM > 0 ? `+${activeWeek.totalElevationGainM} m D+` : ''}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -713,8 +731,8 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
           </table>
         </div>
 
-        <div className="h-64 sm:h-72 w-full" aria-hidden="true">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[260px] sm:h-[280px] w-full min-w-0" aria-hidden="true">
+          <ResponsiveContainer width="100%" height={260} minWidth={0}>
             <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" vertical={false} />
               <XAxis dataKey="label" stroke="#94a3b8" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
@@ -809,9 +827,46 @@ export const WeeklyAnalysisView: React.FC<WeeklyAnalysisViewProps> = ({
               </span>
             )}
           </button>
+
+          <button
+            type="button"
+            role="tab"
+            id="tab-strength"
+            aria-controls="panel-strength"
+            aria-selected={breakdownTab === 'strength'}
+            onClick={() => setBreakdownTab('strength')}
+            className={`flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+              breakdownTab === 'strength'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400'
+                : 'text-slate-300 hover:text-white hover:bg-white/5 border border-white/5'
+            }`}
+          >
+            <TrendingUp size={16} aria-hidden="true" />
+            <span>Force & e1RM</span>
+            {strengthProgression && strengthProgression.exercises.length > 0 && (
+              <span className="font-mono tabular-nums text-xs opacity-85">
+                · {strengthProgression.exercises.length} exo{strengthProgression.exercises.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </button>
         </div>
 
-        {breakdownTab === 'qualities' ? (
+        {breakdownTab === 'strength' ? (
+          <div id="panel-strength" role="tabpanel" aria-labelledby="tab-strength">
+            <StrengthProgressPanel
+              progression={
+                strengthProgression || {
+                  exercises: [],
+                  totalPRCount: 0,
+                  recentPRs: [],
+                  totalStrengthSessions: 0,
+                }
+              }
+              dualBanister={dualBanister}
+              onOpenLiveGym={onOpenLiveGym}
+            />
+          </div>
+        ) : breakdownTab === 'qualities' ? (
           <div id="panel-qualities" role="tabpanel" aria-labelledby="tab-qualities">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
               <div>

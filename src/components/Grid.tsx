@@ -8,7 +8,7 @@ import QualitySparkline from './QualitySparkline';
 import { 
   ChevronDown, ChevronUp, BarChart2, GripVertical, 
   ChevronLeft, ChevronRight, Calendar, ArrowLeftRight,
-  BarChart3, Zap, Clock
+  BarChart3, Zap, Clock, AlertTriangle
 } from 'lucide-react';
 import { haptics } from '../utils/haptics';
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
@@ -21,6 +21,7 @@ import type { WeekStats } from '../utils/weekHelpers';
 import type { VfcAnalysisResult, HrRestAnalysisResult } from '../utils/vfcHelpers';
 import type { DailyMetrics } from '../hooks/useMetricsState';
 import type { TrainingBlock } from '../hooks/useBlocksState';
+import type { InterferenceConflict } from '../utils/hybridIntelligence';
 
 type DropPosition = 'before' | 'after';
 type EmaCurrent = QualityEMAData['current'];
@@ -92,6 +93,7 @@ export interface GridProps {
   onMetricClick: MetricClickHandler;
   onQualityClick: (quality: Quality) => void;
   onOpenWeeklyView?: () => void;
+  conflictsByDate?: Record<string, InterferenceConflict[]>;
 }
 
 /**
@@ -605,7 +607,8 @@ export default function Grid({
   onCellClick, 
   onMetricClick, 
   onQualityClick,
-  onOpenWeeklyView
+  onOpenWeeklyView,
+  conflictsByDate
 }: GridProps) {
   const [expandedQualityId, setExpandedQualityId] = useState<string | null>(null);
   const [draggedQualityId, setDraggedQualityId] = useState<string | null>(null);
@@ -951,10 +954,16 @@ export default function Grid({
               {timeline.map((day) => {
                 const dayBlock = getActiveBlockForDate(day.dateStr, trainingBlocks);
                 const isToday = day.offset === 0;
+                const dayConflicts = conflictsByDate?.[day.dateStr];
+                const hasCriticalConflict = dayConflicts?.some((c) => c.severity === 'critical');
+                const conflictTooltip = dayConflicts
+                  ? dayConflicts.map((c) => `${c.title} — ${c.recommendation}`).join('\n')
+                  : undefined;
                 return (
                   <th 
                     key={day.dateStr} 
                     data-today={isToday ? "true" : undefined}
+                    title={conflictTooltip}
                     className={`py-2 px-1 w-[56px] min-w-[56px] sm:w-[64px] sm:min-w-[64px] text-center border-r border-white/5 relative transition-colors ${
                       isToday 
                         ? 'bg-blue-600/30 text-blue-200 border-x-2 border-x-blue-500/50 shadow-inner today-beacon z-30' 
@@ -971,11 +980,18 @@ export default function Grid({
                     )}
                     <div className="flex flex-col items-center justify-center leading-none">
                       <span className={`text-[9px] font-bold uppercase tracking-wider flex items-center justify-center ${isToday ? 'text-blue-300 font-black' : 'text-slate-400'}`}>
-                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block mr-1 animate-pulse" />}
+                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block mr-1" />}
                         {isToday ? 'AUJ.' : day.display.prefix}
                       </span>
-                      <span className={`text-[11px] font-mono mt-0.5 ${isToday ? 'text-white font-extrabold underline decoration-blue-400 decoration-2' : 'text-slate-300 font-medium'}`}>
-                        {day.display.date}
+                      <span className={`text-[11px] font-mono mt-0.5 flex items-center gap-0.5 ${isToday ? 'text-white font-extrabold underline decoration-blue-400 decoration-2' : 'text-slate-300 font-medium'}`}>
+                        <span>{day.display.date}</span>
+                        {dayConflicts && dayConflicts.length > 0 && (
+                          <AlertTriangle
+                            size={10}
+                            className={hasCriticalConflict ? 'text-rose-400 shrink-0' : 'text-amber-400 shrink-0'}
+                            aria-label={`Interférence concurrente : ${dayConflicts[0].title}`}
+                          />
+                        )}
                       </span>
                     </div>
                   </th>

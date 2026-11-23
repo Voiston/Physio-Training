@@ -230,18 +230,32 @@ function getIntervalsConfig(env) {
   return { configured: apiKey.length > 0, athleteId, authHeader };
 }
 
+function toFiniteNumberOrNull(v) {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const parsed = Number(v);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function sanitizeWellnessItem(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   if (typeof raw.id !== 'string' || !isValidIsoCalendarDate(raw.id)) return null;
-  const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   return {
     id: raw.id,
-    hrv: numOrNull(raw.hrv),
-    restingHR: numOrNull(raw.restingHR),
-    readiness: numOrNull(raw.readiness),
-    sleepScore: numOrNull(raw.sleepScore),
-    sleepSecs: numOrNull(raw.sleepSecs),
-    sleepQuality: numOrNull(raw.sleepQuality),
+    hrv: toFiniteNumberOrNull(raw.hrv),
+    hrvSDNN: toFiniteNumberOrNull(raw.hrvSDNN),
+    restingHR: toFiniteNumberOrNull(raw.restingHR),
+    avgSleepingHR: toFiniteNumberOrNull(raw.avgSleepingHR),
+    readiness: toFiniteNumberOrNull(raw.readiness),
+    GarminTrainingReadiness: toFiniteNumberOrNull(raw.GarminTrainingReadiness),
+    sleepScore: toFiniteNumberOrNull(raw.sleepScore),
+    sleepSecs: toFiniteNumberOrNull(raw.sleepSecs),
+    sleepQuality: toFiniteNumberOrNull(raw.sleepQuality),
+    bodyBattery: toFiniteNumberOrNull(
+      raw.bodyBattery ?? raw.BodyBattery ?? raw.GarminBodyBatteryMax
+    ),
   };
 }
 

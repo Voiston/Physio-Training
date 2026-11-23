@@ -20,6 +20,8 @@ import type {
 } from '../hooks/useIntervalsSync';
 import type { PendingGarminActivity } from '../utils/intervalsMapper';
 
+import type { DailyMetrics } from '../hooks/useMetricsState';
+
 interface GarminSyncModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,6 +31,7 @@ interface GarminSyncModalProps {
   athleteName: string | null;
   lastSyncedAt: Date | null;
   lastMetricsSummary: AutoMetricsImportSummary | null;
+  dailyMetrics?: Record<string, DailyMetrics>;
   error: string | null;
   pendingActivities: PendingGarminActivity[];
   processedCount: number;
@@ -61,6 +64,7 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
   athleteName,
   lastSyncedAt,
   lastMetricsSummary,
+  dailyMetrics,
   error,
   pendingActivities,
   processedCount,
@@ -80,6 +84,32 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
   useModalA11y(isOpen, onClose, modalRef);
 
   if (!isOpen) return null;
+
+  // Fallback sur les dernières métriques déjà présentes dans la grille avant toute synchro manuelle
+  const latestLocalFallback = (() => {
+    if (!dailyMetrics) return null;
+    const dates = Object.keys(dailyMetrics).sort();
+    let vfc: number | undefined;
+    let hrRest: number | undefined;
+    let readiness: number | undefined;
+    let latestDate: string | undefined;
+    for (const d of dates) {
+      const m = dailyMetrics[d];
+      if (!m) continue;
+      let hasAny = false;
+      if (typeof m.vfc === 'number') { vfc = m.vfc; hasAny = true; }
+      if (typeof m.hrRest === 'number') { hrRest = m.hrRest; hasAny = true; }
+      if (typeof m.readiness === 'number') { readiness = m.readiness; hasAny = true; }
+      if (hasAny) latestDate = d;
+    }
+    if (!latestDate) return null;
+    return { latestDate, latestValues: { vfc, hrRest, readiness } };
+  })();
+
+  const displayedDate = lastMetricsSummary?.latestDate || latestLocalFallback?.latestDate;
+  const displayedValues = lastMetricsSummary?.latestValues || latestLocalFallback?.latestValues;
+  const noWellnessFromIntervals =
+    Boolean(lastSyncedAt) && lastMetricsSummary !== null && (lastMetricsSummary.receivedDays ?? 0) === 0;
 
   const statusMeta = (() => {
     switch (connectionState) {
@@ -442,13 +472,13 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
 
             {/* Résumé des dernières métriques matinales importées */}
             <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl space-y-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-200">
                   Métriques quotidiennes (import silencieux)
                 </span>
-                {lastMetricsSummary?.latestDate && (
+                {displayedDate && (
                   <span className="text-xs font-mono tabular-nums text-slate-400">
-                    {lastMetricsSummary.latestDate}
+                    {displayedDate}
                   </span>
                 )}
               </div>
@@ -457,32 +487,60 @@ export const GarminSyncModal: React.FC<GarminSyncModalProps> = ({
                 <div className="py-2.5 px-2 rounded-lg bg-slate-900/90 border border-slate-800">
                   <div className="text-[11px] text-slate-400">VFC</div>
                   <div className="text-base font-mono tabular-nums font-bold text-white mt-0.5">
-                    {lastMetricsSummary?.latestValues?.vfc !== undefined
-                      ? `${lastMetricsSummary.latestValues.vfc} ms`
+                    {displayedValues?.vfc !== undefined
+                      ? `${displayedValues.vfc} ms`
                       : '—'}
                   </div>
                 </div>
                 <div className="py-2.5 px-2 rounded-lg bg-slate-900/90 border border-slate-800">
                   <div className="text-[11px] text-slate-400">FC repos</div>
                   <div className="text-base font-mono tabular-nums font-bold text-white mt-0.5">
-                    {lastMetricsSummary?.latestValues?.hrRest !== undefined
-                      ? `${lastMetricsSummary.latestValues.hrRest} bpm`
+                    {displayedValues?.hrRest !== undefined
+                      ? `${displayedValues.hrRest} bpm`
                       : '—'}
                   </div>
                 </div>
                 <div className="py-2.5 px-2 rounded-lg bg-slate-900/90 border border-slate-800">
                   <div className="text-[11px] text-slate-400">Readiness</div>
                   <div className="text-base font-mono tabular-nums font-bold text-white mt-0.5">
-                    {lastMetricsSummary?.latestValues?.readiness !== undefined
-                      ? `${lastMetricsSummary.latestValues.readiness}/10`
+                    {displayedValues?.readiness !== undefined
+                      ? `${displayedValues.readiness}/10`
                       : '—'}
                   </div>
                 </div>
               </div>
 
-              <p className="text-[11px] text-slate-400 m-0 leading-relaxed">
-                Vos saisies manuelles dans la grille ne sont jamais écrasées par la synchronisation Garmin.
-              </p>
+              {noWellnessFromIntervals ? (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200 space-y-1.5 leading-relaxed">
+                  <div className="font-semibold text-amber-100">
+                    Aucune donnée bien-être (VFC, FC repos, Sommeil) reçue d’Intervals.icu sur les {daysBack} derniers jours.
+                  </div>
+                  <p className="m-0 text-amber-200/90">
+                    Sur{' '}
+                    <a
+                      href="https://intervals.icu/settings"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline text-amber-100 hover:text-white inline-flex items-center gap-0.5"
+                    >
+                      intervals.icu/settings
+                      <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                    </a>{' '}
+                    → <strong>Garmin Connect</strong>, vérifiez que <strong>« Download wellness data »</strong> est bien coché (puis cliquez sur <em>Download old data</em> si activé récemment), puis relancez <strong>Synchroniser</strong>.
+                  </p>
+                </div>
+              ) : lastMetricsSummary && (lastMetricsSummary.receivedDays ?? 0) > 0 ? (
+                <p className="text-[11px] text-emerald-300/90 m-0 leading-relaxed">
+                  {lastMetricsSummary.receivedDays} jour{(lastMetricsSummary.receivedDays ?? 0) > 1 ? 's' : ''} reçu{(lastMetricsSummary.receivedDays ?? 0) > 1 ? 's' : ''} d’Intervals.icu
+                  {lastMetricsSummary.updatedCount > 0
+                    ? ` · ${lastMetricsSummary.updatedCount} mesure${lastMetricsSummary.updatedCount > 1 ? 's' : ''} mise${lastMetricsSummary.updatedCount > 1 ? 's' : ''} à jour dans la grille.`
+                    : ' · déjà à jour dans la grille.'}
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-400 m-0 leading-relaxed">
+                  Vos saisies manuelles dans la grille ne sont jamais écrasées par la synchronisation Garmin.
+                </p>
+              )}
             </div>
 
             {/* État de la boîte de réception des séances */}

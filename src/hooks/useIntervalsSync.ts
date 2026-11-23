@@ -12,9 +12,14 @@ import {
   type IntervalsActivityEntry,
   type PendingGarminActivity,
 } from '../utils/intervalsMapper';
+import {
+  getLearnedGarminRules,
+  recordGarminClassificationPreference,
+} from '../utils/garminPreferences';
 
 export interface AutoMetricsImportSummary {
   updatedCount: number;
+  receivedDays?: number;
   latestDate?: string;
   latestValues?: { vfc?: number; hrRest?: number; readiness?: number };
 }
@@ -93,6 +98,7 @@ export function useIntervalsSync({
   const [lastMetricsSummary, setLastMetricsSummary] = useState<AutoMetricsImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rawActivities, setRawActivities] = useState<IntervalsActivityEntry[]>([]);
+  const [learnedRulesVersion, setLearnedRulesVersion] = useState<number>(0);
   const proxyBaseUrl = useMemo(() => resolveIntervalsEndpoint('').proxyBaseUrl, []);
 
   const lastAutoSyncTimestampRef = useRef<number>(0);
@@ -199,21 +205,22 @@ export function useIntervalsSync({
     ): Promise<{
       ok: boolean;
       metricsUpdated: number;
+      wellnessDaysReceived: number;
       newActivitiesCount: number;
       error?: string;
     }> => {
       if (isSyncingRef.current) {
-        return { ok: false, metricsUpdated: 0, newActivitiesCount: 0 };
+        return { ok: false, metricsUpdated: 0, wellnessDaysReceived: 0, newActivitiesCount: 0 };
       }
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         const msg = 'Appareil hors-ligne : synchronisation Garmin mise en pause.';
         if (!options?.silent) setError(msg);
-        return { ok: false, metricsUpdated: 0, newActivitiesCount: 0, error: msg };
+        return { ok: false, metricsUpdated: 0, wellnessDaysReceived: 0, newActivitiesCount: 0, error: msg };
       }
       if (!currentUser) {
         const msg = 'Connectez votre compte Google pour synchroniser Garmin.';
         if (!options?.silent) setError(msg);
-        return { ok: false, metricsUpdated: 0, newActivitiesCount: 0, error: msg };
+        return { ok: false, metricsUpdated: 0, wellnessDaysReceived: 0, newActivitiesCount: 0, error: msg };
       }
 
       isSyncingRef.current = true;
@@ -247,7 +254,13 @@ export function useIntervalsSync({
           }
           const errMsg = payload.message || payload.error || `Erreur serveur (${resp.status})`;
           setError(errMsg);
-          return { ok: false, metricsUpdated: 0, newActivitiesCount: 0, error: errMsg };
+          return {
+            ok: false,
+            metricsUpdated: 0,
+            wellnessDaysReceived: 0,
+            newActivitiesCount: 0,
+            error: errMsg,
+          };
         }
 
         setIsConfigured(true);
@@ -258,9 +271,36 @@ export function useIntervalsSync({
         // 1. Import silencieux et automatique des métriques quotidiennes (VFC, FC repos, Readiness)
         const normalizedWellness = normalizeIntervalsWellness(payload.wellness || []);
         const summary = applyWellnessRef.current(normalizedWellness);
+
+        // Toujours calculer le résumé des dernières métriques reçues d'Intervals.icu
+        // même si elles étaient déjà à jour localement (updatedCount === 0)
+        const sortedWellness = [...normalizedWellness].sort((a, b) =>
+          a.dateStr.localeCompare(b.dateStr)
+        );
+        let latestVfc: number | undefined;
+        let latestHrRest: number | undefined;
+        let latestReadiness: number | undefined;
+        for (const item of sortedWellness) {
+          if (item.vfc !== undefined) latestVfc = item.vfc;
+          if (item.hrRest !== undefined) latestHrRest = item.hrRest;
+          if (item.readiness !== undefined) latestReadiness = item.readiness;
+        }
+        const latestReceivedDate =
+          sortedWellness.length > 0 ? sortedWellness[sortedWellness.length - 1].dateStr : undefined;
+
+        const fullSummary: AutoMetricsImportSummary = {
+          updatedCount: summary.updatedCount,
+          receivedDays: normalizedWellness.length,
+          latestDate: summary.latestDate || latestReceivedDate,
+          latestValues:
+            latestVfc !== undefined || latestHrRest !== undefined || latestReadiness !== undefined
+              ? { vfc: latestVfc, hrRest: latestHrRest, readiness: latestReadiness }
+              : summary.latestValues,
+        };
+        setLastMetricsSummary(fullSummary);
+
         if (summary.updatedCount > 0) {
-          setLastMetricsSummary(summary);
-          onAutoMetricsRef.current?.(summary);
+          onAutoMetricsRef.current?.(fullSummary);
         }
 
         // 2. Mise à jour des activités brutes pour la boîte de réception 1 clic
@@ -270,12 +310,19 @@ export function useIntervalsSync({
         return {
           ok: true,
           metricsUpdated: summary.updatedCount,
+          wellnessDaysReceived: normalizedWellness.length,
           newActivitiesCount: incomingActivities.length,
         };
       } catch {
         const msg = 'Impossible de joindre le serveur de synchronisation Garmin.';
         if (!options?.silent) setError(msg);
-        return { ok: false, metricsUpdated: 0, newActivitiesCount: 0, error: msg };
+        return {
+          ok: false,
+          metricsUpdated: 0,
+          wellnessDaysReceived: 0,
+          newActivitiesCount: 0,
+          error: msg,
+        };
       } finally {
         isSyncingRef.current = false;
         setIsSyncing(false);
@@ -350,16 +397,18 @@ export function useIntervalsSync({
   // Liste triée (plus récentes en premier) des activités Garmin prêtes à valider en 1 clic
   const pendingActivities = useMemo<PendingGarminActivity[]>(() => {
     const focusIds = activeBlockToday?.focusQualities || [];
+    const learnedRules = getLearnedGarminRules();
     return rawActivities
       .filter((act) => act && act.id && !existingExternalIds.has(String(act.id)))
-      .map((act) => classifyIntervalsActivity(act, qualities, focusIds))
+      .map((act) => classifyIntervalsActivity(act, qualities, focusIds, learnedRules))
       .filter((item): item is PendingGarminActivity => item !== null)
       .sort((a, b) => {
         const dateCmp = b.dateStr.localeCompare(a.dateStr);
         if (dateCmp !== 0) return dateCmp;
         return b.startTime.localeCompare(a.startTime);
       });
-  }, [rawActivities, existingExternalIds, qualities, activeBlockToday]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawActivities, existingExternalIds, qualities, activeBlockToday, learnedRulesVersion]);
 
   const validateActivity = useCallback(
     (activity: PendingGarminActivity, overrides?: ActivityOverride) => {
@@ -378,6 +427,15 @@ export function useIntervalsSync({
 
       saveEventWithImpacts(targetQualityId, activity.dateStr, sessionData, true);
       markIntervalsIdsProcessed([activity.externalId]);
+
+      recordGarminClassificationPreference({
+        title: activity.title,
+        sport: activity.sport,
+        qualityId: targetQualityId,
+        rpeCardio: targetRpeCardio,
+        rpeMusc: targetRpeMusc,
+      });
+      setLearnedRulesVersion((v) => v + 1);
 
       return {
         qualityId: targetQualityId,
@@ -409,10 +467,18 @@ export function useIntervalsSync({
         workingMap[qId][act.dateStr] = built;
 
         saveEventWithImpacts(qId, act.dateStr, built, true);
+        recordGarminClassificationPreference({
+          title: act.title,
+          sport: act.sport,
+          qualityId: qId,
+          rpeCardio: rC,
+          rpeMusc: rM,
+        });
         processedBatch.push(act.externalId);
       }
 
       markIntervalsIdsProcessed(processedBatch);
+      setLearnedRulesVersion((v) => v + 1);
       return processedBatch.length;
     },
     [pendingActivities, rawEvents, saveEventWithImpacts, markIntervalsIdsProcessed]

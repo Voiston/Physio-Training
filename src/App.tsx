@@ -6,9 +6,10 @@ import Grid from './components/Grid';
 const RadarChart = lazy(() => import('./components/RadarChart'));
 import SmartSuggestions from './components/SmartSuggestions';
 import { SimulationBanner } from './components/SimulationBanner';
-import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { GarminInboxBanner } from './components/GarminInboxBanner';
+import { TodayBriefingBar } from './components/TodayBriefingBar';
+import { AppHeader, MobileBottomNav, type AppTab } from './components/AppHeader';
 import { ToastProvider, useToast } from './components/Toast';
 import { useIntervalsSync } from './hooks/useIntervalsSync';
 import type { ScoreModalInfo } from './components/ScoreModal';
@@ -46,10 +47,8 @@ import {
   getSavedCustomExercises 
 } from './utils/muscleHelpers';
 import { 
-  FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
-  FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
-  PanelLeftClose, PanelLeftOpen, BarChart3, Dumbbell, Cloud,
-  MoreVertical, X, Watch
+  Activity, Calendar, Zap, Shield, Plus,
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 
 function AppContent() {
@@ -93,6 +92,10 @@ function AppContent() {
     cardioMuscularBalance,
     intensityDistribution,
     perceivedFatigueAnalysis,
+    dualBanister,
+    interferenceAnalysis,
+    dailyBriefing,
+    strengthProgression,
     // Simulation (What-If)
     isSimulationActive,
     simulatedEvents,
@@ -109,7 +112,7 @@ function AppContent() {
 
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'grid' | 'weeks' | 'physiology' | 'qualities' | 'periodization'>('grid');
+  const [activeTab, setActiveTab] = useState<AppTab>('grid');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [modalInfo, setModalInfo] = useState<ScoreModalInfo | null>(null);
   const [metricModalInfo, setMetricModalInfo] = useState<MetricModalInfo | null>(null);
@@ -311,483 +314,75 @@ function AppContent() {
 
       <div className="relative z-10 flex flex-col h-full gap-5 max-w-[1550px] mx-auto">
         
-        {/* Header Section */}
-        <header className="flex flex-wrap items-center justify-between px-4 lg:px-6 py-3.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md shadow-2xl gap-4" role="banner">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/20 rounded-xl shadow-inner border border-blue-500/30 text-blue-400">
-              <Activity className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg sm:text-xl font-bold tracking-tight text-white">PhysioTracker</span>
-                <span className="text-xs text-blue-400 font-mono font-semibold">Pro</span>
-              </div>
-              <p className="text-[11px] text-slate-400 tracking-wide hidden sm:block m-0">
-                Périodisation par Blocs · Modélisation Banister & Courbes EMA
-              </p>
-            </div>
-          </div>
-          
-          {/* BOUTONS D'ACTIONS DESKTOP (Inchangés, masqués sur mobile) */}
-          <div className="hidden md:flex items-center gap-2">
-            {/* Bouton PWA Install */}
-            <PWAInstallButton />
-
-            {/* Bouton Synchronisation Montre Garmin (via Intervals.icu) */}
-            <button
-              onClick={() => setShowGarminSyncModal(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border whitespace-nowrap ${
-                intervalsSync.pendingActivities.length > 0
-                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-200'
-                  : intervalsSync.connectionState === 'ready'
-                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-              }`}
-              title="Import automatique Garmin (VFC, FC repos, Readiness & séances via Intervals.icu)"
-            >
-              <Watch
-                size={15}
-                className={
-                  intervalsSync.isSyncing
-                    ? 'animate-spin text-blue-400'
-                    : intervalsSync.pendingActivities.length > 0
-                    ? 'text-amber-400'
-                    : 'text-blue-400'
-                }
-                aria-hidden="true"
-              />
-              <span>Garmin</span>
-              {intervalsSync.pendingActivities.length > 0 && (
-                <span className="font-mono tabular-nums text-[11px] font-bold text-amber-300">
-                  ({intervalsSync.pendingActivities.length})
-                </span>
-              )}
-            </button>
-
-            {/* Bouton Synchronisation Cloud Smartphone ↔ PC */}
-            <button
-              onClick={() => setShowCloudSyncModal(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
-                cloudSync.syncStatus === 'synced'
-                  ? 'bg-blue-500/15 hover:bg-blue-500/25 border-blue-500/40 text-blue-300'
-                  : cloudSync.syncStatus === 'syncing'
-                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-300'
-                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-              }`}
-              title="Synchronisation automatique temps réel entre votre smartphone et votre PC"
-            >
-              <Cloud size={15} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} aria-hidden="true" />
-              <span className="hidden sm:inline">Synchro Cloud</span>
-              <span className="sm:hidden">Sync</span>
-              {cloudSync.syncStatus === 'synced' && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-              )}
-            </button>
-
-            {/* Bouton Mode Salle / Live Gym Tracker */}
-            <button
-              onClick={() => {
-                haptics.modeSwitch();
-                setShowLiveGymModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10 group"
-              title="Lancer le Mode Salle : suivi tactile en direct, minuteur de repos et charge adaptative"
-            >
-              <Dumbbell size={15} className="text-emerald-400 group-hover:rotate-12 transition-transform" aria-hidden="true" />
-              <span>Mode Salle</span>
-              {hasGymDraft && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping ml-0.5" title="Séance en cours" />
-              )}
-            </button>
-
-            {/* Bouton Mode Simulation (What-If) */}
-            <button
-              onClick={() => {
-                haptics.modeSwitch();
-                toggleSimulation();
-                showToast({
-                  type: 'info',
-                  title: isSimulationActive ? 'Simulation désactivée' : 'Mode simulation activé',
-                  message: isSimulationActive ? 'Retour aux charges réelles.' : 'Testez des séances prévisionnelles sur 14 jours.'
-                });
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border ${
-                isSimulationActive 
-                  ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/25' 
-                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-              }`}
-              title="Tester des séances prévisionnelles et anticiper la forme (TSB) future"
-            >
-              <Sparkles size={14} className={isSimulationActive ? 'text-purple-200' : 'text-purple-400'} />
-              <span>{isSimulationActive ? 'Simulation Active' : 'Simulation'}</span>
-            </button>
-
-            {/* Bouton Calibrage Constantes Physiologiques */}
-            <button
-              onClick={() => setShowPhysioSettingsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
-              title="Calibrer les constantes de rémanence Banister (tau fatigue 5-12j, tau condition 21-45j)"
-            >
-              <Sliders size={14} className="text-blue-400 shrink-0" />
-              <span className="font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</span>
-            </button>
-
-            {/* Bouton Export Bilan PDF */}
-            <button
-              onClick={() => setShowReportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
-              title="Générer un bilan hebdomadaire ou mensuel PDF pour votre entraîneur"
-            >
-              <FileText size={14} className="text-blue-400 shrink-0" />
-              <span>Bilan PDF</span>
-            </button>
-
-            {/* Import / Export JSON */}
-            <button 
-              onClick={() => fileInputRef.current?.click()} 
-              className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-xl transition-all cursor-pointer"
-              title="Importer des données JSON"
-            >
-              <FileUp size={14} />
-            </button>
-            <button 
-              onClick={() => {
-                exportData();
+        {/* En-tête, tiroir mobile & barre d'onglets principale */}
+        <AppHeader
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          garminPendingCount={intervalsSync.pendingActivities.length}
+          garminConnectionState={intervalsSync.connectionState}
+          garminIsSyncing={intervalsSync.isSyncing}
+          onOpenGarminSync={() => setShowGarminSyncModal(true)}
+          cloudSyncStatus={cloudSync.syncStatus}
+          onOpenCloudSync={() => setShowCloudSyncModal(true)}
+          hasGymDraft={hasGymDraft}
+          onOpenLiveGym={() => setShowLiveGymModal(true)}
+          isSimulationActive={isSimulationActive}
+          onToggleSimulation={() => {
+            haptics.modeSwitch();
+            toggleSimulation();
+            showToast({
+              type: 'info',
+              title: isSimulationActive ? 'Simulation désactivée' : 'Mode simulation activé',
+              message: isSimulationActive ? 'Retour aux charges réelles.' : 'Testez des séances prévisionnelles sur 14 jours.'
+            });
+          }}
+          physioSettings={physioSettings}
+          onOpenPhysioSettings={() => setShowPhysioSettingsModal(true)}
+          onOpenReportModal={() => setShowReportModal(true)}
+          onExportData={() => {
+            exportData();
+            showToast({
+              type: 'success',
+              title: 'Données exportées',
+              message: 'Fichier de sauvegarde JSON téléchargé.'
+            });
+          }}
+          fileInputRef={fileInputRef}
+          onImportFileChange={(e) => {
+            importData(
+              e,
+              () => {
                 showToast({
                   type: 'success',
-                  title: 'Données exportées',
-                  message: 'Fichier de sauvegarde JSON téléchargé.'
+                  title: 'Importation effectuée',
+                  message: 'Données et historique restaurés.'
                 });
-              }} 
-              className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 rounded-xl transition-all cursor-pointer"
-              title="Exporter toutes les données en JSON"
-            >
-              <FileDown size={14} />
-            </button>
-          </div>
-
-          {/* ACTIONS RAPIDES MOBILE (Compact, épuré, sans surcharge) */}
-          <div className="flex md:hidden items-center gap-2">
-            {/* Synchronisation Garmin Mobile */}
-            <button
-              onClick={() => setShowGarminSyncModal(true)}
-              className={`min-w-[40px] min-h-[40px] p-2 rounded-xl border text-xs font-semibold touch-press cursor-pointer flex items-center justify-center gap-1 active:scale-90 transition-all ${
-                intervalsSync.pendingActivities.length > 0
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
-                  : intervalsSync.connectionState === 'ready'
-                  ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
-                  : 'bg-white/5 text-slate-300 border-white/10 active:bg-white/15'
-              }`}
-              aria-label="Synchronisation Garmin"
-              title="Synchronisation Garmin (Intervals.icu)"
-            >
-              <Watch size={16} className={intervalsSync.isSyncing ? 'animate-spin text-blue-400' : ''} aria-hidden="true" />
-              {intervalsSync.pendingActivities.length > 0 && (
-                <span className="font-mono tabular-nums text-[11px] font-bold">
-                  {intervalsSync.pendingActivities.length}
-                </span>
-              )}
-            </button>
-
-            {/* Synchro Cloud Mobile */}
-            <button
-              onClick={() => setShowCloudSyncModal(true)}
-              className={`min-w-[40px] min-h-[40px] p-2 rounded-xl border text-xs font-semibold touch-press cursor-pointer flex items-center justify-center gap-1 active:scale-90 transition-all ${
-                cloudSync.syncStatus === 'synced'
-                  ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
-                  : cloudSync.syncStatus === 'syncing'
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                  : 'bg-white/5 text-slate-300 border-white/10 active:bg-white/15'
-              }`}
-              title="Synchronisation Cloud"
-            >
-              <Cloud size={16} className={cloudSync.syncStatus === 'syncing' ? 'animate-spin text-amber-400' : 'text-blue-400'} />
-              {cloudSync.syncStatus === 'synced' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-              )}
-            </button>
-
-            {/* Bouton Menu Outils Mobile */}
-            <button
-              onClick={() => {
-                haptics.tap();
-                setShowMobileTools(prev => !prev);
-              }}
-              className="min-w-[40px] min-h-[40px] p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 touch-press active:scale-90 active:bg-white/15 transition-all inline-flex items-center justify-center"
-              title="Outils et réglages"
-            >
-              <MoreVertical size={16} />
-            </button>
-          </div>
-
-          {/* Input file caché pour Import JSON */}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={(e) => {
-              importData(
-                e,
-                () => {
-                  showToast({
-                    type: 'success',
-                    title: 'Importation effectuée',
-                    message: 'Données et historique restaurés.'
-                  });
-                },
-                (errorMsg) => {
-                  showToast({
-                    type: 'error',
-                    title: "Échec de l'importation",
-                    message: errorMsg
-                  });
-                }
-              );
-            }} 
-            accept=".json,application/json" 
-            className="hidden" 
-          />
-        </header>
-
-        {/* TIROIR D'OUTILS ET PARAMÈTRES POUR MOBILE */}
-        {showMobileTools && (
-          <div 
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-sm md:hidden animate-fadeIn"
-            onClick={() => setShowMobileTools(false)}
-          >
-            <div 
-              className="w-full bg-[#121217] border-t border-white/15 rounded-t-3xl p-5 shadow-2xl flex flex-col gap-3.5 pb-[max(env(safe-area-inset-bottom,0px),20px)] animate-sheet-up"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
-                    <Sliders size={15} />
-                  </div>
-                  <span className="font-bold text-sm text-white">Outils & Actions Rapides</span>
-                </div>
-                <button 
-                  onClick={() => setShowMobileTools(false)}
-                  className="p-1.5 rounded-xl bg-white/5 text-slate-400 hover:text-white touch-press active:scale-90"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
-                {/* Synchronisation Garmin (Intervals.icu) */}
-                <button
-                  onClick={() => {
-                    setShowMobileTools(false);
-                    setShowGarminSyncModal(true);
-                  }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
-                >
-                  <Watch size={16} className="text-blue-400 shrink-0" />
-                  <div>
-                    <div className="font-bold">Garmin Sync</div>
-                    <div className="text-[10px] text-slate-400">
-                      {intervalsSync.pendingActivities.length > 0
-                        ? `${intervalsSync.pendingActivities.length} séance(s) à valider`
-                        : 'Via Intervals.icu'}
-                    </div>
-                  </div>
-                </button>
-
-                {/* Simulation What-If */}
-                <button
-                  onClick={() => {
-                    haptics.modeSwitch();
-                    setShowMobileTools(false);
-                    toggleSimulation();
-                    showToast({
-                      type: 'info',
-                      title: isSimulationActive ? 'Simulation désactivée' : 'Mode simulation activé',
-                      message: isSimulationActive ? 'Retour aux charges réelles.' : 'Testez des séances prévisionnelles sur 14 jours.'
-                    });
-                  }}
-                  className={`flex items-center gap-2 p-3 rounded-xl text-xs font-semibold border touch-press active:scale-[0.96] text-left ${
-                    isSimulationActive 
-                      ? 'bg-purple-600/30 border-purple-400 text-purple-200 active:bg-purple-600/40' 
-                      : 'bg-white/5 border-white/10 text-slate-200 active:bg-white/10 active:border-white/20'
-                  }`}
-                >
-                  <Sparkles size={16} className="text-purple-400 shrink-0" />
-                  <div>
-                    <div className="font-bold">Simulation</div>
-                    <div className="text-[10px] text-slate-400">{isSimulationActive ? 'Désactiver' : 'What-If (14j)'}</div>
-                  </div>
-                </button>
-
-                {/* Bilan PDF */}
-                <button
-                  onClick={() => {
-                    setShowMobileTools(false);
-                    setShowReportModal(true);
-                  }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
-                >
-                  <FileText size={16} className="text-blue-400 shrink-0" />
-                  <div>
-                    <div className="font-bold">Bilan PDF</div>
-                    <div className="text-[10px] text-slate-400">Export rapport</div>
-                  </div>
-                </button>
-
-                {/* Calibrage Banister */}
-                <button
-                  onClick={() => {
-                    setShowMobileTools(false);
-                    setShowPhysioSettingsModal(true);
-                  }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
-                >
-                  <Sliders size={16} className="text-blue-400 shrink-0" />
-                  <div>
-                    <div className="font-bold">Constantes τ</div>
-                    <div className="text-[10px] text-slate-400 font-mono">τ₁:{physioSettings.tauFatigue}j τ₂:{physioSettings.tauFitness}j</div>
-                  </div>
-                </button>
-
-                {/* Bouton PWA Install */}
-                <PWAInstallButton variant="tile" />
-
-                {/* Import JSON */}
-                <button
-                  onClick={() => {
-                    setShowMobileTools(false);
-                    fileInputRef.current?.click();
-                  }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
-                >
-                  <FileUp size={16} className="text-emerald-400 shrink-0" />
-                  <div>
-                    <div className="font-bold">Importer JSON</div>
-                    <div className="text-[10px] text-slate-400">Restaurer fichier</div>
-                  </div>
-                </button>
-
-                {/* Export JSON */}
-                <button
-                  onClick={() => {
-                    setShowMobileTools(false);
-                    exportData();
-                    showToast({
-                      type: 'success',
-                      title: 'Données exportées',
-                      message: 'Fichier de sauvegarde JSON téléchargé.'
-                    });
-                  }}
-                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-blue-500/10 border border-blue-500/20 text-blue-300 touch-press active:scale-[0.96] active:bg-blue-500/20 text-left"
-                >
-                  <FileDown size={16} className="text-blue-400 shrink-0" />
-                  <div>
-                    <div className="font-bold">Exporter JSON</div>
-                    <div className="text-[10px] text-slate-400">Sauvegarde locale</div>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* BARRE D'ONGLETS PRINCIPALE (Visible sur desktop et tablettes, gérée en bas sur smartphone) */}
-        <nav className="hidden md:flex items-center gap-1.5 p-1.5 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md overflow-x-auto custom-scrollbar shadow-lg">
-          <button
-            onClick={() => setActiveTab('grid')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'grid'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Calendar size={15} />
-            <span>Grille & Planification</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('weeks')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'weeks'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <BarChart3 size={15} />
-            <span>Totaux & Semaines</span>
-            {currentWeekStats && (
-              <span className={`inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0 ${
-                currentWeekStats.comparison.percentLoadChange !== null && currentWeekStats.comparison.percentLoadChange > 15
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                  : currentWeekStats.comparison.percentLoadChange !== null && currentWeekStats.comparison.percentLoadChange < -15
-                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                  : 'bg-white/10 text-slate-200 border-white/10'
-              }`}>
-                {currentWeekStats.totalLoad} UA
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('physiology')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'physiology'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <TrendingUp size={15} />
-            <span>Analyses Banister</span>
-            <span className={`inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0 ${
-              (banisterPerformance?.current?.tsb ?? 0) >= 0 
-                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' 
-                : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-            }`}>
-              {(banisterPerformance?.current?.tsb ?? 0) >= 0 ? `+${banisterPerformance?.current?.tsb ?? 0}` : banisterPerformance?.current?.tsb} TSB
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('qualities')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'qualities'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Layers size={15} />
-            <span>Qualités EMA</span>
-            <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-white/10 text-slate-300 border border-white/10 shrink-0">
-              {qualities.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('periodization')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'periodization'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Target size={15} />
-            <span>Cycles & Objectifs</span>
-            {activeBlockToday ? (
-              <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 truncate max-w-[120px] shrink-0">
-                {activeBlockToday.name}
-              </span>
-            ) : targetCompetition ? (
-              <span className="inline-flex items-center justify-center h-5 px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
-                J-{taperingAnalysis?.daysRemaining}
-              </span>
-            ) : null}
-          </button>
-        </nav>
+              },
+              (errorMsg) => {
+                showToast({
+                  type: 'error',
+                  title: "Échec de l'importation",
+                  message: errorMsg
+                });
+              }
+            );
+          }}
+          showMobileTools={showMobileTools}
+          setShowMobileTools={setShowMobileTools}
+          currentWeekStats={currentWeekStats}
+          currentTsb={banisterPerformance?.current?.tsb ?? 0}
+          qualitiesCount={qualities.length}
+          activeBlockToday={activeBlockToday}
+          targetCompetition={targetCompetition}
+          daysRemaining={taperingAnalysis?.daysRemaining}
+        />
 
         {/* Bannière active du mode Simulation What-If */}
         <SimulationBanner
           isActive={isSimulationActive}
           simulatedEvents={simulatedEvents}
           qualities={qualities}
+          interference={interferenceAnalysis}
           onToggle={toggleSimulation}
           onApplyScenario={applySimulationScenario}
           onAddSimulatedSession={addSimulatedEvent}
@@ -808,6 +403,14 @@ function AppContent() {
         {/* ONGLET 1 : GRILLE & PLANIFICATION */}
         {activeTab === 'grid' && (
           <div className="flex flex-col gap-4 animate-fadeIn">
+            {/* Briefing "Aujourd'hui en 5 secondes" */}
+            <TodayBriefingBar
+              briefing={dailyBriefing}
+              dualBanister={dualBanister}
+              isSimulationActive={isSimulationActive}
+              onOpenBanister={() => setActiveTab('physiology')}
+              onOpenLiveGym={() => setShowLiveGymModal(true)}
+            />
             {/* Bascule Mobile : Grille vs Profil Athlète (évite de scroller 900px sur téléphone avant d'atteindre la grille) */}
             <div className="flex xl:hidden items-center p-1 bg-white/5 border border-white/10 rounded-2xl shadow-sm">
               <button
@@ -1094,6 +697,7 @@ function AppContent() {
                   onQualityClick={handleGridQualityClick}
                   onMetricClick={handleGridMetricClick}
                   onOpenWeeklyView={handleOpenWeeklyView}
+                  conflictsByDate={interferenceAnalysis.conflictsByDate}
                 />
               </div>
             </section>
@@ -1109,6 +713,9 @@ function AppContent() {
                 events={events} 
                 qualities={qualities}
                 allWeeksStats={allWeeksStats}
+                strengthProgression={strengthProgression}
+                dualBanister={dualBanister}
+                onOpenLiveGym={() => setShowLiveGymModal(true)}
                 onOpenScoreModal={(q: Quality, dateStr: string, currentData?: SessionData) => {
                   setModalInfo({ qId: q.id, qName: q.name, dateStr, currentData });
                 }}
@@ -1132,6 +739,8 @@ function AppContent() {
                 cardioMuscularBalance={cardioMuscularBalance}
                 intensityDistribution={intensityDistribution}
                 perceivedFatigueAnalysis={perceivedFatigueAnalysis}
+                dualBanister={dualBanister}
+                interferenceAnalysis={interferenceAnalysis}
                 isSimulationActive={isSimulationActive}
                 physioSettings={physioSettings}
                 onOpenCompetitionModal={() => setShowCompetitionModal(true)}
@@ -1422,6 +1031,7 @@ function AppContent() {
           athleteName={intervalsSync.athleteName}
           lastSyncedAt={intervalsSync.lastSyncedAt}
           lastMetricsSummary={intervalsSync.lastMetricsSummary}
+          dailyMetrics={dailyMetrics}
           error={intervalsSync.error}
           pendingActivities={intervalsSync.pendingActivities}
           processedCount={intervalsSync.processedCount}
@@ -1455,11 +1065,19 @@ function AppContent() {
           }}
           onSyncNow={(days) => {
             intervalsSync.syncNow(days, { silent: false }).then((res) => {
-              if (res.ok && res.metricsUpdated === 0) {
+              if (!res.ok) return;
+              if (res.metricsUpdated === 0 && res.wellnessDaysReceived === 0) {
+                showToast({
+                  type: 'info',
+                  title: 'Aucune métrique bien-être reçue',
+                  message:
+                    'Vérifiez que « Download wellness data » (VFC, FC repos, Sommeil) est activé dans Garmin Connect sur intervals.icu/settings.',
+                });
+              } else if (res.metricsUpdated === 0) {
                 showToast({
                   type: 'info',
                   title: 'Synchronisation Garmin terminée',
-                  message: 'Vos données des derniers jours sont déjà à jour.',
+                  message: `${res.wellnessDaysReceived} jour${res.wellnessDaysReceived > 1 ? 's' : ''} de métriques vérifié${res.wellnessDaysReceived > 1 ? 's' : ''} — déjà à jour dans la grille.`,
                 });
               }
             });
@@ -1487,74 +1105,13 @@ function AppContent() {
       )}
       </Suspense>
 
-      {/* BARRE DE NAVIGATION INFÉRIEURE MOBILE (Sticky bottom tactile avec bouton central Mode Salle) */}
-      <nav 
-        aria-label="Navigation principale mobile"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d12]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex items-center justify-around shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[max(env(safe-area-inset-bottom,0px),8px)] select-none"
-      >
-        {/* Onglet 1: Grille */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('grid')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
-            activeTab === 'grid' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
-          }`}
-        >
-          <Calendar size={18} className={`transition-transform duration-200 ${activeTab === 'grid' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
-          <span className="text-[10px] tracking-tight">Grille</span>
-        </button>
-
-        {/* Onglet 2: Semaines */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('weeks')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
-            activeTab === 'weeks' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
-          }`}
-        >
-          <BarChart3 size={18} className={`transition-transform duration-200 ${activeTab === 'weeks' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
-          <span className="text-[10px] tracking-tight">Semaines</span>
-        </button>
-
-        {/* Bouton central surélevé Mode Salle (accès instantané en 1 clic pour la séance gym) */}
-        <button
-          type="button"
-          onClick={() => setShowLiveGymModal(true)}
-          className="relative -mt-6 mx-1 flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 text-white shadow-lg shadow-emerald-600/40 border border-emerald-400/50 touch-press active:scale-88 active:brightness-125 active:shadow-emerald-500/60 transition-all cursor-pointer group"
-          title="Lancer le Mode Salle"
-          aria-label="Lancer le Mode Salle d'entraînement"
-        >
-          <Dumbbell size={20} className={`group-hover:rotate-12 transition-transform ${hasGymDraft ? 'animate-pulse' : ''}`} aria-hidden="true" />
-          <span className="text-[9px] font-extrabold mt-0.5 tracking-tight whitespace-nowrap">Salle</span>
-          {hasGymDraft && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
-          )}
-        </button>
-
-        {/* Onglet 4: Banister */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('physiology')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
-            activeTab === 'physiology' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
-          }`}
-        >
-          <TrendingUp size={18} className={`transition-transform duration-200 ${activeTab === 'physiology' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
-          <span className="text-[10px] tracking-tight">Banister</span>
-        </button>
-
-        {/* Onglet 5: Cycles */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('periodization')}
-          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 touch-press active:scale-90 transition-all cursor-pointer ${
-            activeTab === 'periodization' ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200 active:text-blue-300'
-          }`}
-        >
-          <Target size={18} className={`transition-transform duration-200 ${activeTab === 'periodization' ? 'text-blue-400 scale-110 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
-          <span className="text-[10px] tracking-tight">Cycles</span>
-        </button>
-      </nav>
+      {/* Barre de navigation inférieure mobile */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        hasGymDraft={hasGymDraft}
+        onOpenLiveGym={() => setShowLiveGymModal(true)}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Quality, SessionData } from '../hooks/useData';
 import { getLocalYYYYMMDD } from './dateHelpers';
+import { extractSessionTelemetry } from './hybridIntelligence';
 
 export interface QualityWeeklyBreakdown {
   qualityId: string;
@@ -29,6 +30,8 @@ export interface WeekComparison {
   deltaDurationMinutes: number;
   percentDurationChange: number | null;
   deltaSessions: number;
+  deltaDistanceKm: number;
+  deltaElevationGainM: number;
   trend: 'up' | 'down' | 'flat';
   progressionStatus: 'safe' | 'optimal' | 'warning' | 'danger' | 'deload' | 'neutral';
   statusBadge: string;
@@ -56,6 +59,8 @@ export interface WeekStats {
   qualitiesCumulativeLoad: number; // Sum of direct + secondary across all qualities
   totalDurationMinutes: number;
   totalDurationFormatted: string; // e.g. "5h 45m"
+  totalDistanceKm: number;
+  totalElevationGainM: number;
   sessionCount: number;
   dailyLoads: { dateStr: string; dayName: string; load: number; duration: number }[];
   meanDailyLoad: number;
@@ -262,6 +267,8 @@ export function computeAllWeeksStats(
     let totalLoad = 0;
     let qualitiesCumulativeLoad = 0;
     let totalDurationMinutes = 0;
+    let totalDistanceKm = 0;
+    let totalElevationGainM = 0;
     let sessionCount = 0;
 
     const sportsData = {
@@ -308,6 +315,10 @@ export function computeAllWeeksStats(
             dayLoad += sLoad;
             dayDuration += sDuration;
             sessionCount += 1;
+
+            const telemetry = extractSessionTelemetry(session);
+            totalDistanceKm += telemetry.distanceKm;
+            totalElevationGainM += telemetry.elevationGainM;
 
             // Répartition sports
             const sp = session.sport === 'bike' ? 'bike' : session.sport === 'run' ? 'run' : 'other';
@@ -416,6 +427,8 @@ export function computeAllWeeksStats(
       qualitiesCumulativeLoad,
       totalDurationMinutes,
       totalDurationFormatted: formatMinutes(totalDurationMinutes),
+      totalDistanceKm: Math.round(totalDistanceKm * 10) / 10,
+      totalElevationGainM: Math.round(totalElevationGainM),
       sessionCount,
       dailyLoads,
       meanDailyLoad,
@@ -433,6 +446,8 @@ export function computeAllWeeksStats(
         deltaDurationMinutes: 0,
         percentDurationChange: null,
         deltaSessions: 0,
+        deltaDistanceKm: 0,
+        deltaElevationGainM: 0,
         trend: 'flat',
         progressionStatus: 'neutral',
         statusBadge: '— Neutre',
@@ -491,6 +506,8 @@ export function computeAllWeeksStats(
         deltaDurationMinutes: deltaDuration,
         percentDurationChange: percentDuration,
         deltaSessions,
+        deltaDistanceKm: Math.round((cur.totalDistanceKm - prev.totalDistanceKm) * 10) / 10,
+        deltaElevationGainM: Math.round(cur.totalElevationGainM - prev.totalElevationGainM),
         trend: deltaLoad > 10 ? 'up' : deltaLoad < -10 ? 'down' : 'flat',
         progressionStatus: progression.status,
         statusBadge: isProrated ? `${progression.badge} (à date)` : progression.badge,

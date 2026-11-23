@@ -55,6 +55,8 @@ export interface SubSession {
   load: number;
   loadCardio?: number;
   loadMusc?: number;
+  distanceKm?: number;
+  elevationGainM?: number;
   sport?: string;
   isEccentric?: boolean;
   exercises?: SessionExercise[];
@@ -71,6 +73,8 @@ export interface SessionData {
   load: number;
   loadCardio?: number;
   loadMusc?: number;
+  distanceKm?: number;
+  elevationGainM?: number;
   sport?: 'run' | 'bike' | 'muscu' | string;
   isEccentric?: boolean;
   isSecondary?: boolean;

@@ -942,8 +942,8 @@ export default function QualitiesDashboard({
             </p>
           </div>
         ) : (
-          <div className="h-[250px] w-full min-h-[220px] relative">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[250px] w-full min-h-[220px] min-w-0 relative">
+            <ResponsiveContainer width="100%" height={250} minWidth={0}>
               <ComposedChart data={activeQualityData.series} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" vertical={false} />
                 <XAxis 

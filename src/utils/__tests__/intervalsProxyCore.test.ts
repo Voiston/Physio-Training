@@ -71,20 +71,28 @@ describe('intervalsProxyCore - validation, CORS, and sanitization', () => {
     expect(
       sanitizeWellnessItem({
         id: '2026-11-20',
-        hrv: 65,
+        hrv: '65.4',
+        hrvSDNN: 72,
         restingHR: 48,
+        avgSleepingHR: 50,
         readiness: 85,
+        GarminTrainingReadiness: 80,
+        BodyBattery: 78,
         sleepScore: Number.NaN,
         secretInjectedField: 'drop-me',
       })
     ).toEqual({
       id: '2026-11-20',
-      hrv: 65,
+      hrv: 65.4,
+      hrvSDNN: 72,
       restingHR: 48,
+      avgSleepingHR: 50,
       readiness: 85,
+      GarminTrainingReadiness: 80,
       sleepScore: null,
       sleepSecs: null,
       sleepQuality: null,
+      bodyBattery: 78,
     });
 
     expect(sanitizeActivityItem({ id: '1', start_date_local: 'bad-date' })).toBeNull();

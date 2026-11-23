@@ -5,7 +5,7 @@ import {
   Play, Pause, Plus, Check, Dumbbell, 
   ChevronDown, ChevronUp, Sparkles, Volume2, VolumeX,
   X, CheckCircle2, ChevronRight, Search, 
-  Layers, Award, Timer, BatteryCharging, Sun
+  Layers, Award, Timer, BatteryCharging, Sun, BookmarkPlus, Trash2
 } from 'lucide-react';
 import { 
   MUSCLE_GROUPS, 
@@ -26,6 +26,13 @@ import {
 } from '../utils/audioHelpers';
 import { haptics } from '../utils/haptics';
 import { computeDetailedSessionLoad } from '../utils/loadHelpers';
+import {
+  getAllGymTemplates,
+  saveCustomGymTemplate,
+  deleteCustomGymTemplate,
+  type GymWorkoutTemplate,
+} from '../utils/gymTemplates';
+import { checkLiveSetPR } from '../utils/hybridIntelligence';
 import type { EventsByQuality, SessionData } from '../types';
 
 export interface LiveSet {
@@ -326,6 +333,8 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   const [activeExercises, setActiveExercises] = useState<LiveExercise[]>([]);
   const activeExercisesRef = useRef(activeExercises);
   activeExercisesRef.current = activeExercises;
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
 
   // Modale d'ajout d'exercice
   const [showAddExercisePicker, setShowAddExercisePicker] = useState(false);
@@ -333,6 +342,16 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [expandedMuscles, setExpandedMuscles] = useState<Record<string, boolean>>({});
+
+  // Modèles hybrides & détection de PR e1RM en direct
+  const [gymTemplates, setGymTemplates] = useState<GymWorkoutTemplate[]>(() => getAllGymTemplates());
+  const [livePrBanner, setLivePrBanner] = useState<{
+    exerciseName: string;
+    newE1RM: number;
+    deltaKg: number;
+  } | null>(null);
+  const [templateNameInput, setTemplateNameInput] = useState('');
+  const [templateSavedMsg, setTemplateSavedMsg] = useState(false);
 
   // De base, les catalogues sont repliés (sauf si l'utilisateur saisit une recherche)
   const isMuscleExpanded = (muscleId: string) => {
@@ -670,6 +689,81 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     setStage('active');
   };
 
+  const handleStartFromTemplate = (tpl: GymWorkoutTemplate) => {
+    if (qualities.some((q) => q.id === tpl.qualityId)) {
+      setSelectedQualityId(tpl.qualityId);
+    }
+
+    const builtExercises: LiveExercise[] = tpl.exercises.map((tEx, idx) => {
+      const catalogDef = allExercises.find((e) => e.id === tEx.exerciseCatalogId);
+      const setCount = Math.max(1, tEx.sets || 3);
+      const sets: LiveSet[] = Array.from({ length: setCount }, (_, sIdx) => ({
+        id: `s_${Date.now()}_${idx}_${sIdx + 1}`,
+        setNumber: sIdx + 1,
+        weightKg: tEx.weightKg,
+        reps: tEx.reps,
+        rir: tEx.rir,
+        restSeconds: tEx.restSeconds || 90,
+        completed: false,
+      }));
+
+      return {
+        id: `ex_${Date.now()}_${idx}`,
+        exerciseCatalogId: catalogDef?.id || tEx.exerciseCatalogId,
+        name: catalogDef?.name || tEx.name,
+        category: catalogDef?.category || tEx.category,
+        muscleRatios: catalogDef?.muscleRatios,
+        sets,
+      };
+    });
+
+    setActiveExercises(builtExercises);
+    setStartedAt(Date.now());
+    setPausedAt(null);
+    setPausedTotalMs(0);
+    setRestTimerState(null);
+    setLivePrBanner(null);
+    haptics.modeSwitch();
+    setStage('active');
+  };
+
+  const handleDeleteCustomTemplate = (templateId: string) => {
+    deleteCustomGymTemplate(templateId);
+    setGymTemplates(getAllGymTemplates());
+  };
+
+  const handleSaveCurrentAsTemplate = () => {
+    if (activeExercises.length === 0) return;
+    const defaultName =
+      templateNameInput.trim() ||
+      `Modèle ${qualities.find((q) => q.id === selectedQualityId)?.name || selectedQualityId}`;
+
+    saveCustomGymTemplate({
+      name: defaultName,
+      qualityId: selectedQualityId,
+      description: `${activeExercises.length} exercice${activeExercises.length > 1 ? 's' : ''} personnalisé${activeExercises.length > 1 ? 's' : ''}`,
+      estimatedMinutes: Math.max(15, Math.round(getElapsedSeconds() / 60) || 40),
+      exercises: activeExercises.map((ex) => {
+        const refSet = ex.sets.find((s) => s.completed) || ex.sets[0];
+        return {
+          exerciseCatalogId: ex.exerciseCatalogId,
+          name: ex.name,
+          category: ex.category,
+          sets: ex.sets.length,
+          reps: refSet?.reps || 10,
+          weightKg: refSet?.weightKg || 0,
+          rir: refSet?.rir ?? 2,
+          restSeconds: refSet?.restSeconds || 90,
+        };
+      }),
+    });
+
+    setGymTemplates(getAllGymTemplates());
+    setTemplateNameInput('');
+    setTemplateSavedMsg(true);
+    setTimeout(() => setTemplateSavedMsg(false), 3000);
+  };
+
   const handleResumeDraft = () => {
     try {
       const saved = localStorage.getItem(STORAGE_DRAFT_KEY);
@@ -741,11 +835,36 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
     const newCompleted = !currentSet.completed;
 
     if (newCompleted) {
-      // Feedback sonore et tactile
-      if (soundEnabled) {
-        playSetCompletedSound();
+      const effectiveReps = Math.max(1, currentSet.reps || 1);
+      const prCheck =
+        currentSet.weightKg > 0
+          ? checkLiveSetPR(
+              targetEx.exerciseCatalogId,
+              targetEx.name,
+              currentSet.weightKg,
+              effectiveReps,
+              currentSet.rir,
+              eventsRef.current
+            )
+          : { isPR: false, newE1RM: 0, previousBestE1RM: 0 };
+
+      if (prCheck.isPR) {
+        const deltaKg = Math.round((prCheck.newE1RM - prCheck.previousBestE1RM) * 10) / 10;
+        setLivePrBanner({
+          exerciseName: targetEx.name,
+          newE1RM: prCheck.newE1RM,
+          deltaKg,
+        });
+        if (soundEnabled) {
+          playVictoryFanfare();
+        }
+        triggerVibration([80, 60, 120]);
+      } else {
+        if (soundEnabled) {
+          playSetCompletedSound();
+        }
+        triggerVibration(60);
       }
-      triggerVibration(60);
 
       // Lancement automatique du minuteur de repos basé sur timestamps
       const restSecs = currentSet.restSeconds || 90;
@@ -1312,6 +1431,67 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
               </div>
             </div>
 
+            {/* Étape 3 : Modèles Hybrides prêts en 1 clic */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  3. Modèles Hybrides (Lancement en 1 clic)
+                </label>
+                <span className="text-[11px] text-slate-500 font-mono tabular-nums">
+                  {gymTemplates.length} modèles
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {gymTemplates.map((tpl) => (
+                  <div
+                    key={tpl.id}
+                    onClick={() => handleStartFromTemplate(tpl)}
+                    className="group p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-emerald-500/40 hover:bg-white/[0.05] transition-colors flex flex-col justify-between gap-2.5 cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-1.5">
+                        <span className="text-xs font-bold text-white leading-snug">
+                          {tpl.name}
+                        </span>
+                        {!tpl.isPreset && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCustomTemplate(tpl.id);
+                            }}
+                            className="p-1 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer shrink-0"
+                            title="Supprimer ce modèle personnalisé"
+                            aria-label={`Supprimer le modèle ${tpl.name}`}
+                          >
+                            <Trash2 size={13} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                        {tpl.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[11px]">
+                      <span className="text-slate-400 font-mono tabular-nums">
+                        {tpl.exercises.length} exos · ~{tpl.estimatedMinutes} min
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartFromTemplate(tpl);
+                        }}
+                        className="text-emerald-400 group-hover:text-emerald-300 font-bold cursor-pointer whitespace-nowrap"
+                      >
+                        Démarrer →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Préférences Audio & Écran */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs text-slate-400">
               <span className="flex items-center gap-2">
@@ -1421,6 +1601,33 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* BANNIÈRE PR e1RM EN DIRECT */}
+            {livePrBanner && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="bg-emerald-950/80 border-b border-emerald-500/40 px-4 py-2 flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="flex items-center gap-2 text-emerald-200 min-w-0">
+                  <Award size={15} className="text-emerald-400 shrink-0" aria-hidden="true" />
+                  <span className="font-bold text-emerald-300">Nouveau PR e1RM</span>
+                  <span className="text-slate-400" aria-hidden="true">·</span>
+                  <span className="font-semibold text-white truncate">{livePrBanner.exerciseName}</span>
+                  <span className="font-mono tabular-nums font-bold text-emerald-300 shrink-0">
+                    {livePrBanner.newE1RM} kg (+{livePrBanner.deltaKg} kg)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLivePrBanner(null)}
+                  className="text-slate-400 hover:text-white cursor-pointer shrink-0"
+                  aria-label="Fermer la notification de record"
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </div>
+            )}
 
             {/* BANNIÈRE MINUTEUR DE REPOS AUTONOME (Zéro dérive, aucun re-rendu du parent) */}
             {restTimerState && (
@@ -1658,6 +1865,27 @@ export const LiveGymModal: React.FC<LiveGymModalProps> = ({
                   Appliquer les impacts métaboliques, mettre à jour la fatigue des qualités associées et le volume MEV/MRV
                 </span>
               </label>
+
+              {/* Sauvegarder comme modèle réutilisable */}
+              {activeExercises.length > 0 && (
+                <div className="pt-3 mt-2 border-t border-white/10 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <input
+                    type="text"
+                    value={templateNameInput}
+                    onChange={(e) => setTemplateNameInput(e.target.value)}
+                    placeholder="Nom du modèle (ex: Force Jambes Trail)..."
+                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCurrentAsTemplate}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-xs font-semibold text-slate-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    <BookmarkPlus size={14} className="text-emerald-400" aria-hidden="true" />
+                    <span>{templateSavedMsg ? 'Modèle enregistré ✓' : 'Enregistrer comme modèle'}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Boutons d'action fin */}

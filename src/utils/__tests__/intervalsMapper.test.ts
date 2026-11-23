@@ -49,6 +49,36 @@ describe('intervalsMapper', () => {
       readiness: 8,
       readinessSource: 'sleepScore',
     });
+
+    const fallbackOut = normalizeIntervalsWellness([
+      {
+        id: '2026-11-22',
+        hrv: null,
+        hrvSDNN: 64.2,
+        restingHR: null,
+        avgSleepingHR: 51.3,
+        readiness: null,
+        bodyBattery: 78,
+      },
+      {
+        id: '2026-11-23',
+        GarminTrainingReadiness: 74,
+      },
+    ]);
+    expect(fallbackOut).toEqual([
+      {
+        dateStr: '2026-11-22',
+        vfc: 64,
+        hrRest: 51,
+        readiness: 8,
+        readinessSource: 'bodyBattery',
+      },
+      {
+        dateStr: '2026-11-23',
+        readiness: 7,
+        readinessSource: 'readiness',
+      },
+    ]);
   });
 
   it('maps Garmin/Intervals sport types to run, bike, and muscu', () => {

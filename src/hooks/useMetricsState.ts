@@ -8,6 +8,12 @@ import {
   computeIntensityDistribution, 
   computePerceivedFatigueAnalysis 
 } from '../utils/physiology';
+import {
+  computeDualBanister,
+  detectTrainingInterference,
+  computeDailyBriefing,
+  computeStrengthProgression,
+} from '../utils/hybridIntelligence';
 import type { Quality, SessionData } from './useData';
 
 export interface DailyMetrics {
@@ -312,6 +318,37 @@ export function useMetricsState(
     return computePerceivedFatigueAnalysis(effectiveEvents);
   }, [effectiveEvents]);
 
+  // Dual-Banister hybride (Cardio/Central vs Musculaire/Périphérique + D+)
+  const dualBanister = useMemo(() => {
+    return computeDualBanister(
+      effectiveEvents,
+      qualities,
+      30,
+      isSimulationActive ? 14 : 7,
+      physioSettings.tauFatigue,
+      physioSettings.tauFitness
+    );
+  }, [effectiveEvents, qualities, isSimulationActive, physioSettings.tauFatigue, physioSettings.tauFitness]);
+
+  // Détecteur d'interférences concurrentes (Force bas du corps vs Intensité / Plyo 0–48h)
+  const interferenceAnalysis = useMemo(() => {
+    return detectTrainingInterference(effectiveEvents, qualities);
+  }, [effectiveEvents, qualities]);
+
+  // Briefing "Aujourd'hui en 5 secondes" (Feu tricolore + 4 signaux + conseil)
+  const dailyBriefing = useMemo(() => {
+    return computeDailyBriefing({
+      dailyMetrics,
+      dualBanister,
+      interference: interferenceAnalysis,
+    });
+  }, [dailyMetrics, dualBanister, interferenceAnalysis]);
+
+  // Progression Force longitudinale (e1RM ajusté RIR + PRs)
+  const strengthProgression = useMemo(() => {
+    return computeStrengthProgression(effectiveEvents);
+  }, [effectiveEvents]);
+
   return {
     dailyMetrics,
     setDailyMetrics,
@@ -328,7 +365,11 @@ export function useMetricsState(
     taperingAnalysis,
     cardioMuscularBalance,
     intensityDistribution,
-    perceivedFatigueAnalysis
+    perceivedFatigueAnalysis,
+    dualBanister,
+    interferenceAnalysis,
+    dailyBriefing,
+    strengthProgression,
   };
 }
 

@@ -6,15 +6,20 @@ import type { Quality, SessionData, SubSession } from '../types';
 import { computeDetailedSessionLoad, isPrimary } from './loadHelpers';
 import { isCardioQuality, isForceQuality } from './qualities';
 import { isSafeDate } from './security';
+import { matchLearnedGarminRule, type LearnedGarminRule } from './garminPreferences';
 
 export interface IntervalsWellnessEntry {
   id: string;
   hrv?: number | null;
+  hrvSDNN?: number | null;
   restingHR?: number | null;
+  avgSleepingHR?: number | null;
   readiness?: number | null;
+  GarminTrainingReadiness?: number | null;
   sleepScore?: number | null;
   sleepSecs?: number | null;
   sleepQuality?: number | null;
+  bodyBattery?: number | null;
 }
 
 export interface IntervalsActivityEntry {
@@ -42,7 +47,7 @@ export interface NormalizedDailyWellness {
   vfc?: number;
   hrRest?: number;
   readiness?: number;
-  readinessSource?: 'readiness' | 'sleepScore' | 'sleepQuality';
+  readinessSource?: 'readiness' | 'sleepScore' | 'bodyBattery' | 'sleepQuality';
 }
 
 export interface PendingGarminActivity {
@@ -78,17 +83,26 @@ function normalizeText(value: string): string {
 }
 
 /**
- * Convertit les champs Readiness / Sommeil d'Intervals.icu vers l'échelle 1–10 de PhysioTracker PRO.
- * - Garmin Training Readiness (0–100) ou Sleep Score (0–100) -> divisé par 10, borné [1, 10]
+ * Convertit les champs Readiness / Sommeil / Body Battery d'Intervals.icu vers l'échelle 1–10 de PhysioTracker PRO.
+ * - Garmin Training Readiness (0–100), Sleep Score (0–100) ou Body Battery (0–100) -> divisé par 10, borné [1, 10]
  * - Readiness déjà sur 1–10 -> conservé tel quel
  * - sleepQuality Intervals.icu (1=Excellent, 2=Bon, 3=Moyen, 4=Faible) -> 9 / 7 / 5 / 3
  */
 export function normalizeReadinessScore(entry: IntervalsWellnessEntry): {
   value?: number;
-  source?: 'readiness' | 'sleepScore' | 'sleepQuality';
+  source?: 'readiness' | 'sleepScore' | 'bodyBattery' | 'sleepQuality';
 } {
-  if (typeof entry.readiness === 'number' && Number.isFinite(entry.readiness) && entry.readiness > 0) {
-    const scaled = entry.readiness > 10 ? Math.round(entry.readiness / 10) : Math.round(entry.readiness);
+  const rawReadiness =
+    typeof entry.readiness === 'number' && Number.isFinite(entry.readiness) && entry.readiness > 0
+      ? entry.readiness
+      : typeof entry.GarminTrainingReadiness === 'number' &&
+        Number.isFinite(entry.GarminTrainingReadiness) &&
+        entry.GarminTrainingReadiness > 0
+      ? entry.GarminTrainingReadiness
+      : null;
+
+  if (rawReadiness !== null) {
+    const scaled = rawReadiness > 10 ? Math.round(rawReadiness / 10) : Math.round(rawReadiness);
     return {
       value: Math.max(1, Math.min(10, scaled)),
       source: 'readiness',
@@ -100,6 +114,14 @@ export function normalizeReadinessScore(entry: IntervalsWellnessEntry): {
     return {
       value: Math.max(1, Math.min(10, scaled)),
       source: 'sleepScore',
+    };
+  }
+
+  if (typeof entry.bodyBattery === 'number' && Number.isFinite(entry.bodyBattery) && entry.bodyBattery > 0) {
+    const scaled = entry.bodyBattery > 10 ? Math.round(entry.bodyBattery / 10) : Math.round(entry.bodyBattery);
+    return {
+      value: Math.max(1, Math.min(10, scaled)),
+      source: 'bodyBattery',
     };
   }
 
@@ -130,15 +152,31 @@ export function normalizeIntervalsWellness(entries: IntervalsWellnessEntry[]): N
 
     const normalized: NormalizedDailyWellness = { dateStr: entry.id };
 
-    if (typeof entry.hrv === 'number' && Number.isFinite(entry.hrv)) {
-      const vfc = Math.round(entry.hrv);
+    const rawHrv =
+      typeof entry.hrv === 'number' && Number.isFinite(entry.hrv) && entry.hrv > 0
+        ? entry.hrv
+        : typeof entry.hrvSDNN === 'number' && Number.isFinite(entry.hrvSDNN) && entry.hrvSDNN > 0
+        ? entry.hrvSDNN
+        : null;
+
+    if (rawHrv !== null) {
+      const vfc = Math.round(rawHrv);
       if (vfc >= 10 && vfc <= 300) {
         normalized.vfc = vfc;
       }
     }
 
-    if (typeof entry.restingHR === 'number' && Number.isFinite(entry.restingHR)) {
-      const hrRest = Math.round(entry.restingHR);
+    const rawHrRest =
+      typeof entry.restingHR === 'number' && Number.isFinite(entry.restingHR) && entry.restingHR > 0
+        ? entry.restingHR
+        : typeof entry.avgSleepingHR === 'number' &&
+          Number.isFinite(entry.avgSleepingHR) &&
+          entry.avgSleepingHR > 0
+        ? entry.avgSleepingHR
+        : null;
+
+    if (rawHrRest !== null) {
+      const hrRest = Math.round(rawHrRest);
       if (hrRest >= 30 && hrRest <= 150) {
         normalized.hrRest = hrRest;
       }
@@ -341,7 +379,8 @@ function estimateRpePair(
 export function classifyIntervalsActivity(
   activity: IntervalsActivityEntry,
   availableQualities: Quality[],
-  activeBlockFocus: string[] = []
+  activeBlockFocus: string[] = [],
+  learnedRules?: LearnedGarminRule[]
 ): PendingGarminActivity | null {
   if (!activity || !activity.id || !activity.start_date_local) return null;
 
@@ -371,17 +410,25 @@ export function classifyIntervalsActivity(
   let preferredQuality = sport === 'muscu' ? 'leg' : 'ef';
   let classificationReason = sport === 'muscu' ? 'Renforcement Garmin' : 'Endurance par défaut';
 
-  // 1. Priorité aux mots-clés explicites dans le titre Garmin
-  const matchedRule = KEYWORD_RULES.find((rule) =>
-    rule.keywords.some((kw) => {
-      if (kw.length <= 3) {
-        return new RegExp(`(^|\\b|\\s)${kw}($|\\b|\\s)`).test(normalizedTitle);
-      }
-      return normalizedTitle.includes(kw);
-    })
-  );
+  // 0. Priorité maximale : préférences apprises des validations précédentes de l'athlète
+  const learnedMatch = learnedRules ? matchLearnedGarminRule(title, sport, learnedRules) : null;
 
-  if (matchedRule) {
+  // 1. Mots-clés explicites dans le titre Garmin
+  const matchedRule = !learnedMatch
+    ? KEYWORD_RULES.find((rule) =>
+        rule.keywords.some((kw) => {
+          if (kw.length <= 3) {
+            return new RegExp(`(^|\\b|\\s)${kw}($|\\b|\\s)`).test(normalizedTitle);
+          }
+          return normalizedTitle.includes(kw);
+        })
+      )
+    : undefined;
+
+  if (learnedMatch) {
+    preferredQuality = learnedMatch.qualityId;
+    classificationReason = `Appris de vos validations (${learnedMatch.hits}×)`;
+  } else if (matchedRule) {
     preferredQuality = matchedRule.qualityId;
     classificationReason = matchedRule.label;
   } else if (sport === 'muscu') {
@@ -424,7 +471,7 @@ export function classifyIntervalsActivity(
     sport === 'muscu' ? 'force' : 'cardio'
   );
 
-  const { rpeCardio, rpeMusc } = estimateRpePair(
+  const estimatedRpe = estimateRpePair(
     activity,
     sport,
     suggestedQualityId,
@@ -432,6 +479,8 @@ export function classifyIntervalsActivity(
     ifRatio,
     hrZones
   );
+  const rpeCardio = learnedMatch ? learnedMatch.rpeCardio : estimatedRpe.rpeCardio;
+  const rpeMusc = learnedMatch ? learnedMatch.rpeMusc : estimatedRpe.rpeMusc;
 
   const distanceKm =
     typeof activity.distance === 'number' && Number.isFinite(activity.distance) && activity.distance >= 100
@@ -544,6 +593,8 @@ export function buildSessionFromGarminActivity(
               loadMusc: existingSession.loadMusc,
               sport: existingSession.sport,
               isEccentric: existingSession.isEccentric,
+              distanceKm: existingSession.distanceKm,
+              elevationGainM: existingSession.elevationGainM,
               notes: existingSession.notes,
             },
           ];
@@ -560,6 +611,8 @@ export function buildSessionFromGarminActivity(
       loadMusc,
       sport: activity.sport,
       isEccentric,
+      distanceKm: activity.distanceKm,
+      elevationGainM: activity.elevationGainM,
       notes,
     };
 
@@ -573,6 +626,12 @@ export function buildSessionFromGarminActivity(
     const totalLoadMusc = allSubs.reduce(
       (s, item) => s + (Number(item.loadMusc) || Number(item.load) || 0),
       0
+    );
+    const totalDistanceKm = Math.round(
+      allSubs.reduce((s, item) => s + (Number(item.distanceKm) || 0), 0) * 10
+    ) / 10;
+    const totalElevationGainM = Math.round(
+      allSubs.reduce((s, item) => s + (Number(item.elevationGainM) || 0), 0)
     );
 
     const weightedCardio =
@@ -600,6 +659,8 @@ export function buildSessionFromGarminActivity(
       load: totalLoad,
       loadCardio: totalLoadCardio,
       loadMusc: totalLoadMusc,
+      ...(totalDistanceKm > 0 ? { distanceKm: totalDistanceKm } : {}),
+      ...(totalElevationGainM > 0 ? { elevationGainM: totalElevationGainM } : {}),
       isSecondary: false,
       subSessions: allSubs,
       notes: existingSession.notes ? `${existingSession.notes} | ${notes}`.slice(0, 950) : notes,
@@ -620,6 +681,8 @@ export function buildSessionFromGarminActivity(
     loadMusc,
     sport: activity.sport,
     isEccentric,
+    ...(activity.distanceKm !== undefined ? { distanceKm: activity.distanceKm } : {}),
+    ...(activity.elevationGainM !== undefined ? { elevationGainM: activity.elevationGainM } : {}),
     isSecondary: false,
     notes,
     source: 'intervals_icu',

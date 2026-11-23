@@ -26,6 +26,8 @@ import type {
 } from '../utils/physiology';
 import type { Quality, EventsByQuality } from '../types';
 import type { DailyMetrics, PhysiologicalSettings } from '../hooks/useMetricsState';
+import { DualBanisterPanel } from './DualBanisterPanel';
+import type { DualBanisterResult, InterferenceAnalysis } from '../utils/hybridIntelligence';
 
 /** Séance agrégée affichée dans l'inspection d'un jour. */
 interface DaySession {
@@ -83,6 +85,8 @@ export interface PhysiologyDashboardProps {
   cardioMuscularBalance?: CardioMuscularBalance | null;
   intensityDistribution?: IntensityDistribution | null;
   perceivedFatigueAnalysis?: PerceivedFatigueAnalysis | null;
+  dualBanister?: DualBanisterResult | null;
+  interferenceAnalysis?: InterferenceAnalysis | null;
   isSimulationActive?: boolean;
   physioSettings?: PhysiologicalSettings | null;
   onOpenCompetitionModal?: (() => void) | null;
@@ -278,6 +282,8 @@ export default function PhysiologyDashboard({
   cardioMuscularBalance = null,
   intensityDistribution = null,
   perceivedFatigueAnalysis = null,
+  dualBanister = null,
+  interferenceAnalysis = null,
   isSimulationActive = false,
   physioSettings = null,
   onOpenCompetitionModal = null,
@@ -1432,8 +1438,8 @@ export default function PhysiologyDashboard({
         </div>
 
         {/* Graphique Banister PMC Recharts */}
-        <div className="h-[280px] sm:h-[320px] w-full relative">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[280px] sm:h-[320px] w-full min-w-0 relative">
+          <ResponsiveContainer width="100%" height={280} minWidth={0}>
             <ComposedChart 
               data={chartData} 
               margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -1607,8 +1613,8 @@ export default function PhysiologyDashboard({
             </div>
           </div>
 
-          <div className="h-[210px] sm:h-[240px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[210px] sm:h-[240px] w-full min-w-0 relative">
+            <ResponsiveContainer width="100%" height={210} minWidth={0}>
               <LineChart data={chartData} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="day" stroke="#94a3b8" tick={{ fontSize: 11, fill: '#94a3b8' }} minTickGap={20} tickLine={false} axisLine={false} />
@@ -1919,6 +1925,11 @@ export default function PhysiologyDashboard({
             )}
           </div>
         </section>
+      )}
+
+      {/* DUAL-BANISTER HYBRIDE & INTERFÉRENCES CONCURRENTES */}
+      {dualBanister && interferenceAnalysis && (
+        <DualBanisterPanel dualBanister={dualBanister} interference={interferenceAnalysis} />
       )}
 
       {/* CADRE MÉTHODOLOGIQUE */}

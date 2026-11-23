@@ -143,6 +143,14 @@ export function sanitizeSessionData(input: unknown): SessionData | null {
     safeSession.tonnageKg = Math.max(0, Math.round(rawSession.tonnageKg));
   }
 
+  if (typeof rawSession.distanceKm === 'number' && Number.isFinite(rawSession.distanceKm)) {
+    safeSession.distanceKm = Math.max(0, Math.min(2000, Math.round(rawSession.distanceKm * 10) / 10));
+  }
+
+  if (typeof rawSession.elevationGainM === 'number' && Number.isFinite(rawSession.elevationGainM)) {
+    safeSession.elevationGainM = Math.max(0, Math.min(30000, Math.round(rawSession.elevationGainM)));
+  }
+
   if (typeof rawSession.notes === 'string') {
     safeSession.notes = rawSession.notes.slice(0, 1000);
   }
@@ -262,6 +270,12 @@ export function sanitizeSessionData(input: unknown): SessionData | null {
         if (typeof sub.loadMusc === 'number' && Number.isFinite(sub.loadMusc)) item.loadMusc = Math.max(0, Math.round(sub.loadMusc));
         if (typeof sub.sport === 'string' && isSafeId(sub.sport)) item.sport = sub.sport.slice(0, 32);
         if (typeof sub.isEccentric === 'boolean') item.isEccentric = sub.isEccentric;
+        if (typeof sub.distanceKm === 'number' && Number.isFinite(sub.distanceKm)) {
+          item.distanceKm = Math.max(0, Math.min(2000, Math.round(sub.distanceKm * 10) / 10));
+        }
+        if (typeof sub.elevationGainM === 'number' && Number.isFinite(sub.elevationGainM)) {
+          item.elevationGainM = Math.max(0, Math.min(30000, Math.round(sub.elevationGainM)));
+        }
         if (typeof sub.notes === 'string') item.notes = sub.notes.slice(0, 500);
         return item;
       });
