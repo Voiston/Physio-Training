@@ -8,7 +8,9 @@ import SmartSuggestions from './components/SmartSuggestions';
 import { SimulationBanner } from './components/SimulationBanner';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { GarminInboxBanner } from './components/GarminInboxBanner';
 import { ToastProvider, useToast } from './components/Toast';
+import { useIntervalsSync } from './hooks/useIntervalsSync';
 import type { ScoreModalInfo } from './components/ScoreModal';
 import type { MetricModalInfo } from './components/MetricModal';
 import type { Quality, SessionData } from './types';
@@ -29,6 +31,7 @@ const TrainingReportModal = lazy(() => import('./components/TrainingReportModal'
 const PhysiologicalSettingsModal = lazy(() => import('./components/PhysiologicalSettingsModal').then(m => ({ default: m.PhysiologicalSettingsModal })));
 const LiveGymModal = lazy(() => import('./components/LiveGymModal').then(m => ({ default: m.LiveGymModal })));
 const CloudSyncModal = lazy(() => import('./components/CloudSyncModal').then(m => ({ default: m.CloudSyncModal })));
+const GarminSyncModal = lazy(() => import('./components/GarminSyncModal').then(m => ({ default: m.GarminSyncModal })));
 
 const ViewFallback = () => (
   <div className="w-full min-h-[380px] flex flex-col items-center justify-center p-8 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md animate-pulse">
@@ -46,12 +49,13 @@ import {
   FileUp, FileDown, Activity, Calendar, Zap, Shield, Plus, 
   FileText, Sparkles, Sliders, TrendingUp, Layers, Target,
   PanelLeftClose, PanelLeftOpen, BarChart3, Dumbbell, Cloud,
-  MoreVertical, X
+  MoreVertical, X, Watch
 } from 'lucide-react';
 
 function AppContent() {
   const { 
     events, 
+    rawEvents,
     qualities, 
     moveQuality,
     reorderQualities,
@@ -70,6 +74,10 @@ function AppContent() {
     qualitiesEMA, 
     saveEventWithImpacts, 
     saveDailyMetric, 
+    applyGarminWellnessBatch,
+    intervalsProcessedIds,
+    markIntervalsIdsProcessed,
+    clearIntervalsProcessedIds,
     exportData, 
     importData,
     // Compétition & Tapering
@@ -113,6 +121,34 @@ function AppContent() {
   const [showPhysioSettingsModal, setShowPhysioSettingsModal] = useState<boolean>(false);
   const [showLiveGymModal, setShowLiveGymModal] = useState<boolean>(false);
   const [showCloudSyncModal, setShowCloudSyncModal] = useState<boolean>(false);
+  const [showGarminSyncModal, setShowGarminSyncModal] = useState<boolean>(false);
+
+  // Synchronisation automatique Garmin via Intervals.icu (VFC/FC/Readiness auto + séances 1 clic)
+  const intervalsSync = useIntervalsSync({
+    currentUser: cloudSync.currentUser,
+    qualities,
+    rawEvents,
+    activeBlockToday,
+    intervalsProcessedIds,
+    markIntervalsIdsProcessed,
+    clearIntervalsProcessedIds,
+    saveEventWithImpacts,
+    applyGarminWellnessBatch,
+    isPaused: showLiveGymModal,
+    onAutoMetricsImported: (summary) => {
+      const parts: string[] = [];
+      if (summary.latestValues?.vfc !== undefined) parts.push(`VFC ${summary.latestValues.vfc} ms`);
+      if (summary.latestValues?.hrRest !== undefined) parts.push(`FC ${summary.latestValues.hrRest} bpm`);
+      if (summary.latestValues?.readiness !== undefined) parts.push(`Forme ${summary.latestValues.readiness}/10`);
+      showToast({
+        type: 'success',
+        title: 'Garmin synchronisé',
+        message: parts.length > 0
+          ? `${parts.join(' · ')} (${summary.updatedCount} mesure${summary.updatedCount > 1 ? 's' : ''})`
+          : `${summary.updatedCount} métrique${summary.updatedCount > 1 ? 's' : ''} matinale${summary.updatedCount > 1 ? 's' : ''} mise${summary.updatedCount > 1 ? 's' : ''} à jour.`,
+      });
+    },
+  });
   const [hasGymDraft, setHasGymDraft] = useState<boolean>(() => {
     try {
       return Boolean(localStorage.getItem('training_live_session_draft_v1'));
@@ -276,6 +312,37 @@ function AppContent() {
             {/* Bouton PWA Install */}
             <PWAInstallButton />
 
+            {/* Bouton Synchronisation Montre Garmin (via Intervals.icu) */}
+            <button
+              onClick={() => setShowGarminSyncModal(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer border whitespace-nowrap ${
+                intervalsSync.pendingActivities.length > 0
+                  ? 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40 text-amber-200'
+                  : intervalsSync.connectionState === 'ready'
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                  : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+              }`}
+              title="Import automatique Garmin (VFC, FC repos, Readiness & séances via Intervals.icu)"
+            >
+              <Watch
+                size={15}
+                className={
+                  intervalsSync.isSyncing
+                    ? 'animate-spin text-blue-400'
+                    : intervalsSync.pendingActivities.length > 0
+                    ? 'text-amber-400'
+                    : 'text-blue-400'
+                }
+                aria-hidden="true"
+              />
+              <span>Garmin</span>
+              {intervalsSync.pendingActivities.length > 0 && (
+                <span className="font-mono tabular-nums text-[11px] font-bold text-amber-300">
+                  ({intervalsSync.pendingActivities.length})
+                </span>
+              )}
+            </button>
+
             {/* Bouton Synchronisation Cloud Smartphone ↔ PC */}
             <button
               onClick={() => setShowCloudSyncModal(true)}
@@ -380,10 +447,31 @@ function AppContent() {
 
           {/* ACTIONS RAPIDES MOBILE (Compact, épuré, sans surcharge) */}
           <div className="flex md:hidden items-center gap-2">
+            {/* Synchronisation Garmin Mobile */}
+            <button
+              onClick={() => setShowGarminSyncModal(true)}
+              className={`min-w-[40px] min-h-[40px] p-2 rounded-xl border text-xs font-semibold touch-press cursor-pointer flex items-center justify-center gap-1 active:scale-90 transition-all ${
+                intervalsSync.pendingActivities.length > 0
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                  : intervalsSync.connectionState === 'ready'
+                  ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                  : 'bg-white/5 text-slate-300 border-white/10 active:bg-white/15'
+              }`}
+              aria-label="Synchronisation Garmin"
+              title="Synchronisation Garmin (Intervals.icu)"
+            >
+              <Watch size={16} className={intervalsSync.isSyncing ? 'animate-spin text-blue-400' : ''} aria-hidden="true" />
+              {intervalsSync.pendingActivities.length > 0 && (
+                <span className="font-mono tabular-nums text-[11px] font-bold">
+                  {intervalsSync.pendingActivities.length}
+                </span>
+              )}
+            </button>
+
             {/* Synchro Cloud Mobile */}
             <button
               onClick={() => setShowCloudSyncModal(true)}
-              className={`p-2 rounded-xl border text-xs font-semibold touch-press cursor-pointer flex items-center gap-1 active:scale-90 transition-all ${
+              className={`min-w-[40px] min-h-[40px] p-2 rounded-xl border text-xs font-semibold touch-press cursor-pointer flex items-center justify-center gap-1 active:scale-90 transition-all ${
                 cloudSync.syncStatus === 'synced'
                   ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
                   : cloudSync.syncStatus === 'syncing'
@@ -404,7 +492,7 @@ function AppContent() {
                 haptics.tap();
                 setShowMobileTools(prev => !prev);
               }}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 touch-press active:scale-90 active:bg-white/15 transition-all"
+              className="min-w-[40px] min-h-[40px] p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 touch-press active:scale-90 active:bg-white/15 transition-all inline-flex items-center justify-center"
               title="Outils et réglages"
             >
               <MoreVertical size={16} />
@@ -465,6 +553,25 @@ function AppContent() {
               </div>
 
               <div className="grid grid-cols-2 gap-2.5 pt-1">
+                {/* Synchronisation Garmin (Intervals.icu) */}
+                <button
+                  onClick={() => {
+                    setShowMobileTools(false);
+                    setShowGarminSyncModal(true);
+                  }}
+                  className="flex items-center gap-2 p-3 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 text-slate-200 touch-press active:scale-[0.96] active:bg-white/10 active:border-white/20 text-left"
+                >
+                  <Watch size={16} className="text-blue-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">Garmin Sync</div>
+                    <div className="text-[10px] text-slate-400">
+                      {intervalsSync.pendingActivities.length > 0
+                        ? `${intervalsSync.pendingActivities.length} séance(s) à valider`
+                        : 'Via Intervals.icu'}
+                    </div>
+                  </div>
+                </button>
+
                 {/* Simulation What-If */}
                 <button
                   onClick={() => {
@@ -893,6 +1000,45 @@ function AppContent() {
                 aria-label="Grille de planification et suggestions" 
                 className={`${mobileGridTab === 'grid' ? 'flex' : 'hidden'} xl:flex flex-1 min-w-0 flex-col gap-5`}
               >
+                {/* Boîte de réception 1 clic des séances Garmin (Intervals.icu) */}
+                <GarminInboxBanner
+                  pendingActivities={intervalsSync.pendingActivities}
+                  qualities={qualities}
+                  rawEvents={rawEvents}
+                  isSyncing={intervalsSync.isSyncing}
+                  onValidate={(activity, override) => {
+                    const result = intervalsSync.validateActivity(activity, override);
+                    const qName = qualities.find(q => q.id === result.qualityId)?.name || result.qualityId;
+                    showToast({
+                      type: 'success',
+                      title: result.wasMerged ? 'Sous-séance Garmin ajoutée' : 'Séance Garmin validée',
+                      message: `${qName} · ${activity.duration} min · Charge ${result.sessionData.load} UA`,
+                    });
+                  }}
+                  onValidateAll={(overridesMap) => {
+                    const count = intervalsSync.validateAllActivities(overridesMap);
+                    if (count > 0) {
+                      showToast({
+                        type: 'success',
+                        title: `${count} séances Garmin validées`,
+                        message: 'Grille et courbes Banister / EMA mises à jour.',
+                      });
+                    }
+                  }}
+                  onDismiss={(externalId) => {
+                    intervalsSync.dismissActivity(externalId);
+                    showToast({
+                      type: 'info',
+                      title: 'Activité ignorée',
+                      message: 'Vous pouvez la réafficher depuis Réglages Garmin si besoin.',
+                    });
+                  }}
+                  onRefresh={() => {
+                    intervalsSync.syncNow(14, { silent: false });
+                  }}
+                  onOpenModal={() => setShowGarminSyncModal(true)}
+                />
+
                 {/* Suggestions & Priorités d'entraînement algorithmiques */}
                 <SmartSuggestions 
                   recommendations={trainingRecommendations}
@@ -1240,6 +1386,72 @@ function AppContent() {
               type: 'info',
               title: 'Synchronisation Débloquée',
               message: 'L\'état de synchronisation a été débloqué et réinitialisé.'
+            });
+          }}
+        />
+      )}
+      {/* Modal Synchronisation Garmin via Intervals.icu */}
+      {showGarminSyncModal && (
+        <GarminSyncModal
+          isOpen={showGarminSyncModal}
+          onClose={() => setShowGarminSyncModal(false)}
+          connectionState={intervalsSync.connectionState}
+          isConfigured={intervalsSync.isConfigured}
+          isSyncing={intervalsSync.isSyncing}
+          athleteName={intervalsSync.athleteName}
+          lastSyncedAt={intervalsSync.lastSyncedAt}
+          lastMetricsSummary={intervalsSync.lastMetricsSummary}
+          error={intervalsSync.error}
+          pendingActivities={intervalsSync.pendingActivities}
+          processedCount={intervalsSync.processedCount}
+          userAccount={cloudSync.userAccount}
+          onLoginWithGoogle={cloudSync.loginWithGoogle}
+          onCheckStatus={() => {
+            intervalsSync.checkStatus().then((res) => {
+              if (res.configured && res.connected) {
+                showToast({
+                  type: 'success',
+                  title: 'Passerelle Garmin connectée',
+                  message: 'Synchronisation automatique activée.',
+                });
+                intervalsSync.syncNow(14, { silent: false });
+              } else if (!res.configured) {
+                showToast({
+                  type: 'info',
+                  title: 'Clé serveur non détectée',
+                  message: 'Ajoutez INTERVALS_ICU_API_KEY dans Settings → Secrets puis réessayez.',
+                });
+              }
+            });
+          }}
+          onSyncNow={(days) => {
+            intervalsSync.syncNow(days, { silent: false }).then((res) => {
+              if (res.ok && res.metricsUpdated === 0) {
+                showToast({
+                  type: 'info',
+                  title: 'Synchronisation Garmin terminée',
+                  message: 'Vos données des derniers jours sont déjà à jour.',
+                });
+              }
+            });
+          }}
+          onValidateAll={() => {
+            const count = intervalsSync.validateAllActivities();
+            if (count > 0) {
+              showToast({
+                type: 'success',
+                title: `${count} séance${count > 1 ? 's' : ''} Garmin validée${count > 1 ? 's' : ''}`,
+                message: 'Grille et courbes Banister / EMA mises à jour.',
+              });
+            }
+          }}
+          onRestoreDismissed={() => {
+            intervalsSync.restoreDismissedActivities().then(() => {
+              showToast({
+                type: 'info',
+                title: 'Historique réinitialisé',
+                message: 'Les activités Garmin récentes ont été rechargées.',
+              });
             });
           }}
         />

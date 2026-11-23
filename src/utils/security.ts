@@ -151,6 +151,10 @@ export function sanitizeSessionData(input: unknown): SessionData | null {
     safeSession.source = rawSession.source.slice(0, 64);
   }
 
+  if (typeof rawSession.externalId === 'string') {
+    safeSession.externalId = rawSession.externalId.slice(0, 64);
+  }
+
   if (typeof rawSession.completedAt === 'string') {
     safeSession.completedAt = rawSession.completedAt.slice(0, 64);
   }
@@ -370,6 +374,26 @@ export function sanitizeTombstonesPayload(raw: unknown): Record<string, number> 
   }
 
   return Object.assign({}, result);
+}
+
+/**
+ * Assainit la liste des identifiants d'activités Intervals.icu déjà traités (validés ou ignorés).
+ * Plafonné aux 500 identifiants les plus récents pour maîtriser le volume Firestore.
+ */
+export function sanitizeIntervalsIdsPayload(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const clean: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string' && typeof item !== 'number') continue;
+    const str = String(item).trim();
+    if (!str || str.length > 64 || !/^[a-zA-Z0-9_.\-:]+$/.test(str)) continue;
+    if (!seen.has(str)) {
+      seen.add(str);
+      clean.push(str);
+    }
+  }
+  return clean.slice(-500);
 }
 
 /**
@@ -798,6 +822,14 @@ export function validateAndStageImportPayload(importedRaw: unknown): StagedImpor
       const safeTombstones = sanitizeTombstonesPayload(imported.tombstones);
       if (Object.keys(safeTombstones).length > 0) {
         entriesToSet.set('physio_tombstones', JSON.stringify(safeTombstones));
+      }
+    }
+
+    // 9b. Validation de l'historique de déduplication Garmin / Intervals.icu
+    if (Array.isArray(imported.intervalsProcessedIds)) {
+      const safeIds = sanitizeIntervalsIdsPayload(imported.intervalsProcessedIds);
+      if (safeIds.length > 0) {
+        entriesToSet.set('physio_intervals_processed_ids', JSON.stringify(safeIds));
       }
     }
 

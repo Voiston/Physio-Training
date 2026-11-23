@@ -35,6 +35,7 @@ import {
   sanitizeEventsPayload, 
   sanitizeDailyMetricsPayload,
   sanitizeTombstonesPayload,
+  sanitizeIntervalsIdsPayload,
   getSavedTombstones,
   saveTombstone,
   removeTombstone,
@@ -134,6 +135,19 @@ export function useData() {
   useEffect(() => {
     tombstonesRef.current = tombstones;
   }, [tombstones]);
+
+  // Historique dédupliqué des activités Garmin / Intervals.icu déjà validées ou ignorées
+  const [intervalsProcessedIds, setIntervalsProcessedIds] = usePersistentState<string[]>(
+    'physio_intervals_processed_ids',
+    () => {
+      try {
+        const raw = localStorage.getItem('physio_intervals_processed_ids');
+        return raw ? sanitizeIntervalsIdsPayload(JSON.parse(raw)) : [];
+      } catch {
+        return [];
+      }
+    }
+  );
 
   const [qualities, setQualitiesState] = usePersistentState<Quality[]>('physio_qualities', () => {
     try {
@@ -267,6 +281,7 @@ export function useData() {
     dailyMetrics,
     setDailyMetrics,
     saveDailyMetric,
+    applyGarminWellnessBatch,
     physioSettings,
     setPhysioSettingsState,
     savePhysioSettings,
@@ -280,6 +295,17 @@ export function useData() {
     intensityDistribution,
     perceivedFatigueAnalysis
   } = useMetricsState(effectiveEvents, qualities, isSimulationActive, { onPushSync: triggerSyncPush });
+
+  const markIntervalsIdsProcessed = useCallback((ids: string[]) => {
+    if (!ids.length) return;
+    setIntervalsProcessedIds(prev => sanitizeIntervalsIdsPayload([...prev, ...ids]));
+    triggerSyncPush();
+  }, [setIntervalsProcessedIds, triggerSyncPush]);
+
+  const clearIntervalsProcessedIds = useCallback(() => {
+    setIntervalsProcessedIds([]);
+    triggerSyncPush();
+  }, [setIntervalsProcessedIds, triggerSyncPush]);
 
 
   // Callback de purge et réinitialisation atomique des états React (appelé au logout)
@@ -302,7 +328,10 @@ export function useData() {
     setSimulatedEvents({});
     setTombstones({});
     localStorage.removeItem('physio_tombstones');
-  }, []);
+    setIntervalsProcessedIds([]);
+    localStorage.removeItem('physio_intervals_processed_ids');
+    localStorage.removeItem('physio_intervals_auto_metrics');
+  }, [setIntervalsProcessedIds]);
 
   const onRemoteDataReceived = useCallback((remoteData: unknown) => {
     if (!remoteData) return;
@@ -413,10 +442,17 @@ export function useData() {
         const val = stagedEntries.get('physio_custom_exercises')!;
         localStorage.setItem('physio_custom_exercises', val);
       }
+
+      if (Array.isArray(imported.intervalsProcessedIds)) {
+        const remoteIds = sanitizeIntervalsIdsPayload(imported.intervalsProcessedIds);
+        if (remoteIds.length > 0) {
+          setIntervalsProcessedIds(prev => sanitizeIntervalsIdsPayload([...prev, ...remoteIds]));
+        }
+      }
     } catch (e) {
       console.error('[Cloud Sync] Error applying remote data:', e);
     }
-  }, [triggerSyncPush]);
+  }, [triggerSyncPush, setIntervalsProcessedIds]);
 
   const getExportableData = useCallback(() => {
     return {
@@ -430,9 +466,10 @@ export function useData() {
       physioSettings,
       customExercises: getSavedCustomExercises(),
       tombstones,
+      intervalsProcessedIds,
       updatedAt: new Date().toISOString(),
     };
-  }, [events, dailyMetrics, trainingBlocks, qualities, blockTemplates, targetCompetition, physioSettings, tombstones]);
+  }, [events, dailyMetrics, trainingBlocks, qualities, blockTemplates, targetCompetition, physioSettings, tombstones, intervalsProcessedIds]);
 
   const cloudSync = useCloudSync({
     onRemoteDataReceived,
@@ -563,6 +600,7 @@ export function useData() {
       physioSettings,
       customExercises: getSavedCustomExercises(),
       tombstones,
+      intervalsProcessedIds,
       exportDate: new Date().toISOString() 
     };
     // Export compact sans indentation inutile : divise le volume par deux et garantit une réimportation fluide
@@ -723,6 +761,10 @@ export function useData() {
     saveEvent, 
     saveEventWithImpacts, 
     saveDailyMetric, 
+    applyGarminWellnessBatch,
+    intervalsProcessedIds,
+    markIntervalsIdsProcessed,
+    clearIntervalsProcessedIds,
     exportData, 
     importData,
     // Constantes physiologiques

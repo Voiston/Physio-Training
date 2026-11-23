@@ -86,6 +86,8 @@ export interface SessionData {
   updatedAt?: number;
   notes?: string;
   type?: string;
+  source?: string;
+  externalId?: string;
 }
 
 export interface QualityEMASeriesPoint {

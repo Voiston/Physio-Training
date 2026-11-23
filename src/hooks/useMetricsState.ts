@@ -119,10 +119,44 @@ export function useMetricsState(
     onPushSync?.();
   };
 
-  const saveDailyMetric = (dateStr: string, type: 'readiness' | 'vfc' | string, score: string | number | null) => {
+  const AUTO_METRICS_KEY = 'physio_intervals_auto_metrics';
+
+  const readAutoMetricKeys = (): Set<string> => {
+    try {
+      const raw = localStorage.getItem(AUTO_METRICS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return new Set(parsed.filter((k): k is string => typeof k === 'string'));
+        }
+      }
+    } catch {
+      // Ignore corrupted local marker
+    }
+    return new Set();
+  };
+
+  const writeAutoMetricKeys = (keys: Set<string>) => {
+    try {
+      localStorage.setItem(AUTO_METRICS_KEY, JSON.stringify(Array.from(keys).slice(-600)));
+    } catch {
+      // Ignore quota errors
+    }
+  };
+
+  const saveDailyMetric = (
+    dateStr: string,
+    type: 'readiness' | 'vfc' | 'hrRest' | string,
+    score: string | number | null,
+    saveOptions?: { source?: 'manual' | 'garmin' }
+  ) => {
     const key = `${dateStr}_${type}`;
+    const autoKeys = readAutoMetricKeys();
+
     if (score === null || score === undefined || score === '') {
       localStorage.removeItem(key);
+      autoKeys.delete(key);
+      writeAutoMetricKeys(autoKeys);
       setDailyMetrics(prev => {
         const updated = { ...prev, [dateStr]: { ...prev[dateStr] } };
         if (updated[dateStr]) delete updated[dateStr][type];
@@ -131,12 +165,95 @@ export function useMetricsState(
     } else {
       const numVal = parseInt(String(score), 10);
       localStorage.setItem(key, String(numVal));
+      if (saveOptions?.source === 'garmin') {
+        autoKeys.add(key);
+      } else {
+        // Une saisie manuelle protège définitivement cette cellule contre les futurs imports auto Garmin
+        autoKeys.delete(key);
+      }
+      writeAutoMetricKeys(autoKeys);
       setDailyMetrics(prev => ({ 
         ...prev, 
         [dateStr]: { ...prev[dateStr], [type]: numVal } 
       }));
     }
     onPushSync?.();
+  };
+
+  /**
+   * Import silencieux et non destructif d'un lot de métriques quotidiennes Garmin / Intervals.icu.
+   * Ne modifie jamais une valeur déjà saisie manuellement par l'utilisateur.
+   */
+  const applyGarminWellnessBatch = (
+    entries: Array<{ dateStr: string; vfc?: number; hrRest?: number; readiness?: number }>
+  ): {
+    updatedCount: number;
+    latestDate?: string;
+    latestValues?: { vfc?: number; hrRest?: number; readiness?: number };
+  } => {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return { updatedCount: 0 };
+    }
+
+    const autoKeys = readAutoMetricKeys();
+    const updatesToApply: Array<{ dateStr: string; metric: 'vfc' | 'hrRest' | 'readiness'; value: number }> = [];
+
+    for (const entry of entries) {
+      const existingDay = dailyMetrics[entry.dateStr] || {};
+      const fields: Array<['vfc' | 'hrRest' | 'readiness', number | undefined]> = [
+        ['vfc', entry.vfc],
+        ['hrRest', entry.hrRest],
+        ['readiness', entry.readiness],
+      ];
+
+      for (const [metric, incomingVal] of fields) {
+        if (incomingVal === undefined || !Number.isFinite(incomingVal)) continue;
+        const storageKey = `${entry.dateStr}_${metric}`;
+        const currentVal = existingDay[metric];
+        const canOverwrite = currentVal === undefined || autoKeys.has(storageKey);
+
+        if (canOverwrite && currentVal !== incomingVal) {
+          updatesToApply.push({ dateStr: entry.dateStr, metric, value: incomingVal });
+          autoKeys.add(storageKey);
+        }
+      }
+    }
+
+    if (updatesToApply.length === 0) {
+      return { updatedCount: 0 };
+    }
+
+    // Persister en localStorage et mettre à jour React en un seul lot atomique
+    updatesToApply.forEach(({ dateStr, metric, value }) => {
+      localStorage.setItem(`${dateStr}_${metric}`, String(value));
+    });
+    writeAutoMetricKeys(autoKeys);
+
+    setDailyMetrics(prev => {
+      const next = { ...prev };
+      updatesToApply.forEach(({ dateStr, metric, value }) => {
+        next[dateStr] = { ...(next[dateStr] || {}), [metric]: value };
+      });
+      return next;
+    });
+
+    onPushSync?.();
+
+    const sortedDates = Array.from(new Set(updatesToApply.map(u => u.dateStr))).sort();
+    const latestDate = sortedDates[sortedDates.length - 1];
+    const latestEntry = entries.find(e => e.dateStr === latestDate);
+
+    return {
+      updatedCount: updatesToApply.length,
+      latestDate,
+      latestValues: latestEntry
+        ? {
+            vfc: latestEntry.vfc,
+            hrRest: latestEntry.hrRest,
+            readiness: latestEntry.readiness,
+          }
+        : undefined,
+    };
   };
 
   // Modèle Banister prédictif
@@ -198,6 +315,7 @@ export function useMetricsState(
     dailyMetrics,
     setDailyMetrics,
     saveDailyMetric,
+    applyGarminWellnessBatch,
     physioSettings,
     setPhysioSettingsState,
     savePhysioSettings,
