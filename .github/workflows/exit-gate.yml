@@ -18,12 +18,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then
-            npm ci
+            npm ci || {
+              echo "::warning::package-lock.json désynchronisé avec package.json, repli vers npm install..."
+              npm install --no-audit --no-fund
+            }
           else
             npm install --no-audit --no-fund
           fi
